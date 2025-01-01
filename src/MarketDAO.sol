@@ -3,17 +3,17 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
 
 contract MarketDAO is ERC1155 {
-    using Counters for Counters.Counter;
-
     // Constants
     uint256 public constant GOVERNANCE_TOKEN_ID = 0;
     
     // Counters
-    Counters.Counter private _electionIds;
-    Counters.Counter private _proposalIds;
+    uint256 private _nextElectionId;
+    uint256 private _nextProposalId;
+
+    // Total supply tracking
+    mapping(uint256 => uint256) private _totalSupply;
 
     // DAO Parameters
     string public name;
@@ -72,6 +72,21 @@ contract MarketDAO is ERC1155 {
         electionDuration = _electionDuration;
     }
 
+    function totalSupply(uint256 id) public view returns (uint256) {
+        return _totalSupply[id];
+    }
+
+    // Testing functions - these would be replaced with proper access control in production
+    function mint(address account, uint256 id, uint256 amount) public {
+        _mint(account, id, amount, "");
+        _totalSupply[id] += amount;
+    }
+
+    function burn(address account, uint256 id, uint256 amount) public {
+        _burn(account, id, amount);
+        _totalSupply[id] -= amount;
+    }
+
     function createProposal(
         string calldata _description,
         address _tokenRecipient,
@@ -88,8 +103,7 @@ contract MarketDAO is ERC1155 {
             require(_tokenRecipient == address(0), "Token recipient should be zero for text proposals");
         }
         
-        uint256 newProposalId = _proposalIds.current();
-        _proposalIds.increment();
+        uint256 newProposalId = _nextProposalId++;
 
         Proposal storage newProposal = proposals[newProposalId];
         newProposal.id = newProposalId;
@@ -120,17 +134,18 @@ contract MarketDAO is ERC1155 {
     }
 
     function _shouldCreateElection(Proposal storage proposal) internal view returns (bool) {
-        uint256 totalSupply = totalSupply(GOVERNANCE_TOKEN_ID);
-        return (proposal.supportCount * 100) / totalSupply >= supportThreshold;
+        uint256 supply = totalSupply(GOVERNANCE_TOKEN_ID);
+        return (proposal.supportCount * 100) / supply >= supportThreshold;
     }
 
     function _createElection(uint256 _proposalId) internal {
-        uint256 newElectionId = _electionIds.current();
-        _electionIds.increment();
-
+        uint256 newElectionId = _nextElectionId++;
+        uint256 newVotingTokenId = _nextElectionId;  // Use the next election ID as the voting token ID
+        
         Election storage newElection = elections[newElectionId];
         newElection.id = newElectionId;
         newElection.proposalId = _proposalId;
+        newElection.votingTokenId = newVotingTokenId;
         newElection.startTime = block.timestamp + electionDelay;
         newElection.endTime = newElection.startTime + electionDuration;
         
@@ -138,16 +153,13 @@ contract MarketDAO is ERC1155 {
         // Note: In production we'd want to use CREATE2 or a more sophisticated method
         newElection.yesAddress = address(uint160(uint256(keccak256(abi.encodePacked("yes", newElectionId)))));
         newElection.noAddress = address(uint160(uint256(keccak256(abi.encodePacked("no", newElectionId)))));
-        
-        newElection.votingTokenId = _electionIds.current() + 1;
-        _electionIds.increment();
 
         // Distribute voting tokens to all governance token holders
         address[] memory holders = _getGovernanceTokenHolders(); // This needs to be implemented
         for (uint i = 0; i < holders.length; i++) {
             uint256 governanceBalance = balanceOf(holders[i], GOVERNANCE_TOKEN_ID);
             if (governanceBalance > 0) {
-                _mint(holders[i], votingTokenId, governanceBalance, "");
+                _mint(holders[i], newElection.votingTokenId, governanceBalance, "");
                 newElection.votingTokensIssued[holders[i]] = governanceBalance;
             }
         }
@@ -160,9 +172,8 @@ contract MarketDAO is ERC1155 {
         require(!election.executed, "Election already executed");
         require(block.timestamp > election.endTime, "Election still ongoing");
         
-        uint256 votingTokenId = election.votingTokenId;
-        uint256 yesVotes = balanceOf(election.yesAddress, votingTokenId);
-        uint256 noVotes = balanceOf(election.noAddress, votingTokenId);
+        uint256 yesVotes = balanceOf(election.yesAddress, election.votingTokenId);
+        uint256 noVotes = balanceOf(election.noAddress, election.votingTokenId);
         uint256 totalVotes = yesVotes + noVotes;
         
         // Check quorum
@@ -184,9 +195,9 @@ contract MarketDAO is ERC1155 {
         address[] memory holders = _getGovernanceTokenHolders(); // Need to implement this
         for (uint i = 0; i < holders.length; i++) {
             if (holders[i] != election.yesAddress && holders[i] != election.noAddress) {
-                uint256 balance = balanceOf(holders[i], votingTokenId);
+                uint256 balance = balanceOf(holders[i], election.votingTokenId);
                 if (balance > 0) {
-                    _burn(holders[i], votingTokenId, balance);
+                    _burn(holders[i], election.votingTokenId, balance);
                 }
             }
         }

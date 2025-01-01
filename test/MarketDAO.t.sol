@@ -38,9 +38,9 @@ contract MarketDAOTest is Test {
         );
 
         // Mint some initial governance tokens
-        dao._mint(user1, 0, 100, ""); // 100 governance tokens to user1
-        dao._mint(user2, 0, 50, "");  // 50 governance tokens to user2
-        dao._mint(user3, 0, 50, "");  // 50 governance tokens to user3
+        dao.mint(user1, 0, 100); // 100 governance tokens to user1
+        dao.mint(user2, 0, 50);  // 50 governance tokens to user2
+        dao.mint(user3, 0, 50);  // 50 governance tokens to user3
     }
 
     function testInitialSetup() public {
