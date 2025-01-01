@@ -240,16 +240,17 @@ contract MarketDAO is ERC1155 {
         uint256 yesVotes = balanceOf(election.yesAddress, election.votingTokenId);
         uint256 noVotes = balanceOf(election.noAddress, election.votingTokenId);
         uint256 totalVotes = yesVotes + noVotes;
-        
-        // Check quorum
         uint256 totalPossibleVotes = totalSupply(GOVERNANCE_TOKEN_ID);
-        require((totalVotes * 100) / totalPossibleVotes >= quorumPercentage, "Quorum not reached");
         
         // Mark as executed
         election.executed = true;
+
+        // Calculate quorum and result
+        bool hasQuorum = (totalVotes * 100) / totalPossibleVotes >= quorumPercentage;
+        bool passed = hasQuorum && yesVotes > noVotes;
         
-        // If this is a token proposal, mint tokens if passed
-        if (yesVotes > noVotes) {
+        // If both quorum met and yes wins, implement the proposal
+        if (passed) {
             Proposal storage proposal = proposals[election.proposalId];
             if (proposal.tokenAmount > 0) {
                 _mint(proposal.tokenRecipient, GOVERNANCE_TOKEN_ID, proposal.tokenAmount, "");
@@ -257,7 +258,7 @@ contract MarketDAO is ERC1155 {
         }
         
         // Zero out all voting tokens except those at yes/no addresses
-        address[] memory holders = _getGovernanceTokenHolders(); // Need to implement this
+        address[] memory holders = _getGovernanceTokenHolders();
         for (uint i = 0; i < holders.length; i++) {
             if (holders[i] != election.yesAddress && holders[i] != election.noAddress) {
                 uint256 balance = balanceOf(holders[i], election.votingTokenId);
@@ -267,9 +268,8 @@ contract MarketDAO is ERC1155 {
             }
         }
         
-        emit ElectionExecuted(_electionId, yesVotes > noVotes);
+        emit ElectionExecuted(_electionId, passed);
     }
-    
     function _getGovernanceTokenHolders() internal view returns (address[] memory) {
         return _governanceHoldersList;
     }
