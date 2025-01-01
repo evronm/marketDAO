@@ -43,6 +43,7 @@ contract MarketDAOTest is Test {
         dao.mint(user3, 0, 50);  // 50 governance tokens to user3
     }
 
+    // Basic Setup Tests
     function testInitialSetup() public {
         assertEq(dao.name(), DAO_NAME);
         assertEq(dao.supportThreshold(), SUPPORT_THRESHOLD);
@@ -54,18 +55,18 @@ contract MarketDAOTest is Test {
         assertEq(dao.balanceOf(user1, 0), 100);
         assertEq(dao.balanceOf(user2, 0), 50);
         assertEq(dao.balanceOf(user3, 0), 50);
+        assertEq(dao.totalSupply(0), 200);
     }
 
+    // Proposal Creation Tests
     function testCreateTextProposal() public {
-        vm.startPrank(user1);
-        
+        vm.prank(user1);
         uint256 proposalId = dao.createProposal(
             "Test Proposal",
             address(0),
             0
         );
         
-        // Check proposal was created correctly
         (
             uint256 id,
             address proposer,
@@ -83,28 +84,24 @@ contract MarketDAOTest is Test {
         assertEq(tokenAmount, 0);
         assertEq(supportCount, 0);
         assertEq(executed, false);
-        
-        vm.stopPrank();
     }
 
     function testCreateTokenProposal() public {
-        vm.startPrank(user1);
-        
+        vm.prank(user1);
         uint256 proposalId = dao.createProposal(
             "Token Award",
             user2,
             100
         );
         
-        // Check proposal was created correctly
         (
             uint256 id,
             address proposer,
             string memory description,
             address tokenRecipient,
             uint256 tokenAmount,
-            uint256 supportCount,
-            bool executed
+            ,
+            
         ) = dao.proposals(proposalId);
         
         assertEq(id, proposalId);
@@ -112,43 +109,154 @@ contract MarketDAOTest is Test {
         assertEq(description, "Token Award");
         assertEq(tokenRecipient, user2);
         assertEq(tokenAmount, 100);
-        assertEq(supportCount, 0);
-        assertEq(executed, false);
-        
-        vm.stopPrank();
     }
 
+    // Support and Election Creation Tests
     function testProposalSupport() public {
-        // Create proposal
         vm.prank(user1);
         uint256 proposalId = dao.createProposal("Test Proposal", address(0), 0);
         
-        // Support proposal with user2
         vm.prank(user2);
         dao.supportProposal(proposalId);
         
-        // Check support count increased by user2's token amount
-        (,,,,, uint256 supportCount,) = dao.proposals(proposalId);
+        (, , , , , uint256 supportCount, ) = dao.proposals(proposalId);
         assertEq(supportCount, 50); // user2 has 50 tokens
     }
 
-    function testProposalToElection() public {
-        // Create proposal
+    function testElectionCreation() public {
+        // Create and support proposal
         vm.prank(user1);
         uint256 proposalId = dao.createProposal("Test Proposal", address(0), 0);
         
-        // Support proposal with user1 (100 tokens) and user2 (50 tokens)
+        // Support with enough tokens to trigger election
+        vm.prank(user1); // 100 tokens
+        dao.supportProposal(proposalId);
+        vm.prank(user2); // 50 more tokens = 150 total > 51% of 200
+        dao.supportProposal(proposalId);
+        
+        // Get election state
+        (
+            uint256 id,
+            uint256 eProposalId,
+            uint256 votingTokenId,
+            uint256 startTime,
+            uint256 endTime,
+            address yesAddress,
+            address noAddress,
+            bool executed,
+            uint256 yesVotes,
+            uint256 noVotes
+        ) = dao.getElectionState(0); // First election should be ID 0
+        
+        // Verify election was created correctly
+        assertEq(eProposalId, proposalId);
+        assertFalse(executed);
+        assertEq(startTime, block.timestamp + ELECTION_DELAY);
+        assertEq(endTime, startTime + ELECTION_DURATION);
+        assertNotEq(yesAddress, address(0));
+        assertNotEq(noAddress, address(0));
+        assertEq(yesVotes, 0);
+        assertEq(noVotes, 0);
+        
+        // Verify voting tokens were distributed
+        assertEq(dao.getVotingTokenBalance(0, user1), 100);
+        assertEq(dao.getVotingTokenBalance(0, user2), 50);
+        assertEq(dao.getVotingTokenBalance(0, user3), 50);
+    }
+
+    // Election Voting Tests
+    function testVotingPeriod() public {
+        // Create and support proposal
+        vm.prank(user1);
+        uint256 proposalId = dao.createProposal("Test Proposal", address(0), 0);
+        
         vm.prank(user1);
         dao.supportProposal(proposalId);
         vm.prank(user2);
         dao.supportProposal(proposalId);
         
-        // Total support: 150 tokens out of 200 total = 75% > SUPPORT_THRESHOLD
-        // This should have triggered election creation
+        // Election should not be ongoing before delay
+        assertFalse(dao.isOngoing(0));
         
-        // TODO: Add checks for election creation once we implement election query functions
+        // Move time to after election start
+        vm.warp(block.timestamp + ELECTION_DELAY + 1);
+        
+        // Election should now be ongoing
+        assertTrue(dao.isOngoing(0));
+        
+        // Get election info to find yes/no addresses and voting token ID
+        (,, uint256 votingTokenId,,, address yesAddress, address noAddress,,uint256 yesVotes, uint256 noVotes) = 
+            dao.getElectionState(0);
+        
+        // Check initial voting token distribution
+        assertEq(dao.getVotingTokenBalance(0, user1), 100);
+        assertEq(dao.getVotingTokenBalance(0, user2), 50);
+        
+        // Transfer voting tokens to yes/no addresses using the correct token ID
+        vm.startPrank(user1);
+        dao.safeTransferFrom(user1, yesAddress, votingTokenId, 60, "");
+        dao.safeTransferFrom(user1, noAddress, votingTokenId, 40, "");
+        vm.stopPrank();
+        
+        vm.prank(user2);
+        dao.safeTransferFrom(user2, yesAddress, votingTokenId, 50, "");
+        
+        // Verify vote counts
+        (,,,,,,,,uint256 newYesVotes, uint256 newNoVotes) = dao.getElectionState(0);
+        assertEq(newYesVotes, 110);
+        assertEq(newNoVotes, 40);
+        
+        // Check quorum
+        assertTrue(dao.hasQuorum(0));
     }
 
+    // Election Execution Tests
+    function testElectionExecution() public {
+        // Create and support token proposal
+        vm.prank(user1);
+        uint256 proposalId = dao.createProposal("Token Award", user3, 100);
+        
+        vm.prank(user1);
+        dao.supportProposal(proposalId);
+        vm.prank(user2);
+        dao.supportProposal(proposalId);
+        
+        // Move time to after election start
+        vm.warp(block.timestamp + ELECTION_DELAY + 1);
+        
+        // Get election info to find yes/no addresses and voting token ID
+        (,, uint256 votingTokenId,,, address yesAddress, address noAddress,,,) = dao.getElectionState(0);
+        
+        // Vote with all tokens to ensure quorum (200 total tokens, need 40% = 80 tokens)
+        vm.prank(user1);
+        dao.safeTransferFrom(user1, yesAddress, votingTokenId, 100, "");
+        vm.prank(user2);
+        dao.safeTransferFrom(user2, noAddress, votingTokenId, 50, "");
+        vm.prank(user3);
+        dao.safeTransferFrom(user3, yesAddress, votingTokenId, 50, "");
+        
+        // Move time to after election
+        vm.warp(block.timestamp + ELECTION_DURATION + 1);
+        
+        // Execute election
+        dao.executeElection(0);
+        
+        // Verify execution
+        (,,,,,,,bool executed, uint256 yesVotes, uint256 noVotes) = dao.getElectionState(0);
+        assertTrue(executed);
+        assertEq(yesVotes, 150);
+        assertEq(noVotes, 50);
+        
+        // Verify token award was processed
+        assertEq(dao.balanceOf(user3, 0), 150); // Original 50 + 100 awarded
+        
+        // Verify voting tokens were burned except at yes/no addresses
+        assertEq(dao.getVotingTokenBalance(0, user1), 0);
+        assertEq(dao.getVotingTokenBalance(0, user2), 0);
+        assertEq(dao.getVotingTokenBalance(0, user3), 0);
+    }
+
+    // Failure Cases
     function testFailCreateProposalWithoutTokens() public {
         address noTokenUser = makeAddr("noTokenUser");
         vm.prank(noTokenUser);
@@ -165,11 +273,155 @@ contract MarketDAOTest is Test {
         dao.createProposal("", address(0), 100); // Should fail due to missing recipient
     }
 
-    // Additional tests to be added:
-    // - Election creation and token distribution
-    // - Voting mechanism
-    // - Election execution
-    // - Token transfers during voting period
-    // - Quorum requirements
-    // - Edge cases and failure modes
+    function testFailDoubleSupportProposal() public {
+        vm.prank(user1);
+        uint256 proposalId = dao.createProposal("Test Proposal", address(0), 0);
+        
+        vm.prank(user2);
+        dao.supportProposal(proposalId);
+        
+        vm.prank(user2);
+        dao.supportProposal(proposalId); // Should fail
+    }
+
+    // Timing Tests
+    function testElectionTiming() public {
+        // Create and support proposal
+        vm.prank(user1);
+        uint256 proposalId = dao.createProposal("Test Proposal", address(0), 0);
+        
+        vm.prank(user1);
+        dao.supportProposal(proposalId);
+        vm.prank(user2);
+        dao.supportProposal(proposalId);
+        
+        // Test at different times
+        vm.warp(block.timestamp + ELECTION_DELAY - 1); // Just before start
+        assertFalse(dao.isOngoing(0));
+        
+        vm.warp(block.timestamp + 2); // Just after start
+        assertTrue(dao.isOngoing(0));
+        
+        vm.warp(block.timestamp + ELECTION_DURATION - 1); // Just before end
+        assertTrue(dao.isOngoing(0));
+        
+        vm.warp(block.timestamp + 2); // Just after end
+        assertFalse(dao.isOngoing(0));
+        
+        // Try to execute before end should fail
+        vm.warp(block.timestamp - ELECTION_DURATION); // Back during election
+        vm.expectRevert("Election still ongoing");
+        dao.executeElection(0);
+    }
+
+    // Multiple Elections Tests
+    function testMultipleElections() public {
+        // Create first proposal and election
+        vm.prank(user1);
+        uint256 proposalId1 = dao.createProposal("Proposal 1", address(0), 0);
+        vm.prank(user1);
+        dao.supportProposal(proposalId1);
+        vm.prank(user2);
+        dao.supportProposal(proposalId1);
+        
+        // Create second proposal and election
+        vm.prank(user1);
+        uint256 proposalId2 = dao.createProposal("Proposal 2", address(0), 0);
+        vm.prank(user1);
+        dao.supportProposal(proposalId2);
+        vm.prank(user2);
+        dao.supportProposal(proposalId2);
+        
+        // Get election details
+        (,, uint256 votingTokenId1,,, address yesAddress1, address noAddress1,,,) = dao.getElectionState(0);
+        (,, uint256 votingTokenId2,,, address yesAddress2, address noAddress2,,,) = dao.getElectionState(1);
+        
+        // Verify different voting token IDs
+        assertTrue(votingTokenId1 != votingTokenId2);
+        
+        // Verify different voting addresses
+        assertTrue(yesAddress1 != yesAddress2);
+        assertTrue(noAddress1 != noAddress2);
+        
+        // Move to election period
+        vm.warp(block.timestamp + ELECTION_DELAY + 1);
+        
+        // Vote on both elections
+        vm.startPrank(user1);
+        dao.safeTransferFrom(user1, yesAddress1, votingTokenId1, 60, "");
+        dao.safeTransferFrom(user1, noAddress2, votingTokenId2, 60, ""); // Vote differently on second election
+        vm.stopPrank();
+        
+        vm.startPrank(user2);
+        dao.safeTransferFrom(user2, yesAddress1, votingTokenId1, 50, "");
+        dao.safeTransferFrom(user2, yesAddress2, votingTokenId2, 50, "");
+        vm.stopPrank();
+        
+        // Verify independent vote counting
+        (,,,,,,,,uint256 yesVotes1, uint256 noVotes1) = dao.getElectionState(0);
+        (,,,,,,,,uint256 yesVotes2, uint256 noVotes2) = dao.getElectionState(1);
+        
+        assertEq(yesVotes1, 110);
+        assertEq(noVotes1, 0);
+        assertEq(yesVotes2, 50);
+        assertEq(noVotes2, 60);
+        
+        // Move to end of election
+        vm.warp(block.timestamp + ELECTION_DURATION + 1);
+        
+        // Execute both elections
+        dao.executeElection(0);
+        dao.executeElection(1);
+        
+        // Verify both executed
+        (,,,,,,,bool executed1,,) = dao.getElectionState(0);
+        (,,,,,,,bool executed2,,) = dao.getElectionState(1);
+        assertTrue(executed1);
+        assertTrue(executed2);
+    }
+
+    function testVotingTokenManagement() public {
+        // Create and support proposal
+        vm.prank(user1);
+        uint256 proposalId = dao.createProposal("Test Proposal", address(0), 0);
+        
+        vm.prank(user1);
+        dao.supportProposal(proposalId);
+        vm.prank(user2);
+        dao.supportProposal(proposalId);
+        
+        // Get election details
+        (,, uint256 votingTokenId,,, address yesAddress, address noAddress,,,) = dao.getElectionState(0);
+        
+        // Verify initial voting token distribution
+        assertEq(dao.balanceOf(user1, votingTokenId), 100);
+        assertEq(dao.balanceOf(user2, votingTokenId), 50);
+        assertEq(dao.balanceOf(user3, votingTokenId), 50);
+        
+        // Test token transfers between users
+        vm.prank(user1);
+        dao.safeTransferFrom(user1, user2, votingTokenId, 30, "");
+        
+        assertEq(dao.balanceOf(user1, votingTokenId), 70);
+        assertEq(dao.balanceOf(user2, votingTokenId), 80);
+        
+        // Move to election period
+        vm.warp(block.timestamp + ELECTION_DELAY + 1);
+        
+        // Vote with transferred tokens
+        vm.startPrank(user2);
+        dao.safeTransferFrom(user2, yesAddress, votingTokenId, 80, "");
+        vm.stopPrank();
+        
+        // Move to end and execute
+        vm.warp(block.timestamp + ELECTION_DURATION + 1);
+        dao.executeElection(0);
+        
+        // Verify tokens are burned except at yes/no addresses
+        assertEq(dao.balanceOf(user1, votingTokenId), 0);
+        assertEq(dao.balanceOf(user2, votingTokenId), 0);
+        assertEq(dao.balanceOf(user3, votingTokenId), 0);
+        assertEq(dao.balanceOf(yesAddress, votingTokenId), 80);
+        assertEq(dao.balanceOf(noAddress, votingTokenId), 0);
+    }
 }

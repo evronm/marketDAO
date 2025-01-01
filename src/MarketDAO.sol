@@ -76,15 +76,80 @@ contract MarketDAO is ERC1155 {
         return _totalSupply[id];
     }
 
+    // Governance token holder tracking
+    mapping(address => bool) private _governanceHolders;
+    address[] private _governanceHoldersList;
+
     // Testing functions - these would be replaced with proper access control in production
     function mint(address account, uint256 id, uint256 amount) public {
         _mint(account, id, amount, "");
         _totalSupply[id] += amount;
+        
+        // Track governance token holders
+        if (id == GOVERNANCE_TOKEN_ID && !_governanceHolders[account]) {
+            _governanceHolders[account] = true;
+            _governanceHoldersList.push(account);
+        }
     }
 
     function burn(address account, uint256 id, uint256 amount) public {
         _burn(account, id, amount);
         _totalSupply[id] -= amount;
+        
+        // Update governance holder tracking
+        if (id == GOVERNANCE_TOKEN_ID && balanceOf(account, GOVERNANCE_TOKEN_ID) == 0) {
+            _governanceHolders[account] = false;
+            // Note: We don't remove from list as it would change array ordering
+        }
+    }
+
+    // Helper functions for election state
+    function getElectionState(uint256 electionId) public view returns (
+        uint256 id,
+        uint256 proposalId,
+        uint256 votingTokenId,
+        uint256 startTime,
+        uint256 endTime,
+        address yesAddress,
+        address noAddress,
+        bool executed,
+        uint256 yesVotes,
+        uint256 noVotes
+    ) {
+        Election storage election = elections[electionId];
+        return (
+            election.id,
+            election.proposalId,
+            election.votingTokenId,
+            election.startTime,
+            election.endTime,
+            election.yesAddress,
+            election.noAddress,
+            election.executed,
+            balanceOf(election.yesAddress, election.votingTokenId),
+            balanceOf(election.noAddress, election.votingTokenId)
+        );
+    }
+
+    function getVotingTokenBalance(uint256 electionId, address voter) public view returns (uint256) {
+        Election storage election = elections[electionId];
+        return balanceOf(voter, election.votingTokenId);
+    }
+
+    function isOngoing(uint256 electionId) public view returns (bool) {
+        Election storage election = elections[electionId];
+        return block.timestamp >= election.startTime && 
+               block.timestamp <= election.endTime &&
+               !election.executed;
+    }
+
+    function hasQuorum(uint256 electionId) public view returns (bool) {
+        Election storage election = elections[electionId];
+        uint256 yesVotes = balanceOf(election.yesAddress, election.votingTokenId);
+        uint256 noVotes = balanceOf(election.noAddress, election.votingTokenId);
+        uint256 totalVotes = yesVotes + noVotes;
+        uint256 totalPossibleVotes = totalSupply(GOVERNANCE_TOKEN_ID);
+        return (totalVotes * 100) / totalPossibleVotes >= quorumPercentage;
     }
 
     function createProposal(
@@ -205,9 +270,7 @@ contract MarketDAO is ERC1155 {
         emit ElectionExecuted(_electionId, yesVotes > noVotes);
     }
     
-    // Helper function to get governance token holders
-    // This needs a proper implementation - possibly through events or a separate mapping
     function _getGovernanceTokenHolders() internal view returns (address[] memory) {
-        // Implementation needed
+        return _governanceHoldersList;
     }
 }
