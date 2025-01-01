@@ -11,6 +11,9 @@ contract MarketDAOTest is Test {
     TestUser bob;
     TestUser charlie;
 
+    event HolderAdded(address holder);
+    event HolderRemoved(address holder);
+
     // Initial DAO parameters
     string constant NAME = "TestDAO";
     uint256 constant SUPPORT_THRESHOLD = 30; // 30%
@@ -35,15 +38,19 @@ contract MarketDAOTest is Test {
             URI
         );
 
-        // Mint initial tokens to test accounts instead of transferring
-        // Note: owner can mint because DAO contract constructor gave them ownership
+        // Mint initial tokens to test accounts
         vm.startPrank(address(dao.owner()));
+        vm.expectEmit(true, true, true, true);
+        emit HolderAdded(address(alice));
         dao.mint(address(alice), 300);
+        
+        vm.expectEmit(true, true, true, true);
+        emit HolderAdded(address(bob));
         dao.mint(address(bob), 200);
         vm.stopPrank();
     }
 
-    function test_Deployment() public view {
+    function test_Deployment() public {
         assertEq(dao.daoName(), NAME);
         assertEq(dao.supportThreshold(), SUPPORT_THRESHOLD);
         assertEq(dao.quorumPercentage(), QUORUM);
@@ -51,10 +58,10 @@ contract MarketDAOTest is Test {
         assertEq(dao.electionDuration(), ELECTION_DURATION);
     }
 
-    function test_InitialTokenDistribution() public view {
+    function test_InitialTokenDistribution() public {
         assertEq(dao.balanceOf(address(alice), 0), 300);
         assertEq(dao.balanceOf(address(bob), 0), 200);
-        assertEq(dao.balanceOf(address(dao.owner()), 0), 0); // Owner has no tokens
+        assertEq(dao.balanceOf(address(dao.owner()), 0), 0);
     }
 
     function test_CreateProposal() public {
@@ -94,27 +101,190 @@ contract MarketDAOTest is Test {
         dao.createProposal("Test Proposal", address(0), 0);
     }
 
-    function test_Support_And_Trigger_Election() public {
-        // Create proposal
+    function test_GovernanceHolderTracking() public {
+        address[] memory holders = dao._getGovernanceTokenHolders();
+        assertEq(holders.length, 2, "Should start with 2 holders");
+
+        // Transfer some tokens to charlie
+        vm.startPrank(address(alice));
+        
+        vm.expectEmit(true, true, true, true);
+        emit HolderAdded(address(charlie));
+        dao.safeTransferFrom(address(alice), address(charlie), 0, 100, "");
+        vm.stopPrank();
+
+        holders = dao._getGovernanceTokenHolders();
+        assertEq(holders.length, 3, "Should have 3 holders after adding charlie");
+
+        // Transfer all tokens away from alice
+        vm.startPrank(address(alice));
+        vm.expectEmit(true, true, true, true);
+        emit HolderRemoved(address(alice));
+        dao.safeTransferFrom(address(alice), address(bob), 0, 200, "");
+        vm.stopPrank();
+
+        holders = dao._getGovernanceTokenHolders();
+        assertEq(holders.length, 2, "Should have 2 holders after removing alice");
+    }
+
+    function test_Voting() public {
+        // Create and trigger a proposal
         vm.prank(address(alice));
-        uint256 proposalId = dao.createProposal(
-            "Test Proposal",
-            address(0),
-            0
-        );
-
-        // First check it's not triggered
-        (, , , , , , uint256 supportCount, bool triggered) = dao.proposals(proposalId);
-        assertEq(supportCount, 0);
-        assertFalse(triggered);
-
-        // Support from Bob (200/500 = 40%) should trigger since > 30% threshold
+        uint256 proposalId = dao.createProposal("Test Proposal", address(0), 0);
+        
         vm.prank(address(bob));
         dao.supportProposal(proposalId);
         
-        (, , , , , , supportCount, triggered) = dao.proposals(proposalId);
-        assertEq(supportCount, 200);
-        assertTrue(triggered, "Election should be triggered with 40% support");
+        // Get election info
+        uint256 electionId = 0;  // First election
+        (
+            ,
+            ,
+            ,
+            ,
+            address yesAddress,
+            address noAddress,
+            ,
+            ,
+            uint256 votingTokenId
+        ) = dao.elections(electionId);
+        
+        // Vote yes with Alice's voting tokens
+        vm.startPrank(address(alice));
+        assertEq(dao.balanceOf(address(alice), votingTokenId), 300, "Alice should have voting tokens");
+        dao.safeTransferFrom(address(alice), yesAddress, votingTokenId, 300, "");
+        vm.stopPrank();
+        
+        // Vote no with Bob's voting tokens
+        vm.startPrank(address(bob));
+        assertEq(dao.balanceOf(address(bob), votingTokenId), 200, "Bob should have voting tokens");
+        dao.safeTransferFrom(address(bob), noAddress, votingTokenId, 200, "");
+        vm.stopPrank();
+        
+        // Verify vote counts
+        assertEq(dao.balanceOf(yesAddress, votingTokenId), 300);
+        assertEq(dao.balanceOf(noAddress, votingTokenId), 200);
+    }
+
+    function test_EarlyVictory() public {
+        // Create and trigger a proposal
+        vm.prank(address(alice));
+        uint256 proposalId = dao.createProposal("Test Proposal", address(0), 0);
+        
+        vm.prank(address(bob));
+        dao.supportProposal(proposalId);
+        
+        uint256 electionId = 0;
+        (
+            ,
+            ,
+            ,
+            ,
+            address yesAddress,
+            ,
+            uint256 totalVotingTokens,
+            ,
+            uint256 votingTokenId
+        ) = dao.elections(electionId);
+        
+        // Transfer more than 50% to yes votes
+        vm.prank(address(alice));
+        dao.safeTransferFrom(
+            address(alice),
+            yesAddress,
+            votingTokenId,
+            300,  // 300/500 = 60% > 50%
+            ""
+        );
+        
+        // Should pass immediately
+        assertTrue(dao.hasElectionPassed(electionId), "Election should pass immediately with >50% yes votes");
+    }
+
+    function test_QuorumNotMet() public {
+        // Create and trigger a proposal
+        vm.prank(address(alice));
+        uint256 proposalId = dao.createProposal("Test Proposal", address(0), 0);
+        
+        vm.prank(address(bob));
+        dao.supportProposal(proposalId);
+        
+        uint256 electionId = 0;
+        (
+            ,
+            ,
+            ,
+            uint256 endTime,
+            address yesAddress,
+            ,
+            ,
+            ,
+            uint256 votingTokenId
+        ) = dao.elections(electionId);
+        
+        // Only vote with a small amount
+        vm.prank(address(alice));
+        dao.safeTransferFrom(
+            address(alice),
+            yesAddress,
+            votingTokenId,
+            50,  // Only 10% of total votes
+            ""
+        );
+        
+        // Fast forward past end time
+        vm.warp(endTime + 1);
+        
+        // Should fail due to not meeting quorum (50%)
+        assertFalse(dao.hasElectionPassed(electionId), "Election should fail due to not meeting quorum");
+    }
+
+    function test_MintingProposal() public {
+        address mintRecipient = makeAddr("recipient");
+        uint256 mintAmount = 100;
+
+        // Create and trigger a minting proposal
+        vm.prank(address(alice));
+        uint256 proposalId = dao.createProposal(
+            "Mint tokens",
+            mintRecipient,
+            mintAmount
+        );
+        
+        vm.prank(address(bob));
+        dao.supportProposal(proposalId);
+        
+        uint256 electionId = 0;
+        (
+            ,
+            ,
+            ,
+            uint256 endTime,
+            address yesAddress,
+            ,
+            ,
+            ,
+            uint256 votingTokenId
+        ) = dao.elections(electionId);
+        
+        // Vote yes with enough tokens
+        vm.prank(address(alice));
+        dao.safeTransferFrom(
+            address(alice),
+            yesAddress,
+            votingTokenId,
+            300,
+            ""
+        );
+        
+        // Fast forward past end time
+        vm.warp(endTime + 1);
+        
+        // Execute the proposal
+        dao.executeElection(electionId);
+        
+        // Verify tokens were minted
+        assertEq(dao.balanceOf(mintRecipient, 0), mintAmount, "Tokens should be minted to recipient");
     }
 }
 

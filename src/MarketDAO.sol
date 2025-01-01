@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "forge-std/console.sol";
 
 contract MarketDAO is ERC1155, Ownable {
     // Constants
@@ -15,6 +16,7 @@ contract MarketDAO is ERC1155, Ownable {
     // Token tracking
     uint256 private _governanceTokenSupply;
     address[] private _holders;
+    mapping(address => bool) private _isHolder;
     
     // DAO Parameters
     string public daoName;
@@ -53,6 +55,8 @@ contract MarketDAO is ERC1155, Ownable {
     mapping(uint256 => Election) public elections;
     
     // Events
+    event HolderAdded(address holder);
+    event HolderRemoved(address holder);
     event ProposalCreated(uint256 indexed proposalId, address proposer);
     event ProposalSupported(uint256 indexed proposalId, address supporter, uint256 supportCount, uint256 totalSupply);
     event ElectionStarted(uint256 indexed electionId, uint256 proposalId);
@@ -73,11 +77,66 @@ contract MarketDAO is ERC1155, Ownable {
         electionDuration = _electionDuration;
     }
 
-    // Mint function for initial token distribution
-    function mint(address to, uint256 amount) external onlyOwner {
-        _mint(to, GOVERNANCE_TOKEN_ID, amount, "");
+    function addHolder(address holder) internal {
+        if (!_isHolder[holder]) {
+            _holders.push(holder);
+            _isHolder[holder] = true;
+            emit HolderAdded(holder);
+        }
     }
-    
+
+    function removeHolder(address holder) internal {
+        if (_isHolder[holder]) {
+            for (uint i = 0; i < _holders.length; i++) {
+                if (_holders[i] == holder) {
+                    _holders[i] = _holders[_holders.length - 1];
+                    _holders.pop();
+                    break;
+                }
+            }
+            _isHolder[holder] = false;
+            emit HolderRemoved(holder);
+        }
+    }
+
+    function mint(address to, uint256 amount) external onlyOwner {
+        require(to != address(0), "Cannot mint to zero address");
+        _mint(to, GOVERNANCE_TOKEN_ID, amount, "");
+        addHolder(to);
+        _governanceTokenSupply += amount;
+    }
+
+    function _update(
+        address from,
+        address to,
+        uint256[] memory ids,
+        uint256[] memory amounts
+    ) internal virtual override {
+        
+        for (uint256 i = 0; i < ids.length; i++) {
+            if (ids[i] != GOVERNANCE_TOKEN_ID) continue;
+            
+            console.log("Processing transfer:");
+            console.log("From:", from);
+            console.log("To:", to);
+            
+            // Add new holder if receiving tokens
+            if (to != address(0)) {
+                addHolder(to);
+            }
+            
+            // Remove holder if sending all tokens
+            if (from != address(0)) {
+                uint256 remainingBalance = balanceOf(from, GOVERNANCE_TOKEN_ID);
+                if (remainingBalance == amounts[i]) { // Will have 0 after transfer
+                    removeHolder(from);
+                }
+            }
+        }
+        
+        super._update(from, to, ids, amounts);
+    }
+
     function createProposal(
         string memory description,
         address mintTo,
@@ -119,13 +178,11 @@ contract MarketDAO is ERC1155, Ownable {
         
         proposal.supporters[msg.sender] = true;
         proposal.supportCount += supporterBalance;
-
-        uint256 currentSupply = _governanceTokenSupply;
-        emit ProposalSupported(proposalId, msg.sender, proposal.supportCount, currentSupply);
+        
+        emit ProposalSupported(proposalId, msg.sender, proposal.supportCount, _governanceTokenSupply);
         
         // Check if we have enough support to trigger election
-        // supportThreshold is in percentage points, so 30 means 30%
-        if (proposal.supportCount * 100 >= currentSupply * supportThreshold) {
+        if (proposal.supportCount * 100 >= _governanceTokenSupply * supportThreshold) {
             _triggerElection(proposalId);
         }
     }
@@ -153,13 +210,11 @@ contract MarketDAO is ERC1155, Ownable {
         newElection.votingTokenId = votingTokenId;
         
         // Mint voting tokens to all governance token holders
-        address[] memory holders = _getGovernanceTokenHolders();
         uint256 totalVotingTokens = 0;
-        
-        for (uint256 i = 0; i < holders.length; i++) {
-            uint256 balance = balanceOf(holders[i], GOVERNANCE_TOKEN_ID);
+        for (uint256 i = 0; i < _holders.length; i++) {
+            uint256 balance = balanceOf(_holders[i], GOVERNANCE_TOKEN_ID);
             if (balance > 0) {
-                _mint(holders[i], votingTokenId, balance, "");
+                _mint(_holders[i], votingTokenId, balance, "");
                 totalVotingTokens += balance;
             }
         }
@@ -180,6 +235,8 @@ contract MarketDAO is ERC1155, Ownable {
         // If proposal includes token minting, do it
         if (proposal.mintAmount > 0 && proposal.mintTo != address(0)) {
             _mint(proposal.mintTo, GOVERNANCE_TOKEN_ID, proposal.mintAmount, "");
+            addHolder(proposal.mintTo);
+            _governanceTokenSupply += proposal.mintAmount;
         }
         
         election.executed = true;
@@ -207,52 +264,7 @@ contract MarketDAO is ERC1155, Ownable {
         return yesVotes > noVotes;
     }
 
-    function _update(
-        address from,
-        address to,
-        uint256[] memory ids,
-        uint256[] memory amounts
-    ) internal virtual override {        
-        super._update(from, to, ids, amounts);
-        
-        for (uint256 i = 0; i < ids.length; i++) {
-            if (ids[i] != GOVERNANCE_TOKEN_ID) continue;
-            
-            // Update total supply for mints and burns
-            if (from == address(0)) {  // mint
-                _governanceTokenSupply += amounts[i];
-            }
-            if (to == address(0)) {    // burn
-                _governanceTokenSupply -= amounts[i];
-            }
-            
-            // Add new holder if receiving tokens
-            if (to != address(0) && balanceOf(to, GOVERNANCE_TOKEN_ID) == 0) {
-                _holders.push(to);
-            }
-            
-            // Remove holder if sending all tokens
-            if (from != address(0) && from != to) {  // Skip on mints and self-transfers
-                uint256 remainingBalance = balanceOf(from, GOVERNANCE_TOKEN_ID) - amounts[i];
-                if (remainingBalance == 0) {
-                    for (uint256 j = 0; j < _holders.length; j++) {
-                        if (_holders[j] == from) {
-                            _holders[j] = _holders[_holders.length - 1];
-                            _holders.pop();
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    function totalSupply(uint256 id) public view returns (uint256) {
-        require(id == GOVERNANCE_TOKEN_ID, "Only governance token has tracked supply");
-        return _governanceTokenSupply;
-    }
-
-    function _getGovernanceTokenHolders() internal view returns (address[] memory) {
+    function _getGovernanceTokenHolders() public view returns (address[] memory) {
         return _holders;
     }
 }
