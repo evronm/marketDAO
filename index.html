@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarketDAO Interface</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .proposal, .election {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 3px;
+        }
+        button {
+            margin: 5px;
+            padding: 8px 15px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        button:disabled {
+            background: #ccc;
+        }
+        input, textarea {
+            margin: 5px 0;
+            padding: 5px;
+            width: 100%;
+            max-width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div id="connection">
+        <button onclick="connectWallet()">Connect Wallet</button>
+        <p id="walletInfo"></p>
+    </div>
+
+    <div id="daoInfo" class="section">
+        <h2>DAO Information</h2>
+        <p>Name: <span id="daoName"></span></p>
+        <p>Your Governance Tokens: <span id="govTokens"></span></p>
+        <p>Total Supply: <span id="totalSupply"></span></p>
+    </div>
+
+    <div id="createProposal" class="section">
+        <h2>Create Proposal</h2>
+        <textarea id="proposalDesc" placeholder="Proposal Description"></textarea><br>
+        <input type="text" id="mintTo" placeholder="Mint To Address (optional)"><br>
+        <input type="number" id="mintAmount" placeholder="Mint Amount (optional)"><br>
+        <button onclick="submitProposal()">Submit Proposal</button>
+    </div>
+
+    <div id="activeProposals" class="section">
+        <h2>Active Proposals</h2>
+        <div id="proposalsList"></div>
+    </div>
+
+    <div id="activeElections" class="section">
+        <h2>Active Elections</h2>
+        <div id="electionsList"></div>
+    </div>
+
+    <script>
+        const CONTRACT_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
+        const CONTRACT_ABI = [
+            "function daoName() view returns (string)",
+            "function balanceOf(address account, uint256 id) view returns (uint256)",
+            "function createProposal(string memory description, address mintTo, uint256 mintAmount) returns (uint256)",
+            "function supportProposal(uint256 proposalId)",
+            "function proposals(uint256) view returns (uint256 id, address proposer, string description, address mintTo, uint256 mintAmount, uint256 createdAt, uint256 supportCount, bool triggered)",
+            "function elections(uint256) view returns (uint256 id, uint256 proposalId, uint256 startTime, uint256 endTime, address yesVoteAddress, address noVoteAddress, uint256 totalVotingTokens, bool executed, uint256 votingTokenId)",
+            "function hasElectionPassed(uint256 electionId) view returns (bool)",
+            "function executeElection(uint256 electionId)",
+            "function _getGovernanceTokenHolders() view returns (address[])",
+            "function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes memory data)"
+        ];
+        
+        let provider, signer, contract;
+        let currentAccount;
+        const GOVERNANCE_TOKEN_ID = 0;
+
+        async function connectWallet() {
+            try {
+                if (!window.ethereum) {
+                    alert('Please install MetaMask!');
+                    return;
+                }
+
+                provider = new ethers.BrowserProvider(window.ethereum);
+                const accounts = await provider.send("eth_requestAccounts", []);
+                currentAccount = accounts[0];
+                signer = await provider.getSigner();
+                contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+                document.getElementById('walletInfo').textContent = `Connected: ${currentAccount}`;
+                
+                // Load initial data
+                await updateDaoInfo();
+                await updateProposals();
+                await updateElections();
+
+                // Setup event listeners for updates
+                setInterval(async () => {
+                    await updateProposals();
+                    await updateElections();
+                }, 10000);
+
+            } catch (error) {
+                console.error('Error connecting wallet:', error);
+                alert('Failed to connect wallet');
+            }
+        }
+
+        async function updateDaoInfo() {
+            const name = await contract.daoName();
+            const balance = await contract.balanceOf(currentAccount, GOVERNANCE_TOKEN_ID);
+            
+            document.getElementById('daoName').textContent = name;
+            document.getElementById('govTokens').textContent = balance.toString();
+
+            // Get total supply by summing balances of all holders
+            const holders = await contract._getGovernanceTokenHolders();
+            let totalSupply = 0n;
+            for (const holder of holders) {
+                const balance = await contract.balanceOf(holder, GOVERNANCE_TOKEN_ID);
+                totalSupply += balance;
+            }
+            document.getElementById('totalSupply').textContent = totalSupply.toString();
+        }
+
+        async function submitProposal() {
+            try {
+                const description = document.getElementById('proposalDesc').value;
+                const mintTo = document.getElementById('mintTo').value;
+                const mintAmount = document.getElementById('mintAmount').value;
+
+                if (!description) {
+                    alert('Description is required');
+                    return;
+                }
+
+                const tx = await contract.createProposal(
+                    description,
+                    mintTo || ethers.ZeroAddress,
+                    mintAmount || 0
+                );
+                await tx.wait();
+                
+                alert('Proposal created successfully!');
+                await updateProposals();
+            } catch (error) {
+                console.error('Error creating proposal:', error);
+                alert('Failed to create proposal');
+            }
+        }
+
+        async function supportProposal(proposalId) {
+            try {
+                const tx = await contract.supportProposal(proposalId);
+                await tx.wait();
+                alert('Proposal supported successfully!');
+                await updateProposals();
+            } catch (error) {
+                console.error('Error supporting proposal:', error);
+                alert('Failed to support proposal');
+            }
+        }
+
+        async function vote(electionId, votingTokenId, isYesVote) {
+            try {
+                const election = await contract.elections(electionId);
+                const balance = await contract.balanceOf(currentAccount, votingTokenId);
+                
+                if (balance <= 0) {
+                    alert('No voting tokens available');
+                    return;
+                }
+
+                const voteAddress = isYesVote ? election.yesVoteAddress : election.noVoteAddress;
+                const tx = await contract.safeTransferFrom(
+                    currentAccount,
+                    voteAddress,
+                    votingTokenId,
+                    balance,
+                    "0x"
+                );
+                await tx.wait();
+                alert('Vote cast successfully!');
+                await updateElections();
+            } catch (error) {
+                console.error('Error voting:', error);
+                alert('Failed to cast vote');
+            }
+        }
+
+        async function executeElection(electionId) {
+            try {
+                const tx = await contract.executeElection(electionId);
+                await tx.wait();
+                alert('Election executed successfully!');
+                await updateElections();
+            } catch (error) {
+                console.error('Error executing election:', error);
+                alert('Failed to execute election');
+            }
+        }
+
+        async function updateProposals() {
+            const proposalsDiv = document.getElementById('proposalsList');
+            proposalsDiv.innerHTML = '';
+            
+            let proposalId = 0;
+            while (true) {
+                try {
+                    const proposal = await contract.proposals(proposalId);
+                    if (proposal.createdAt === 0n) break;
+
+                    const div = document.createElement('div');
+                    div.className = 'proposal';
+                    div.innerHTML = `
+                        <p><strong>Description:</strong> ${proposal.description}</p>
+                        <p><strong>Proposer:</strong> ${proposal.proposer}</p>
+                        ${proposal.mintAmount > 0 ? `
+                            <p><strong>Mint To:</strong> ${proposal.mintTo}</p>
+                            <p><strong>Mint Amount:</strong> ${proposal.mintAmount.toString()}</p>
+                        ` : ''}
+                        <p><strong>Support:</strong> ${proposal.supportCount.toString()}</p>
+                        ${!proposal.triggered ? `
+                            <button onclick="supportProposal(${proposalId})">Support</button>
+                        ` : '<p><em>Election triggered</em></p>'}
+                    `;
+                    proposalsDiv.appendChild(div);
+                    proposalId++;
+                } catch (error) {
+                    break;
+                }
+            }
+        }
+
+        async function updateElections() {
+            const electionsDiv = document.getElementById('electionsList');
+            electionsDiv.innerHTML = '';
+            
+            let electionId = 0;
+            while (true) {
+                try {
+                    const election = await contract.elections(electionId);
+                    if (election.startTime === 0n) break;
+
+                    const proposal = await contract.proposals(election.proposalId);
+                    const hasEnded = BigInt(Math.floor(Date.now() / 1000)) > election.endTime;
+                    const hasPassed = await contract.hasElectionPassed(electionId);
+
+                    const div = document.createElement('div');
+                    div.className = 'election';
+                    div.innerHTML = `
+                        <p><strong>Proposal:</strong> ${proposal.description}</p>
+                        <p><strong>Voting Token ID:</strong> ${election.votingTokenId.toString()}</p>
+                        <p><strong>End Time:</strong> ${new Date(Number(election.endTime) * 1000).toLocaleString()}</p>
+                        <p><strong>Status:</strong> ${hasEnded ? (hasPassed ? 'Passed' : 'Failed') : 'Active'}</p>
+                        ${!election.executed && !hasEnded ? `
+                            <button onclick="vote(${electionId}, ${election.votingTokenId}, true)">Vote Yes</button>
+                            <button onclick="vote(${electionId}, ${election.votingTokenId}, false)">Vote No</button>
+                        ` : ''}
+                        ${hasPassed && !election.executed ? `
+                            <button onclick="executeElection(${electionId})">Execute</button>
+                        ` : ''}
+                    `;
+                    electionsDiv.appendChild(div);
+                    electionId++;
+                } catch (error) {
+                    break;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
