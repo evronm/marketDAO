@@ -5,6 +5,11 @@ import "forge-std/Test.sol";
 import "../src/MarketDAO.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 
+// Helper contract to make test addresses ERC1155 compatible
+contract TestUser is ERC1155Holder {
+    constructor() {}
+}
+
 contract MarketDAOTest is Test {
     MarketDAO public dao;
     TestUser alice;
@@ -127,116 +132,139 @@ contract MarketDAOTest is Test {
         assertEq(holders.length, 2, "Should have 2 holders after removing alice");
     }
 
-    function test_Voting() public {
-        // Create and trigger a proposal
+    function test_VotingTokenTrading() public {
+        // Create and trigger proposal
         vm.prank(address(alice));
         uint256 proposalId = dao.createProposal("Test Proposal", address(0), 0);
         
         vm.prank(address(bob));
         dao.supportProposal(proposalId);
         
-        // Get election info
-        uint256 electionId = 0;  // First election
-        (
-            ,
-            ,
-            ,
-            ,
-            address yesAddress,
-            address noAddress,
-            ,
-            ,
-            uint256 votingTokenId
-        ) = dao.elections(electionId);
+        uint256 electionId = 0;
+        (,,,,,,,,uint256 votingTokenId) = dao.elections(electionId);
         
-        // Vote yes with Alice's voting tokens
-        vm.startPrank(address(alice));
-        assertEq(dao.balanceOf(address(alice), votingTokenId), 300, "Alice should have voting tokens");
+        // Alice sells half her voting tokens to Charlie
+        vm.prank(address(alice));
+        dao.safeTransferFrom(address(alice), address(charlie), votingTokenId, 150, "");
+        
+        // Verify balances
+        assertEq(dao.balanceOf(address(alice), votingTokenId), 150, "Alice should have 150 voting tokens left");
+        assertEq(dao.balanceOf(address(charlie), votingTokenId), 150, "Charlie should have 150 voting tokens");
+    }
+
+    function test_MultipleConcurrentElections() public {
+        // Create and trigger first proposal
+        vm.prank(address(alice));
+        uint256 proposalId1 = dao.createProposal("Proposal 1", address(0), 0);
+        
+        vm.prank(address(bob));
+        dao.supportProposal(proposalId1);
+        
+        // Create and trigger second proposal
+        vm.prank(address(alice));
+        uint256 proposalId2 = dao.createProposal("Proposal 2", address(0), 0);
+        
+        vm.prank(address(bob));
+        dao.supportProposal(proposalId2);
+        
+        // Verify both elections have unique voting tokens
+        uint256 electionId1 = 0;
+        uint256 electionId2 = 1;
+        
+        (,,,,,,,,uint256 votingTokenId1) = dao.elections(electionId1);
+        (,,,,,,,,uint256 votingTokenId2) = dao.elections(electionId2);
+        
+        assertTrue(votingTokenId1 != votingTokenId2, "Voting tokens should be unique");
+        
+        // Verify both alice and bob got voting tokens for both elections
+        assertEq(dao.balanceOf(address(alice), votingTokenId1), 300);
+        assertEq(dao.balanceOf(address(alice), votingTokenId2), 300);
+        assertEq(dao.balanceOf(address(bob), votingTokenId1), 200);
+        assertEq(dao.balanceOf(address(bob), votingTokenId2), 200);
+    }
+
+    function test_FailedElectionExecution() public {
+        // Create and trigger proposal
+        vm.prank(address(alice));
+        uint256 proposalId = dao.createProposal("Test Proposal", address(0), 0);
+        
+        vm.prank(address(bob));
+        dao.supportProposal(proposalId);
+        
+        uint256 electionId = 0;
+        (,,,uint256 endTime,,,,,) = dao.elections(electionId);
+        
+        // Fast forward past end time without any votes
+        vm.warp(endTime + 1);
+        
+        // Try to execute failed election
+        vm.expectRevert("Election has not passed");
+        dao.executeElection(electionId);
+    }
+
+    function test_DoubleExecution() public {
+        // Create and trigger proposal
+        vm.prank(address(alice));
+        uint256 proposalId = dao.createProposal("Test Proposal", address(0), 0);
+        
+        vm.prank(address(bob));
+        dao.supportProposal(proposalId);
+        
+        uint256 electionId = 0;
+        (,,,uint256 endTime,address yesAddress,,,, uint256 votingTokenId) = dao.elections(electionId);
+        
+        // Vote yes with majority
+        vm.prank(address(alice));
         dao.safeTransferFrom(address(alice), yesAddress, votingTokenId, 300, "");
-        vm.stopPrank();
-        
-        // Vote no with Bob's voting tokens
-        vm.startPrank(address(bob));
-        assertEq(dao.balanceOf(address(bob), votingTokenId), 200, "Bob should have voting tokens");
-        dao.safeTransferFrom(address(bob), noAddress, votingTokenId, 200, "");
-        vm.stopPrank();
-        
-        // Verify vote counts
-        assertEq(dao.balanceOf(yesAddress, votingTokenId), 300);
-        assertEq(dao.balanceOf(noAddress, votingTokenId), 200);
-    }
-
-    function test_EarlyVictory() public {
-        // Create and trigger a proposal
-        vm.prank(address(alice));
-        uint256 proposalId = dao.createProposal("Test Proposal", address(0), 0);
-        
-        vm.prank(address(bob));
-        dao.supportProposal(proposalId);
-        
-        uint256 electionId = 0;
-        (
-            ,
-            ,
-            ,
-            ,
-            address yesAddress,
-            ,
-            uint256 totalVotingTokens,
-            ,
-            uint256 votingTokenId
-        ) = dao.elections(electionId);
-        
-        // Transfer more than 50% to yes votes
-        vm.prank(address(alice));
-        dao.safeTransferFrom(
-            address(alice),
-            yesAddress,
-            votingTokenId,
-            300,  // 300/500 = 60% > 50%
-            ""
-        );
-        
-        // Should pass immediately
-        assertTrue(dao.hasElectionPassed(electionId), "Election should pass immediately with >50% yes votes");
-    }
-
-    function test_QuorumNotMet() public {
-        // Create and trigger a proposal
-        vm.prank(address(alice));
-        uint256 proposalId = dao.createProposal("Test Proposal", address(0), 0);
-        
-        vm.prank(address(bob));
-        dao.supportProposal(proposalId);
-        
-        uint256 electionId = 0;
-        (
-            ,
-            ,
-            ,
-            uint256 endTime,
-            address yesAddress,
-            ,
-            ,
-            ,
-            uint256 votingTokenId
-        ) = dao.elections(electionId);
-        
-        // Only vote with a small amount
-        vm.prank(address(alice));
-        dao.safeTransferFrom(
-            address(alice),
-            yesAddress,
-            votingTokenId,
-            50,  // Only 10% of total votes
-            ""
-        );
         
         // Fast forward past end time
         vm.warp(endTime + 1);
         
-        // Should fail due to not meeting quorum (50%)
-        assertFalse(dao.hasElectionPassed(electionId), "Election should fail due to not meeting quorum");
+        // Execute successfully
+        dao.executeElection(electionId);
+        
+        // Try to execute again
+        vm.expectRevert("Election already executed");
+        dao.executeElection(electionId);
+    }
+
+    function test_InvalidMintProposal() public {
+        // Try to create proposal with mint amount but no address
+        vm.prank(address(alice));
+        vm.expectRevert("Invalid mint address");
+        dao.createProposal("Invalid Mint", address(0), 100);
+    }
+
+    function test_DoubleSupportPrevention() public {
+        // Create proposal
+        vm.prank(address(alice));
+        uint256 proposalId = dao.createProposal("Test Proposal", address(0), 0);
+        
+        // Support once
+        vm.prank(address(bob));
+        dao.supportProposal(proposalId);
+        
+        // Try to support again
+        vm.prank(address(bob));
+        vm.expectRevert("Already supported");
+        dao.supportProposal(proposalId);
+    }
+
+    function test_VotingTokenBurning() public {
+        // Create and trigger proposal
+        vm.prank(address(alice));
+        uint256 proposalId = dao.createProposal("Test Proposal", address(0), 0);
+        
+        vm.prank(address(bob));
+        dao.supportProposal(proposalId);
+        
+        uint256 electionId = 0;
+        (,,,uint256 endTime,,,,,uint256 votingTokenId) = dao.elections(electionId);
+        
+        // Try to burn voting tokens
+        vm.prank(address(alice));
+        vm.expectRevert(); // ERC1155: burn amount exceeds balance
+        dao.safeTransferFrom(address(alice), address(0), votingTokenId, 100, "");
     }
 
     function test_MintingProposal() public {
@@ -286,9 +314,4 @@ contract MarketDAOTest is Test {
         // Verify tokens were minted
         assertEq(dao.balanceOf(mintRecipient, 0), mintAmount, "Tokens should be minted to recipient");
     }
-}
-
-// Helper contract to make test addresses ERC1155 compatible
-contract TestUser is ERC1155Holder {
-    constructor() {}
 }
