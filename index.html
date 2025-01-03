@@ -8,176 +8,341 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 1200px;
+            max-width: 800px;
             margin: 0 auto;
             padding: 20px;
+        .vote-amount {
+            width: 150px;
+            margin-right: 10px;
+            margin-bottom: 10px;
         }
         .section {
-            margin-bottom: 30px;
-            padding: 20px;
+            margin: 20px 0;
+            padding: 15px;
             border: 1px solid #ddd;
             border-radius: 5px;
         }
-        .proposal, .election {
-            margin: 10px 0;
-            padding: 10px;
-            background: #f5f5f5;
-            border-radius: 3px;
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
         }
         button {
-            margin: 5px;
-            padding: 8px 15px;
-            background: #007bff;
+            padding: 8px 16px;
+            background-color: #007bff;
             color: white;
             border: none;
-            border-radius: 3px;
+            border-radius: 4px;
             cursor: pointer;
         }
-        button:disabled {
-            background: #ccc;
+        button:hover {
+            background-color: #0056b3;
         }
-        input, textarea {
-            margin: 5px 0;
-            padding: 5px;
-            width: 100%;
-            max-width: 300px;
+        .debug {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            font-family: monospace;
         }
     </style>
 </head>
 <body>
-    <div id="connection">
-        <button onclick="connectWallet()">Connect Wallet</button>
-        <p id="walletInfo"></p>
+    <div class="section">
+        <button onclick="connect()">Connect Wallet</button>
+        <p id="status"></p>
     </div>
 
-    <div id="daoInfo" class="section">
-        <h2>DAO Information</h2>
-        <p>Name: <span id="daoName"></span></p>
-        <p>Your Governance Tokens: <span id="govTokens"></span></p>
-        <p>Total Supply: <span id="totalSupply"></span></p>
+    <div id="tokenInfo" class="section" style="display:none">
+        <h3>Token Information</h3>
+        <p>Your Balance: <span id="balance">0</span></p>
+        <p>Total Supply: <span id="totalSupply">0</span></p>
     </div>
 
-    <div id="createProposal" class="section">
-        <h2>Create Proposal</h2>
-        <textarea id="proposalDesc" placeholder="Proposal Description"></textarea><br>
-        <input type="text" id="mintTo" placeholder="Mint To Address (optional)"><br>
-        <input type="number" id="mintAmount" placeholder="Mint Amount (optional)"><br>
-        <button onclick="submitProposal()">Submit Proposal</button>
+    <div id="mintSection" class="section" style="display:none">
+        <h3>Mint Tokens (Owner Only)</h3>
+        <input type="text" id="mintTo" placeholder="Address to mint to">
+        <input type="number" id="mintAmount" placeholder="Amount">
+        <button onclick="mint()">Mint</button>
     </div>
 
-    <div id="activeProposals" class="section">
-        <h2>Active Proposals</h2>
+    <div id="proposalSection" class="section" style="display:none">
+        <h3>Create Proposal</h3>
+        <textarea id="proposalDesc" placeholder="Proposal Description" rows="4"></textarea>
+        <input type="text" id="proposalMintTo" placeholder="Mint To Address (optional)">
+        <input type="number" id="proposalMintAmount" placeholder="Mint Amount (optional)">
+        <button onclick="createProposal()">Submit Proposal</button>
+    </div>
+
+    <div id="activeProposalsSection" class="section" style="display:none">
+        <h3>Active Proposals</h3>
         <div id="proposalsList"></div>
     </div>
 
-    <div id="activeElections" class="section">
-        <h2>Active Elections</h2>
+    <div id="activeElectionsSection" class="section" style="display:none">
+        <h3>Active Elections</h3>
         <div id="electionsList"></div>
     </div>
 
+    <div id="debug" class="debug"></div>
+
     <script>
         const CONTRACT_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
-        const CONTRACT_ABI = [
-            "function daoName() view returns (string)",
-            "function balanceOf(address account, uint256 id) view returns (uint256)",
-            "function createProposal(string memory description, address mintTo, uint256 mintAmount) returns (uint256)",
-            "function supportProposal(uint256 proposalId)",
-            "function proposals(uint256) view returns (uint256 id, address proposer, string description, address mintTo, uint256 mintAmount, uint256 createdAt, uint256 supportCount, bool triggered)",
-            "function elections(uint256) view returns (uint256 id, uint256 proposalId, uint256 startTime, uint256 endTime, address yesVoteAddress, address noVoteAddress, uint256 totalVotingTokens, bool executed, uint256 votingTokenId)",
-            "function hasElectionPassed(uint256 electionId) view returns (bool)",
-            "function executeElection(uint256 electionId)",
-            "function _getGovernanceTokenHolders() view returns (address[])",
-            "function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes memory data)"
-        ];
-        
+        const GOVERNANCE_TOKEN_ID = 0;
         let provider, signer, contract;
         let currentAccount;
-        const GOVERNANCE_TOKEN_ID = 0;
+        
+        function log(message) {
+            const debug = document.getElementById('debug');
+            debug.innerHTML += `<p>${message}</p>`;
+            console.log(message);
+        }
 
-        async function connectWallet() {
+        async function connect() {
             try {
                 if (!window.ethereum) {
                     alert('Please install MetaMask!');
                     return;
                 }
 
-                provider = new ethers.BrowserProvider(window.ethereum);
-                const accounts = await provider.send("eth_requestAccounts", []);
-                currentAccount = accounts[0];
-                signer = await provider.getSigner();
-                contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-
-                document.getElementById('walletInfo').textContent = `Connected: ${currentAccount}`;
+                log('Requesting accounts...');
+                const accounts = await window.ethereum.request({ 
+                    method: 'eth_requestAccounts'
+                });
                 
-                // Load initial data
-                await updateDaoInfo();
+                currentAccount = accounts[0];
+                log(`Connected account: ${currentAccount}`);
+                document.getElementById('status').textContent = `Connected: ${currentAccount}`;
+
+                provider = new ethers.BrowserProvider(window.ethereum);
+                signer = await provider.getSigner();
+                
+                // Initialize contract with expanded ABI
+                contract = new ethers.Contract(
+                    CONTRACT_ADDRESS,
+                    [
+                        "function owner() view returns (address)",
+                        "function mint(address to, uint256 amount)",
+                        "function balanceOf(address account, uint256 id) view returns (uint256)",
+                        "function _getGovernanceTokenHolders() view returns (address[])",
+                        "function createProposal(string memory description, address mintTo, uint256 mintAmount) returns (uint256)",
+                        "function supportProposal(uint256 proposalId)",
+                        "function proposals(uint256) view returns (uint256 id, address proposer, string description, address mintTo, uint256 mintAmount, uint256 createdAt, uint256 supportCount, bool triggered)",
+                        "function elections(uint256) view returns (uint256 id, uint256 proposalId, uint256 startTime, uint256 endTime, address yesVoteAddress, address noVoteAddress, uint256 totalVotingTokens, bool executed, uint256 votingTokenId)",
+                        "function executeElection(uint256 electionId)",
+                        "function hasElectionPassed(uint256 electionId) view returns (bool)",
+                        "function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes memory data)"
+                    ],
+                    signer
+                );
+
+                const owner = await contract.owner();
+                if (owner.toLowerCase() === currentAccount.toLowerCase()) {
+                    document.getElementById('mintSection').style.display = 'block';
+                }
+
+                // Show all sections and update data
+                document.getElementById('tokenInfo').style.display = 'block';
+                document.getElementById('proposalSection').style.display = 'block';
+                document.getElementById('activeProposalsSection').style.display = 'block';
+                document.getElementById('activeElectionsSection').style.display = 'block';
+                await updateBalances();
                 await updateProposals();
                 await updateElections();
 
-                // Setup event listeners for updates
-                setInterval(async () => {
-                    await updateProposals();
-                    await updateElections();
-                }, 10000);
+            } catch (error) {
+                console.error('Error:', error);
+                log(`Error: ${error.message}`);
+            }
+        }
+
+        async function updateBalances() {
+            try {
+                // Get user's balance
+                const balance = await contract.balanceOf(currentAccount, GOVERNANCE_TOKEN_ID);
+                document.getElementById('balance').textContent = balance.toString();
+
+                // Calculate total supply from holders
+                const holders = await contract._getGovernanceTokenHolders();
+                let totalSupply = 0n;
+                for (const holder of holders) {
+                    const holderBalance = await contract.balanceOf(holder, GOVERNANCE_TOKEN_ID);
+                    totalSupply += holderBalance;
+                }
+                document.getElementById('totalSupply').textContent = totalSupply.toString();
+            } catch (error) {
+                log(`Error updating balances: ${error.message}`);
+            }
+        }
+
+        async function mint() {
+            try {
+                const to = document.getElementById('mintTo').value;
+                const amount = document.getElementById('mintAmount').value;
+
+                if (!ethers.isAddress(to)) {
+                    alert('Invalid address');
+                    return;
+                }
+
+                if (!amount || amount <= 0) {
+                    alert('Invalid amount');
+                    return;
+                }
+
+                log('Minting tokens...');
+                const tx = await contract.mint(to, amount);
+                log(`Transaction hash: ${tx.hash}`);
+                
+                log('Waiting for confirmation...');
+                await tx.wait();
+                log('Transaction confirmed!');
+                
+                // Clear inputs and update balances
+                document.getElementById('mintTo').value = '';
+                document.getElementById('mintAmount').value = '';
+                await updateBalances();
 
             } catch (error) {
-                console.error('Error connecting wallet:', error);
-                alert('Failed to connect wallet');
+                log(`Error minting: ${error.message}`);
             }
         }
 
-        async function updateDaoInfo() {
-            const name = await contract.daoName();
-            const balance = await contract.balanceOf(currentAccount, GOVERNANCE_TOKEN_ID);
-            
-            document.getElementById('daoName').textContent = name;
-            document.getElementById('govTokens').textContent = balance.toString();
-
-            // Get total supply by summing balances of all holders
-            const holders = await contract._getGovernanceTokenHolders();
-            let totalSupply = 0n;
-            for (const holder of holders) {
-                const balance = await contract.balanceOf(holder, GOVERNANCE_TOKEN_ID);
-                totalSupply += balance;
-            }
-            document.getElementById('totalSupply').textContent = totalSupply.toString();
-        }
-
-        async function submitProposal() {
+        async function createProposal() {
             try {
                 const description = document.getElementById('proposalDesc').value;
-                const mintTo = document.getElementById('mintTo').value;
-                const mintAmount = document.getElementById('mintAmount').value;
+                const mintTo = document.getElementById('proposalMintTo').value;
+                const mintAmount = document.getElementById('proposalMintAmount').value;
 
                 if (!description) {
                     alert('Description is required');
                     return;
                 }
 
+                log('Creating proposal...');
                 const tx = await contract.createProposal(
                     description,
                     mintTo || ethers.ZeroAddress,
                     mintAmount || 0
                 );
-                await tx.wait();
+                log(`Transaction hash: ${tx.hash}`);
                 
-                alert('Proposal created successfully!');
-                await updateProposals();
+                log('Waiting for confirmation...');
+                await tx.wait();
+                log('Proposal created!');
+                
+                // Clear inputs
+                document.getElementById('proposalDesc').value = '';
+                document.getElementById('proposalMintTo').value = '';
+                document.getElementById('proposalMintAmount').value = '';
+
             } catch (error) {
-                console.error('Error creating proposal:', error);
-                alert('Failed to create proposal');
+                log(`Error creating proposal: ${error.message}`);
+            }
+        }
+
+        async function updateProposals() {
+            try {
+                const proposalsList = document.getElementById('proposalsList');
+                proposalsList.innerHTML = '';
+                let proposalId = 0;
+                
+                while (true) {
+                    try {
+                        const proposal = await contract.proposals(proposalId);
+                        if (proposal.createdAt === 0n) break;
+
+                        const div = document.createElement('div');
+                        div.className = 'section';
+                        div.innerHTML = `
+                            <h4>Proposal #${proposalId}</h4>
+                            <p><strong>Description:</strong> ${proposal.description}</p>
+                            <p><strong>Proposer:</strong> ${proposal.proposer}</p>
+                            ${proposal.mintAmount > 0 ? `
+                                <p><strong>Mint To:</strong> ${proposal.mintTo}</p>
+                                <p><strong>Mint Amount:</strong> ${proposal.mintAmount.toString()}</p>
+                            ` : ''}
+                            <p><strong>Support:</strong> ${proposal.supportCount.toString()}</p>
+                            ${!proposal.triggered ? `
+                                <button onclick="supportProposal(${proposalId})">Support</button>
+                            ` : '<p><em>Election triggered</em></p>'}
+                        `;
+                        proposalsList.appendChild(div);
+                        proposalId++;
+                    } catch (error) {
+                        break;
+                    }
+                }
+            } catch (error) {
+                log(`Error updating proposals: ${error.message}`);
+            }
+        }
+
+        async function updateElections() {
+            try {
+                const electionsList = document.getElementById('electionsList');
+                electionsList.innerHTML = '';
+                let electionId = 0;
+                
+                while (true) {
+                    try {
+                        const election = await contract.elections(electionId);
+                        if (election.startTime === 0n) break;
+
+                        const proposal = await contract.proposals(election.proposalId);
+                        const hasEnded = BigInt(Math.floor(Date.now() / 1000)) > election.endTime;
+                        const hasPassed = await contract.hasElectionPassed(electionId);
+
+                        const div = document.createElement('div');
+                        div.className = 'section';
+                        div.innerHTML = `
+                            <h4>Election #${electionId}</h4>
+                            <p><strong>Proposal:</strong> ${proposal.description}</p>
+                            <p><strong>Voting Token ID:</strong> ${election.votingTokenId.toString()}</p>
+                            <p><strong>End Time:</strong> ${new Date(Number(election.endTime) * 1000).toLocaleString()}</p>
+                            <p><strong>Your Voting Tokens:</strong> ${balance.toString()}</p>
+                            <p><strong>Status:</strong> ${hasEnded ? (hasPassed ? 'Passed' : 'Failed') : 'Active'}</p>
+                            ${!election.executed && !hasEnded ? `
+                                <div>
+                                    <input type="number" id="voteAmount-${electionId}" 
+                                           placeholder="Amount of voting tokens" 
+                                           max="${balance.toString()}"
+                                           class="vote-amount">
+                                    <button onclick="vote(${electionId}, ${election.votingTokenId}, true)">Vote Yes</button>
+                                    <button onclick="vote(${electionId}, ${election.votingTokenId}, false)">Vote No</button>
+                                </div>
+                            ` : ''}
+                            ${hasPassed && !election.executed ? `
+                                <button onclick="executeElection(${electionId})">Execute</button>
+                            ` : ''}
+                        `;
+                        electionsList.appendChild(div);
+                        electionId++;
+                    } catch (error) {
+                        break;
+                    }
+                }
+            } catch (error) {
+                log(`Error updating elections: ${error.message}`);
             }
         }
 
         async function supportProposal(proposalId) {
             try {
+                log(`Supporting proposal ${proposalId}...`);
                 const tx = await contract.supportProposal(proposalId);
+                log(`Transaction hash: ${tx.hash}`);
+                
+                log('Waiting for confirmation...');
                 await tx.wait();
-                alert('Proposal supported successfully!');
+                log('Proposal supported!');
+                
                 await updateProposals();
+                await updateElections();
             } catch (error) {
-                console.error('Error supporting proposal:', error);
-                alert('Failed to support proposal');
+                log(`Error supporting proposal: ${error.message}`);
             }
         }
 
@@ -185,108 +350,65 @@
             try {
                 const election = await contract.elections(electionId);
                 const balance = await contract.balanceOf(currentAccount, votingTokenId);
+                const amount = BigInt(document.getElementById(`voteAmount-${electionId}`).value || "0");
                 
-                if (balance <= 0) {
-                    alert('No voting tokens available');
+                if (amount <= 0n) {
+                    alert('Please enter a valid amount');
+                    return;
+                }
+
+                if (amount > balance) {
+                    alert('Amount exceeds your voting token balance');
                     return;
                 }
 
                 const voteAddress = isYesVote ? election.yesVoteAddress : election.noVoteAddress;
+                log(`Voting ${isYesVote ? 'Yes' : 'No'} on election ${electionId} with ${amount} tokens...`);
+                
                 const tx = await contract.safeTransferFrom(
                     currentAccount,
                     voteAddress,
                     votingTokenId,
-                    balance,
+                    amount,
                     "0x"
                 );
+                log(`Transaction hash: ${tx.hash}`);
+                
+                log('Waiting for confirmation...');
                 await tx.wait();
-                alert('Vote cast successfully!');
+                log('Vote cast!');
+                
                 await updateElections();
             } catch (error) {
-                console.error('Error voting:', error);
-                alert('Failed to cast vote');
+                log(`Error voting: ${error.message}`);
             }
         }
 
         async function executeElection(electionId) {
             try {
+                log(`Executing election ${electionId}...`);
                 const tx = await contract.executeElection(electionId);
+                log(`Transaction hash: ${tx.hash}`);
+                
+                log('Waiting for confirmation...');
                 await tx.wait();
-                alert('Election executed successfully!');
+                log('Election executed!');
+                
                 await updateElections();
+                await updateBalances();
             } catch (error) {
-                console.error('Error executing election:', error);
-                alert('Failed to execute election');
+                log(`Error executing election: ${error.message}`);
             }
         }
 
-        async function updateProposals() {
-            const proposalsDiv = document.getElementById('proposalsList');
-            proposalsDiv.innerHTML = '';
-            
-            let proposalId = 0;
-            while (true) {
-                try {
-                    const proposal = await contract.proposals(proposalId);
-                    if (proposal.createdAt === 0n) break;
-
-                    const div = document.createElement('div');
-                    div.className = 'proposal';
-                    div.innerHTML = `
-                        <p><strong>Description:</strong> ${proposal.description}</p>
-                        <p><strong>Proposer:</strong> ${proposal.proposer}</p>
-                        ${proposal.mintAmount > 0 ? `
-                            <p><strong>Mint To:</strong> ${proposal.mintTo}</p>
-                            <p><strong>Mint Amount:</strong> ${proposal.mintAmount.toString()}</p>
-                        ` : ''}
-                        <p><strong>Support:</strong> ${proposal.supportCount.toString()}</p>
-                        ${!proposal.triggered ? `
-                            <button onclick="supportProposal(${proposalId})">Support</button>
-                        ` : '<p><em>Election triggered</em></p>'}
-                    `;
-                    proposalsDiv.appendChild(div);
-                    proposalId++;
-                } catch (error) {
-                    break;
-                }
-            }
-        }
-
-        async function updateElections() {
-            const electionsDiv = document.getElementById('electionsList');
-            electionsDiv.innerHTML = '';
-            
-            let electionId = 0;
-            while (true) {
-                try {
-                    const election = await contract.elections(electionId);
-                    if (election.startTime === 0n) break;
-
-                    const proposal = await contract.proposals(election.proposalId);
-                    const hasEnded = BigInt(Math.floor(Date.now() / 1000)) > election.endTime;
-                    const hasPassed = await contract.hasElectionPassed(electionId);
-
-                    const div = document.createElement('div');
-                    div.className = 'election';
-                    div.innerHTML = `
-                        <p><strong>Proposal:</strong> ${proposal.description}</p>
-                        <p><strong>Voting Token ID:</strong> ${election.votingTokenId.toString()}</p>
-                        <p><strong>End Time:</strong> ${new Date(Number(election.endTime) * 1000).toLocaleString()}</p>
-                        <p><strong>Status:</strong> ${hasEnded ? (hasPassed ? 'Passed' : 'Failed') : 'Active'}</p>
-                        ${!election.executed && !hasEnded ? `
-                            <button onclick="vote(${electionId}, ${election.votingTokenId}, true)">Vote Yes</button>
-                            <button onclick="vote(${electionId}, ${election.votingTokenId}, false)">Vote No</button>
-                        ` : ''}
-                        ${hasPassed && !election.executed ? `
-                            <button onclick="executeElection(${electionId})">Execute</button>
-                        ` : ''}
-                    `;
-                    electionsDiv.appendChild(div);
-                    electionId++;
-                } catch (error) {
-                    break;
-                }
-            }
+        // Setup MetaMask event listeners
+        if (window.ethereum) {
+            window.ethereum.on('accountsChanged', () => {
+                window.location.reload();
+            });
+            window.ethereum.on('chainChanged', () => {
+                window.location.reload();
+            });
         }
     </script>
 </body>
