@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -294,6 +295,7 @@
                         const proposal = await contract.proposals(election.proposalId);
                         const hasEnded = BigInt(Math.floor(Date.now() / 1000)) > election.endTime;
                         const hasPassed = await contract.hasElectionPassed(electionId);
+                        const balance = await contract.balanceOf(currentAccount, election.votingTokenId);
 
                         const div = document.createElement('div');
                         div.className = 'section';
