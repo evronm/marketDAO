@@ -1,18 +1,20 @@
 # Market DAO
 
-MarketDAO is a governance concept, bringing market forces to bear on group decisions.  The cheif conceit of MarketDAO is that the voting rights should be saleable.  This is a proof concept and as such is short on features. 
+MarketDAO is a governance concept, bringing market forces to bear on group decisions.  The cheif conceit of MarketDAO is that the voting rights should be tradeable.  This is a proof concept and as such is short on features. 
 
 ## POC Details
 
-  - The DAO is built around an 1155 contract the first of whose tokens is a governance token.  
+  - The DAO is built around an 1155 contract.
+    - Token 0 is a governance token.  
+    - The remainder of the token ID's are voting tokens, one ID per election.
   - A user must have Governance tokens to make proposals
   - A proposal consists of a description field and optional address and amount fields
     - Proposals that contain an amount must also contain a valid address.  If the proposal passes, the specified number of governance tokens are minted to the specified address.
-    - Proposals that do no contains an amount and address must contain a description.  These will be considered "resolutions" in the DAO if they pass.
+    - Proposals that do not contain an amount and address must contain a description.  These will be considered "resolutions" in the DAO if they pass.
   - Proposals must meet a support threshold to trigger an election.
     - Supporting a proposal costs only gas, but is limited by the number of governance tokens the user has. 
   - When an election is triggered:
-    - A voting token is emitted to every governance token holder for every governance token they hold.  
+    - A new voting token is emitted to every governance token holder for every governance token they hold.  
     - Addresses are created for "yes" and "no" votes
   - While an election is ongoing:
     - Any voting tokens sent to the "yes" or "no" address count as votes. Votes are irrevocable.
@@ -21,6 +23,7 @@ MarketDAO is a governance concept, bringing market forces to bear on group decis
   - When an electino ends, the "yes" and "no" addresses no longer accept voting tokens, rendering the voting tokens worthless
     - If, at the end of an election, the quorum is met and the "yes" votes outnumber the "no" votes, the resolution passes.  In this case, the election must be executed manually by any user.
     - If, at any point before the election ends, the "yes" vote total is more than half of the voting tokens issued, the resolution passes, thus obviating the need to execute it manually.
+    - Likewise, if at any point "no" votes comprise more than half of voting tokens issued, the resolution fails and no manual execution is needed.
 
 Upon logging in, the user is presented with:
 
@@ -40,6 +43,7 @@ Initial parameters:
   - Length of an election.
 
 ## Future Possibilities:
+  - Control of a treasury, with a new proposal type for treasury transfers.
   - Additional tokens which can be minted and/or transferred.
   - Multiple choice elections, as hinted above
   - Election length as a proposal parameter
