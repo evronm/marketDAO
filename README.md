@@ -5,6 +5,7 @@ MarketDAO is a governance concept, bringing market forces to bear on group decis
 ## Implementation Details
 
   - The DAO is built around an 1155 contract (inherits from the OpenZeppelin ERC1155 implementation) the first of whose tokens is a governance token.  
+    - The number of governance tokens may be fixed at creation time, or they may be mintable by proposal/election without limit.
   - The DAO may also optionally control a treasury wallet.
   - A user must have Governance tokens to make proposals
   - Proposals all inherit from the Proposal base class.
@@ -15,6 +16,7 @@ MarketDAO is a governance concept, bringing market forces to bear on group decis
         - Governance token mint - Mints a specified number of governance tokens to the specified address.  This type does not apply to DAOs with a fixed supply of governance tokens. Description is optional; address and amount are required.
   - Proposals must meet a support threshold to trigger an election.  This is based on total token supply.
     - Supporting a proposal costs only gas, but is limited by the number of governance tokens the user has. 
+    - The same governance tokens can be used to support multiple proposals.
   - When an election is triggered:
     - A voting token is emitted to every governance token holder for every governance token they hold.  
         - The voting token ID is one higher than the previous voting token ID.
@@ -23,7 +25,7 @@ MarketDAO is a governance concept, bringing market forces to bear on group decis
     - Any voting tokens sent to the "yes" or "no" address count as votes. Votes are irrevocable.
     - **Voting tokens may also be transferred from one address to another.  This is the distinguishing feature of this governance mechanism**.
     - The DAO does not implement a market for voting tokens, but voting tokens may be bought and sold on any existing marketplaces or directly between users
-  - When an electino ends, the "yes" and "no" addresses no longer accept voting tokens, rendering the voting tokens worthless
+  - When an electino ends, the "yes" and "no" addresses no longer accept voting tokens, rendering the voting tokens worthless.
     - If, at the end of an election, the quorum is met and the "yes" votes outnumber the "no" votes, the resolution passes.  In this case, the election must be executed manually by any user.
     - If, at any point before the election ends, the "yes" vote total is more than half of the voting tokens issued, the proposal passes, thus obviating the need to execute it manually.
     - Likewise if at any point the "no" votes total more than half the voting tokens issued, the election ends and the proposal fails.
