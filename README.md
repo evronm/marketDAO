@@ -6,7 +6,8 @@ MarketDAO is a governance concept, bringing market forces to bear on group decis
 
   - The DAO is built around an 1155 contract (inherits from the OpenZeppelin ERC1155 implementation) the first of whose tokens is a governance token.  
     - The number of governance tokens may be fixed at creation time, or they may be mintable by proposal/election without limit.
-  - The DAO may also optionally control a treasury wallet.
+  - The DAO may also optionally control a treasury.
+    - The treasury is held by the base contract, so it inherits from the requisite contracts.
   - A user must have Governance tokens to make proposals
   - Proposals all inherit from the Proposal base class.
     - The Proposal base class implements the entire proposal lifecycle including creation, support, election triggering, but not execution.  That's handled by the subclasses, which can also override other parts of the life cycle.
@@ -27,8 +28,9 @@ MarketDAO is a governance concept, bringing market forces to bear on group decis
     - The DAO does not implement a market for voting tokens, but voting tokens may be bought and sold on any existing marketplaces or directly between users
   - When an electino ends, the "yes" and "no" addresses no longer accept voting tokens, rendering the voting tokens worthless.
     - If, at the end of an election, the quorum is met and the "yes" votes outnumber the "no" votes, the resolution passes.  In this case, the election must be executed manually by any user.
-    - If, at any point before the election ends, the "yes" vote total is more than half of the voting tokens issued, the proposal passes, thus obviating the need to execute it manually.
-    - Likewise if at any point the "no" votes total more than half the voting tokens issued, the election ends and the proposal fails.
+    - Each time a vote is cast, a check is done for early termination.
+        - If the "yes" vote total is more than half of the voting tokens issued, the proposal passes, thus obviating the need to execute it manually.
+        - Likewise if the "no" votes total more than half the voting tokens issued, the election ends and the proposal fails.
 
 Initial parameters:
   - Name of the DAO
