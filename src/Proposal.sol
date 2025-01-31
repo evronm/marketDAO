@@ -43,6 +43,7 @@ abstract contract Proposal {
         proposer = msg.sender;
         description = _description;
         createdAt = block.number;
+        dao.setActiveProposal(address(this));
     }
     
     function addSupport(uint256 amount) external onlyBeforeElection {
@@ -135,6 +136,7 @@ abstract contract Proposal {
         _execute();
     }
     
-    // To be implemented by specific proposal types
-    function _execute() internal virtual;
+    function _execute() internal virtual {
+        require(!executed, "Already executed");
+    }
 }

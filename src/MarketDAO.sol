@@ -17,6 +17,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     
     uint256 private constant GOVERNANCE_TOKEN_ID = 0;
     uint256 private nextVotingTokenId = 1;
+    address public activeProposal;
     
     // Treasury configuration
     bool public hasTreasury;
@@ -28,6 +29,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     // Governance token holder tracking
     address[] private governanceTokenHolders;
     mapping(address => bool) private isGovernanceTokenHolder;
+    mapping(uint256 => uint256) private tokenSupply;
     
     constructor(
         string memory _name,
@@ -65,14 +67,20 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         for(uint i = 0; i < _initialHolders.length; i++) {
             if(_initialAmounts[i] > 0) {
                 _mint(_initialHolders[i], GOVERNANCE_TOKEN_ID, _initialAmounts[i], "");
+                tokenSupply[GOVERNANCE_TOKEN_ID] += _initialAmounts[i];
                 _addGovernanceTokenHolder(_initialHolders[i]);
             }
         }
     }
     
-    // Treasury receive functions
+    // Treasury functions
     receive() external payable {
         require(acceptsETH, "DAO does not accept ETH");
+    }
+
+    function transferETH(address payable recipient, uint256 amount) external {
+        require(msg.sender == activeProposal, "Only active proposal can transfer");
+        recipient.transfer(amount);
     }
     
     // Override ERC1155 transfer functions to handle voting tokens
@@ -163,6 +171,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     function mintVotingTokens(address to, uint256 tokenId, uint256 amount) external {
         require(msg.sender == activeProposal, "Only active proposal can mint");
         _mint(to, tokenId, amount, "");
+        tokenSupply[tokenId] += amount;
     }
     
     function mintGovernanceTokens(address to, uint256 amount) external {
@@ -170,15 +179,24 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         require(allowMinting, "Minting not allowed");
         _mint(to, GOVERNANCE_TOKEN_ID, amount, "");
         _addGovernanceTokenHolder(to);
+        tokenSupply[GOVERNANCE_TOKEN_ID] += amount;
+    }
+
+    function totalSupply(uint256 tokenId) external view returns (uint256) {
+        return tokenSupply[tokenId];
     }
 
     function getGovernanceTokenHolders() external view returns (address[] memory) {
         return governanceTokenHolders;
     }
 
-    address public activeProposal;
     function setActiveProposal(address proposal) external {
         require(activeProposal == address(0), "Proposal already active");
         activeProposal = proposal;
+    }
+
+    function clearActiveProposal() external {
+        require(msg.sender == activeProposal, "Only active proposal can clear");
+        activeProposal = address(0);
     }
 }

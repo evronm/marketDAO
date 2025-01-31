@@ -100,7 +100,6 @@ contract MarketDAOTest is Test {
             initialAmounts
         );
         
-        (bool success,) = address(noTreasuryDao).call{value: 1 ether}("");
-        assertTrue(!success);
+        payable(address(noTreasuryDao)).transfer(1 ether);
     }
 }

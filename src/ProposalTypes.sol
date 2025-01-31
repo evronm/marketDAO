@@ -12,7 +12,9 @@ contract ResolutionProposal is Proposal {
     }
 
     function _execute() internal override {
+        super._execute();
         executed = true;
+        dao.clearActiveProposal();
     }
 }
 
@@ -41,12 +43,11 @@ contract TreasuryProposal is Proposal {
     }
 
     function _execute() internal override {
-        require(!executed, "Already executed");
-        executed = true;
-
+        super._execute();
+        
         if(token == address(0)) {
             require(dao.acceptsETH(), "ETH not accepted");
-            payable(recipient).transfer(amount);
+            dao.transferETH(payable(recipient), amount);
         } else {
             if(tokenId == 0) {
                 require(dao.acceptsERC20(), "ERC20 not accepted");
@@ -61,6 +62,8 @@ contract TreasuryProposal is Proposal {
                 }
             }
         }
+        executed = true;
+        dao.clearActiveProposal();
     }
 }
 
@@ -83,8 +86,9 @@ contract MintProposal is Proposal {
     }
 
     function _execute() internal override {
-        require(!executed, "Already executed");
-        executed = true;
+        super._execute();
         dao.mintGovernanceTokens(recipient, amount);
+        executed = true;
+        dao.clearActiveProposal();
     }
 }
