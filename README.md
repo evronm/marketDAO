@@ -52,11 +52,14 @@ Upon logging in, the user is presented with:
   - A link to view the results of previous elections.
 
 ## Future Possibilities:
-  - Multiple choice elections
+  - Multiple choice proposals
+  - Expiring proposals
+  - Proposal revocation proposals
+  - Irrevocable or harder to revoke proposals, comprising a constitution of sorts
+    - One possibility:  per-proposal supermajority requirement, with the same supermajority requirement for revocation.
   - Election length as a proposal parameter
-  - A constitution, specified at creation time and requiring a tunable supermajority to change.
-    - Different rules could require different threshholds to change.
   - staking for proposals - proposer puts up a stake which gets burned if the proposal is not accepted, or if the proposal is not passed.  
     - Supporting a proposal could also require a stake.
+    - Stake can either be in governance tokens and burned or distributed, or in an exogenous currency with lost stakes going into the treasury.
 
 

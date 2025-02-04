@@ -3,18 +3,185 @@
 <head>
     <title>Market DAO</title>
     <style>
-        .hidden { display: none; }
-        .tab { padding: 10px; cursor: pointer; }
-        .active-tab { background: #eee; }
-        .proposal-form { margin-top: 20px; }
-        .proposal-form textarea, .proposal-form input {
-            display: block;
-            margin: 10px 0;
-            width: 300px;
-        }
-        .proposal-form textarea {
-            height: 100px;
-        }
+/* Base styles */
+:root {
+    --primary-color: #2563eb;
+    --primary-hover: #1d4ed8;
+    --secondary-color: #64748b;
+    --background-color: #f8fafc;
+    --surface-color: #ffffff;
+    --border-color: #e2e8f0;
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --success-color: #22c55e;
+    --error-color: #ef4444;
+    --transition: all 0.2s ease-in-out;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-primary);
+    line-height: 1.5;
+    margin: 0;
+    padding: 20px;
+}
+
+/* Layout */
+#main-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    background: var(--surface-color);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Connect Wallet Button */
+#connect-wallet {
+    display: flex;
+    justify-content: center;
+    padding: 40px;
+}
+
+#connect-wallet button {
+    padding: 12px 24px;
+    font-size: 1.1em;
+    font-weight: 600;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+#connect-wallet button:hover {
+    background-color: var(--primary-hover);
+    transform: translateY(-1px);
+}
+
+/* Tabs */
+#tabs {
+    display: flex;
+    gap: 8px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 24px;
+    padding-bottom: 4px;
+}
+
+.tab {
+    padding: 12px 20px;
+    border-radius: 8px 8px 0 0;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: var(--transition);
+}
+
+.tab:hover {
+    color: var(--primary-color);
+    background-color: rgba(37, 99, 235, 0.05);
+}
+
+.active-tab {
+    color: var(--primary-color);
+    background-color: rgba(37, 99, 235, 0.1);
+    border-bottom: 2px solid var(--primary-color);
+}
+
+/* Forms */
+.proposal-form {
+    max-width: 600px;
+    padding: 24px;
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-top: 24px;
+}
+
+.proposal-form h3 {
+    margin-top: 0;
+    color: var(--text-primary);
+}
+
+select, input, textarea {
+    width: 100%;
+    padding: 12px;
+    margin: 8px 0 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 1em;
+    transition: var(--transition);
+}
+
+select:focus, input:focus, textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 12px 20px;
+    font-size: 1em;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+button:hover {
+    background-color: var(--primary-hover);
+}
+
+/* Proposals List */
+.proposal {
+    padding: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    background: var(--surface-color);
+    transition: var(--transition);
+}
+
+.proposal:hover {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.proposal h3 {
+    margin-top: 0;
+    color: var(--text-primary);
+}
+
+.proposal input[type="number"] {
+    width: 200px;
+    margin-right: 12px;
+}
+
+/* DAO Info */
+#dao-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 16px;
+    padding: 20px;
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+#dao-info p {
+    margin: 8px 0;
+    padding: 12px;
+    background: var(--background-color);
+    border-radius: 6px;
+}
+
+/* Utility Classes */
+.hidden {
+    display: none !important;
+}
     </style>
 </head>
 <body>
