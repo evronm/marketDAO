@@ -52,11 +52,13 @@ Upon logging in, the user is presented with:
   - A link to view the results of previous elections.
 
 ## Future Possibilities:
+  - Resolution enhancements
+    - "Current" flag for each resolution.  This allows:
+      - Expiring resolutions
+      - Proposals to cancel resolutions
+          - Variable revocation requirements per resolution
+          - One possibility:  per-proposal supermajority requirement, with the same supermajority requirement for revocation.
   - Multiple choice proposals
-  - Expiring proposals
-  - Proposal revocation proposals
-  - Irrevocable or harder to revoke proposals, comprising a constitution of sorts
-    - One possibility:  per-proposal supermajority requirement, with the same supermajority requirement for revocation.
   - Election length as a proposal parameter
   - staking for proposals - proposer puts up a stake which gets burned if the proposal is not accepted, or if the proposal is not passed.  
     - Supporting a proposal could also require a stake.
