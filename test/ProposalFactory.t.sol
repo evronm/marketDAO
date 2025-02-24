@@ -25,6 +25,7 @@ contract ProposalFactoryTest is Test {
             100,
             50,
             true,
+            0, //token sales off
             treasuryConfig,
             initialHolders,
             initialAmounts

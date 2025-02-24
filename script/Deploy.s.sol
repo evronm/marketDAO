@@ -12,6 +12,7 @@ contract DeployConfig {
     uint256 constant MAX_PROPOSAL_AGE = 100;       // blocks until proposal expires
     uint256 constant ELECTION_DURATION = 50;       // blocks for voting period
     bool constant ALLOW_MINTING = true;            // can mint new governance tokens
+    uint256 constant TOKEN_PRICE = 0;       // blocks for voting period
 }
 
 contract DeployScript is Script, DeployConfig {
@@ -39,6 +40,7 @@ contract DeployScript is Script, DeployConfig {
             MAX_PROPOSAL_AGE,
             ELECTION_DURATION,
             ALLOW_MINTING,
+            TOKEN_PRICE,
             getTreasuryConfig(),
             initialHolders,
             initialAmounts

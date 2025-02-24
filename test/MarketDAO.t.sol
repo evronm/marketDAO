@@ -30,6 +30,7 @@ contract MarketDAOTest is Test {
             100, // 100 blocks max proposal age
             50,  // 50 blocks election duration
             true, // allow minting
+            0, //token sales off
             treasuryConfig,
             initialHolders,
             initialAmounts
@@ -95,6 +96,7 @@ contract MarketDAOTest is Test {
             100,
             50,
             true,
+            0, //token sales off
             treasuryConfig,
             initialHolders,
             initialAmounts

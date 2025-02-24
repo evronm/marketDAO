@@ -36,6 +36,7 @@ contract ProposalTest is Test {
             100, // max proposal age
             50,  // election duration
             true, // allow minting
+            0, //token sales off
             treasuryConfig,
             initialHolders,
             initialAmounts

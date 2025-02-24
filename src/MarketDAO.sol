@@ -14,6 +14,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     uint256 public maxProposalAge;          // max age of proposal without election
     uint256 public electionDuration;        // length of election in blocks
     bool public allowMinting;               // whether new governance tokens can be minted
+    uint256 public tokenPrice;              // price per token in wei (0 = direct sales disabled)
     
     uint256 private constant GOVERNANCE_TOKEN_ID = 0;
     uint256 private nextVotingTokenId = 1;
@@ -38,6 +39,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         uint256 _maxProposalAge,
         uint256 _electionDuration,
         bool _allowMinting,
+        uint256 _tokenPrice,
         string[] memory _treasuryConfig,
         address[] memory _initialHolders,
         uint256[] memory _initialAmounts
@@ -52,6 +54,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         maxProposalAge = _maxProposalAge;
         electionDuration = _electionDuration;
         allowMinting = _allowMinting;
+        tokenPrice = _tokenPrice;
         
         // Set up treasury configuration
         hasTreasury = _treasuryConfig.length > 0;
@@ -73,6 +76,19 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         }
     }
     
+    // Direct token purchase function
+    function purchaseTokens() external payable nonReentrant {
+        require(tokenPrice > 0, "Direct token sales disabled");
+        require(msg.value > 0, "Payment required");
+        require(msg.value % tokenPrice == 0, "Payment must be multiple of token price");
+        
+        uint256 tokenAmount = msg.value / tokenPrice;
+        _mint(msg.sender, GOVERNANCE_TOKEN_ID, tokenAmount, "");
+        tokenSupply[GOVERNANCE_TOKEN_ID] += tokenAmount;
+        _addGovernanceTokenHolder(msg.sender);
+    }
+    
+    // Rest of the contract remains unchanged... 
     // Treasury functions
     receive() external payable {
         require(acceptsETH, "DAO does not accept ETH");
