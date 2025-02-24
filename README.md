@@ -11,10 +11,11 @@ MarketDAO is a governance concept, bringing market forces to bear on group decis
   - A user must have Governance tokens to make proposals
   - Proposals all inherit from the Proposal base class.
     - The Proposal base class implements the entire proposal lifecycle including creation, support, election triggering, but not execution.  That's handled by the subclasses, which can also override other parts of the life cycle.
-    - There are 3 proposal types:
+    - There are 4 proposal types:
         - resolutions - These are text only proposals.  The description is treated as a resolution to pass and is required. 
         - Treasury transfer - Transfer a specified number of tokens from the treasury to a specified address.  This type only applies to DAOs that control a treasury.  Description is optional; address, amount and token type are required.
         - Governance token mint - Mints a specified number of governance tokens to the specified address.  This type does not apply to DAOs with a fixed supply of governance tokens. Description is optional; address and amount are required.
+        - Governance token price change - Sets the price of new governance tokens.  a 0 here disables direct governance token sales.
   - Proposals must meet a support threshold to trigger an election.  This is based on total token supply.
     - Supporting a proposal costs only gas, but is limited by the number of governance tokens the user has. 
     - The same governance tokens can be used to support multiple proposals.
