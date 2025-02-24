@@ -198,6 +198,11 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         tokenSupply[GOVERNANCE_TOKEN_ID] += amount;
     }
 
+    function setTokenPrice(uint256 newPrice) external {
+        require(msg.sender == activeProposal, "Only active proposal can set price");
+        tokenPrice = newPrice;
+    }
+
     function totalSupply(uint256 tokenId) external view returns (uint256) {
         return tokenSupply[tokenId];
     }

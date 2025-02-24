@@ -92,3 +92,23 @@ contract MintProposal is Proposal {
         dao.clearActiveProposal();
     }
 }
+
+contract TokenPriceProposal is Proposal {
+    uint256 public newPrice;
+
+    constructor(
+        MarketDAO _dao,
+        string memory _description,
+        uint256 _newPrice
+    ) Proposal(_dao, _description) {
+        require(bytes(_description).length > 0, "Description required");
+        newPrice = _newPrice;
+    }
+
+    function _execute() internal override {
+        super._execute();
+        dao.setTokenPrice(newPrice);
+        executed = true;
+        dao.clearActiveProposal();
+    }
+}

@@ -54,6 +54,20 @@ contract ProposalFactory {
         return proposal;
     }
 
+    
+    function createTokenPriceProposal(
+        string memory description,
+        uint256 newPrice
+    ) external returns (TokenPriceProposal) {
+        TokenPriceProposal proposal = new TokenPriceProposal(
+            dao,
+            description,
+            newPrice
+        );
+        proposals[proposalCount++] = address(proposal);
+        return proposal;
+    }
+
     function getProposal(uint256 index) external view returns (address) {
         require(index < proposalCount, "Invalid proposal index");
         return proposals[index];
