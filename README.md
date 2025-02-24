@@ -41,6 +41,7 @@ Initial parameters:
   - Treasury - a list of token types in the treasury.  If not present, no treasury is used and this is a governance only DAO.
     - Valid values for the list: "ETH", "ERC20", "ERC721", "ERC1155"
   - Allow/disallow governance token minting elections
+  - Initial token price - If set to 0, direct token sales are disabled
   - inintial token distribution as key value pairs (address, amount)
 
 Upon logging in, the user is presented with:
