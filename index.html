@@ -1,481 +1,293 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Market DAO</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market DAO Interface</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.5.2/dist/web3.min.js"></script>
     <style>
-/* Base styles */
-:root {
-    --primary-color: #2563eb;
-    --primary-hover: #1d4ed8;
-    --secondary-color: #64748b;
-    --background-color: #f8fafc;
-    --surface-color: #ffffff;
-    --border-color: #e2e8f0;
-    --text-primary: #1e293b;
-    --text-secondary: #64748b;
-    --success-color: #22c55e;
-    --error-color: #ef4444;
-    --transition: all 0.2s ease-in-out;
-}
-
-body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background-color: var(--background-color);
-    color: var(--text-primary);
-    line-height: 1.5;
-    margin: 0;
-    padding: 20px;
-}
-
-/* Layout */
-#main-content {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
-    background: var(--surface-color);
-    border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-/* Connect Wallet Button */
-#connect-wallet {
-    display: flex;
-    justify-content: center;
-    padding: 40px;
-}
-
-#connect-wallet button {
-    padding: 12px 24px;
-    font-size: 1.1em;
-    font-weight: 600;
-    background-color: var(--primary-color);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: var(--transition);
-}
-
-#connect-wallet button:hover {
-    background-color: var(--primary-hover);
-    transform: translateY(-1px);
-}
-
-/* Tabs */
-#tabs {
-    display: flex;
-    gap: 8px;
-    border-bottom: 1px solid var(--border-color);
-    margin-bottom: 24px;
-    padding-bottom: 4px;
-}
-
-.tab {
-    padding: 12px 20px;
-    border-radius: 8px 8px 0 0;
-    font-weight: 500;
-    color: var(--text-secondary);
-    transition: var(--transition);
-}
-
-.tab:hover {
-    color: var(--primary-color);
-    background-color: rgba(37, 99, 235, 0.05);
-}
-
-.active-tab {
-    color: var(--primary-color);
-    background-color: rgba(37, 99, 235, 0.1);
-    border-bottom: 2px solid var(--primary-color);
-}
-
-/* Forms */
-.proposal-form {
-    max-width: 600px;
-    padding: 24px;
-    background: var(--surface-color);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    margin-top: 24px;
-}
-
-.proposal-form h3 {
-    margin-top: 0;
-    color: var(--text-primary);
-}
-
-select, input, textarea {
-    width: 100%;
-    padding: 12px;
-    margin: 8px 0 16px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    font-size: 1em;
-    transition: var(--transition);
-}
-
-select:focus, input:focus, textarea:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
-}
-
-button {
-    background-color: var(--primary-color);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    padding: 12px 20px;
-    font-size: 1em;
-    font-weight: 500;
-    cursor: pointer;
-    transition: var(--transition);
-}
-
-button:hover {
-    background-color: var(--primary-hover);
-}
-
-/* Proposals List */
-.proposal {
-    padding: 20px;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    margin-bottom: 16px;
-    background: var(--surface-color);
-    transition: var(--transition);
-}
-
-.proposal:hover {
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-}
-
-.proposal h3 {
-    margin-top: 0;
-    color: var(--text-primary);
-}
-
-.proposal input[type="number"] {
-    width: 200px;
-    margin-right: 12px;
-}
-
-/* DAO Info */
-#dao-info {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 16px;
-    padding: 20px;
-    background: var(--surface-color);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-}
-
-#dao-info p {
-    margin: 8px 0;
-    padding: 12px;
-    background: var(--background-color);
-    border-radius: 6px;
-}
-
-/* Utility Classes */
-.hidden {
-    display: none !important;
-}
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .section {
+            background-color: #f4f4f4;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        input, select, button {
+            margin: 10px 0;
+            padding: 8px;
+            width: 100%;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
     </style>
 </head>
 <body>
-    <div id="connect-wallet" class="hidden">
-        <button onclick="connectWallet()">Connect Wallet</button>
+    <h1>Market DAO Interface</h1>
+
+    <div id="connect-section" class="section">
+        <h2>Connect Wallet</h2>
+        <button id="connectButton">Connect to MetaMask</button>
     </div>
 
-    <div id="main-content" class="hidden">
-        <div id="tabs">
-            <span class="tab" onclick="showTab('info')">DAO Info</span>
-            <span class="tab" onclick="showTab('create')">Create Proposal</span>
-            <span class="tab" onclick="showTab('proposals')">Active Proposals</span>
-            <span class="tab" onclick="showTab('elections')">Elections</span>
-            <span class="tab" onclick="showTab('past')">Past Elections</span>
-        </div>
-
-        <div id="info-tab" class="tab-content">
-            <h2>DAO Information</h2>
-            <div id="dao-info"></div>
-        </div>
-
-        <div id="create-tab" class="tab-content hidden">
-            <h2>Create Proposal</h2>
-            <select id="proposal-type" onchange="showProposalForm()">
-                <option value="">Select Proposal Type</option>
-                <option value="resolution">Resolution</option>
-                <option value="treasury">Treasury Transfer</option>
-                <option value="mint">Mint Tokens</option>
-            </select>
-
-            <div id="resolution-form" class="proposal-form hidden">
-                <h3>Resolution Proposal</h3>
-                <textarea id="resolution-description" placeholder="Description"></textarea>
-                <button onclick="createResolutionProposal()">Create</button>
-            </div>
-
-            <div id="treasury-form" class="proposal-form hidden">
-                <h3>Treasury Transfer</h3>
-                <textarea id="treasury-description" placeholder="Description"></textarea>
-                <input type="text" id="treasury-recipient" placeholder="Recipient Address">
-                <input type="number" id="treasury-amount" placeholder="Amount">
-                <input type="text" id="treasury-token" placeholder="Token Address (leave empty for ETH)">
-                <input type="number" id="treasury-tokenId" placeholder="Token ID (for NFTs)">
-                <button onclick="createTreasuryProposal()">Create</button>
-            </div>
-
-            <div id="mint-form" class="proposal-form hidden">
-                <h3>Mint Proposal</h3>
-                <textarea id="mint-description" placeholder="Description"></textarea>
-                <input type="text" id="mint-recipient" placeholder="Recipient Address">
-                <input type="number" id="mint-amount" placeholder="Amount">
-                <button onclick="createMintProposal()">Create</button>
-            </div>
-        </div>
-
-        <div id="proposals-tab" class="tab-content hidden">
-            <h2>Active Proposals</h2>
-            <div id="proposal-list"></div>
-        </div>
-
-        <div id="elections-tab" class="tab-content hidden">
-            <h2>Active Elections</h2>
-            <div id="election-list"></div>
-        </div>
-
-        <div id="past-tab" class="tab-content hidden">
-            <h2>Past Elections</h2>
-            <div id="past-list"></div>
-        </div>
+    <div id="dao-info" class="section" style="display:none;">
+        <h2>DAO Information</h2>
+        <p>Name: <span id="daoName"></span></p>
+        <p>Token Price: <span id="tokenPrice"></span> ETH</p>
+        <p>Support Threshold: <span id="supportThreshold"></span>%</p>
+        <p>Quorum Percentage: <span id="quorumPercentage"></span>%</p>
+        <p>Governance Token Balance: <span id="tokenBalance"></span></p>
+        <button id="purchaseTokens">Purchase Tokens</button>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
-    <script>
-        const DAO_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
-        const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512';
+    <div id="proposal-section" class="section" style="display:none;">
+        <h2>Create Proposal</h2>
+        <select id="proposalType">
+            <option value="resolution">Resolution Proposal</option>
+            <option value="treasury">Treasury Proposal</option>
+            <option value="mint">Mint Proposal</option>
+            <option value="price">Token Price Proposal</option>
+        </select>
+
+        <div id="proposal-details">
+            <input type="text" id="description" placeholder="Proposal Description">
+            
+            <!-- Treasury Proposal Fields -->
+            <div id="treasury-fields" style="display:none;">
+                <input type="text" id="recipient" placeholder="Recipient Address">
+                <input type="text" id="amount" placeholder="Amount (in ETH)">
+                <input type="text" id="token" placeholder="Token Address (optional)">
+                <input type="text" id="tokenId" placeholder="Token ID (optional)">
+            </div>
+
+            <!-- Mint Proposal Fields -->
+            <div id="mint-fields" style="display:none;">
+                <input type="text" id="mintRecipient" placeholder="Recipient Address">
+                <input type="text" id="mintAmount" placeholder="Amount to Mint">
+            </div>
+
+            <!-- Price Proposal Fields -->
+            <div id="price-fields" style="display:none;">
+                <input type="text" id="newPrice" placeholder="New Token Price (ETH)">
+            </div>
+        </div>
         
-        const daoABI = [
-            "function name() view returns (string)",
-            "function supportThreshold() view returns (uint256)",
-            "function quorumPercentage() view returns (uint256)",
-            "function maxProposalAge() view returns (uint256)",
-            "function electionDuration() view returns (uint256)",
-            "function allowMinting() view returns (bool)",
-            "function hasTreasury() view returns (bool)",
-            "function acceptsETH() view returns (bool)",
-            "function acceptsERC20() view returns (bool)",
-            "function acceptsERC721() view returns (bool)",
-            "function acceptsERC1155() view returns (bool)",
-            "function balanceOf(address account, uint256 id) view returns (uint256)",
-            "function totalSupply(uint256 id) view returns (uint256)",
-            "function getGovernanceTokenHolders() view returns (address[])",
-            "function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes data)",
-            "function setApprovalForAll(address operator, bool approved)"
-        ];
+        <button id="createProposal">Create Proposal</button>
+    </div>
 
-        const factoryABI = [
-            "function dao() view returns (address)",
-            "function proposals(uint256) view returns (address)",
-            "function proposalCount() view returns (uint256)",
-            "function createResolutionProposal(string description) returns (address)",
-            "function createTreasuryProposal(string description, address recipient, uint256 amount, address token, uint256 tokenId) returns (address)",
-            "function createMintProposal(string description, address recipient, uint256 amount) returns (address)",
-            "function getProposal(uint256 index) view returns (address)"
-        ];
+    <script>
+        // Contract configuration
+        const FACTORY_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
+        const DAO_ADDRESS = '0xd5ebe185d52486a7b4e5b957ebd44f84ffa6a5f2eae418e3821d0981642e5ee2';
 
-        const proposalABI = [
-            "function description() view returns (string)",
-            "function supportTotal() view returns (uint256)",
-            "function electionTriggered() view returns (bool)",
-            "function addSupport(uint256 amount)",
-            "function removeSupport(uint256 amount)",
-            "function yesVoteAddress() view returns (address)",
-            "function noVoteAddress() view returns (address)",
-            "function execute()"
-        ];
+        // Global application state
+        const state = {
+            web3: null,
+            daoContract: null,
+            factoryContract: null,
+            userAddress: null,
+            marketDaoABI: null,
+            proposalFactoryABI: null
+        };
 
-        let provider, signer, daoContract, factoryContract;
+        // Load ABI files
+        async function loadABIs() {
+            try {
+                // Fetch MarketDAO ABI
+                const marketDaoResponse = await fetch('MarketDAO.json');
+                const marketDaoJson = await marketDaoResponse.json();
+                state.marketDaoABI = marketDaoJson.abi;
 
-        async function init() {
-            if (typeof window.ethereum !== 'undefined') {
-                document.getElementById('connect-wallet').classList.remove('hidden');
+                // Fetch ProposalFactory ABI
+                const proposalFactoryResponse = await fetch('ProposalFactory.json');
+                const proposalFactoryJson = await proposalFactoryResponse.json();
+                state.proposalFactoryABI = proposalFactoryJson.abi;
+
+                return true;
+            } catch (error) {
+                console.error('Failed to load ABIs:', error);
+                alert('Failed to load contract ABIs. Check console for details.');
+                return false;
+            }
+        }
+
+        // Connect Wallet
+        async function connectWallet() {
+            // Ensure ABIs are loaded first
+            const abisLoaded = await loadABIs();
+            if (!abisLoaded) return;
+
+            if (window.ethereum) {
+                try {
+                    // Initialize Web3
+                    state.web3 = new Web3(window.ethereum);
+
+                    // Request account access
+                    const accounts = await window.ethereum.request({ 
+                        method: 'eth_requestAccounts' 
+                    });
+                    state.userAddress = state.web3.utils.toChecksumAddress(accounts[0]);
+
+                    // Properly checksum the addresses
+                    const factoryAddress = state.web3.utils.toChecksumAddress(FACTORY_ADDRESS);
+                    const daoAddress = state.web3.utils.toChecksumAddress(DAO_ADDRESS);
+
+                    // Initialize contracts
+                    state.daoContract = new state.web3.eth.Contract(
+                        state.marketDaoABI, 
+                        daoAddress
+                    );
+                    state.factoryContract = new state.web3.eth.Contract(
+                        state.proposalFactoryABI, 
+                        factoryAddress
+                    );
+
+                    // Fetch and display DAO info
+                    await fetchDaoInfo();
+
+                    // Show/hide sections
+                    document.getElementById('connect-section').style.display = 'none';
+                    document.getElementById('dao-info').style.display = 'block';
+                    document.getElementById('proposal-section').style.display = 'block';
+                } catch (error) {
+                    console.error('Failed to connect wallet', error);
+                    alert('Failed to connect wallet: ' + error.message);
+                }
             } else {
                 alert('Please install MetaMask!');
             }
         }
 
-        async function connectWallet() {
+        // Fetch DAO Information
+        async function fetchDaoInfo() {
+            if (!state.daoContract) return;
+
             try {
-                await window.ethereum.request({ method: 'eth_requestAccounts' });
-                provider = new ethers.providers.Web3Provider(window.ethereum);
-                signer = provider.getSigner();
-                
-                daoContract = new ethers.Contract(DAO_ADDRESS, daoABI, signer);
-                factoryContract = new ethers.Contract(FACTORY_ADDRESS, factoryABI, signer);
-                
-                document.getElementById('connect-wallet').classList.add('hidden');
-                document.getElementById('main-content').classList.remove('hidden');
-                
-                showTab('info');
-                loadDaoInfo();
-            } catch (err) {
-                console.error(err);
-                alert('Failed to connect wallet');
+                const name = await state.daoContract.methods.name().call();
+                const tokenPrice = await state.daoContract.methods.tokenPrice().call();
+                const supportThreshold = await state.daoContract.methods.supportThreshold().call();
+                const quorumPercentage = await state.daoContract.methods.quorumPercentage().call();
+                const tokenBalance = await state.daoContract.methods.balanceOf(state.userAddress, 0).call();
+
+                document.getElementById('daoName').textContent = name;
+                document.getElementById('tokenPrice').textContent = state.web3.utils.fromWei(tokenPrice, 'ether');
+                document.getElementById('supportThreshold').textContent = supportThreshold;
+                document.getElementById('quorumPercentage').textContent = quorumPercentage;
+                document.getElementById('tokenBalance').textContent = tokenBalance;
+            } catch (error) {
+                console.error('Error fetching DAO info', error);
             }
         }
 
-        function showTab(tabName) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            document.getElementById(tabName + '-tab').classList.remove('hidden');
-            
-            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active-tab'));
-            document.querySelector(`.tab[onclick="showTab('${tabName}')"]`).classList.add('active-tab');
+        // Purchase Tokens
+        async function purchaseTokens() {
+            if (!state.daoContract) return;
 
-            if (tabName === 'proposals') {
-                loadActiveProposals();
-            }
-        }
-
-        async function loadDaoInfo() {
             try {
-                const name = await daoContract.name();
-                const supportThreshold = await daoContract.supportThreshold();
-                const quorum = await daoContract.quorumPercentage();
-                const maxAge = await daoContract.maxProposalAge();
-                const duration = await daoContract.electionDuration();
-                const allowMint = await daoContract.allowMinting();
-                const hasTreasury = await daoContract.hasTreasury();
-                
-                document.getElementById('dao-info').innerHTML = `
-                    <p>Name: ${name}</p>
-                    <p>Support Threshold: ${supportThreshold}%</p>
-                    <p>Quorum: ${quorum}%</p>
-                    <p>Max Proposal Age: ${maxAge} blocks</p>
-                    <p>Election Duration: ${duration} blocks</p>
-                    <p>Allow Minting: ${allowMint}</p>
-                    <p>Has Treasury: ${hasTreasury}</p>
-                `;
-            } catch (err) {
-                console.error(err);
-                alert('Failed to load DAO info');
+                const tokenPrice = await state.daoContract.methods.tokenPrice().call();
+                await state.daoContract.methods.purchaseTokens().send({
+                    from: state.userAddress,
+                    value: tokenPrice
+                });
+                alert('Tokens purchased successfully!');
+                await fetchDaoInfo();
+            } catch (error) {
+                console.error('Token purchase failed', error);
+                alert('Token purchase failed: ' + error.message);
             }
         }
 
-        function showProposalForm() {
-            const type = document.getElementById('proposal-type').value;
-            document.querySelectorAll('.proposal-form').forEach(el => el.classList.add('hidden'));
-            if (type) {
-                document.getElementById(type + '-form').classList.remove('hidden');
-            }
-        }
+        // Create Proposal
+        async function createProposal() {
+            if (!state.factoryContract) return;
 
-        async function createResolutionProposal() {
+            const proposalType = document.getElementById('proposalType').value;
+            const description = document.getElementById('description').value;
+
             try {
-                const description = document.getElementById('resolution-description').value;
-                const tx = await factoryContract.createResolutionProposal(description);
-                await tx.wait();
-                alert('Resolution proposal created!');
-            } catch (err) {
-                console.error(err);
-                alert('Failed to create proposal');
-            }
-        }
-
-        async function createTreasuryProposal() {
-            try {
-                const description = document.getElementById('treasury-description').value;
-                const recipient = document.getElementById('treasury-recipient').value;
-                const amount = document.getElementById('treasury-amount').value;
-                const token = document.getElementById('treasury-token').value || ethers.constants.AddressZero;
-                const tokenId = document.getElementById('treasury-tokenId').value || 0;
-
-                const tx = await factoryContract.createTreasuryProposal(
-                    description,
-                    recipient,
-                    amount,
-                    token,
-                    tokenId
-                );
-                await tx.wait();
-                alert('Treasury proposal created!');
-            } catch (err) {
-                console.error(err);
-                alert('Failed to create proposal');
-            }
-        }
-
-        async function createMintProposal() {
-            try {
-                const description = document.getElementById('mint-description').value;
-                const recipient = document.getElementById('mint-recipient').value;
-                const amount = document.getElementById('mint-amount').value;
-
-                const tx = await factoryContract.createMintProposal(
-                    description,
-                    recipient,
-                    amount
-                );
-                await tx.wait();
-                alert('Mint proposal created!');
-            } catch (err) {
-                console.error(err);
-                alert('Failed to create proposal');
-            }
-        }
-
-        async function loadActiveProposals() {
-            try {
-                const count = await factoryContract.proposalCount();
-                let html = '';
-                
-                for(let i = 0; i < count; i++) {
-                    const proposalAddress = await factoryContract.getProposal(i);
-                    const proposalContract = new ethers.Contract(proposalAddress, proposalABI, signer);
-                    
-                    const description = await proposalContract.description();
-                    const supportTotal = await proposalContract.supportTotal();
-                    const electionTriggered = await proposalContract.electionTriggered();
-                    
-                    if (!electionTriggered) {
-                        html += `
-                            <div class="proposal">
-                                <h3>Proposal #${i}</h3>
-                                <p>${description}</p>
-                                <p>Support: ${supportTotal}</p>
-                                <input type="number" id="support-amount-${i}" placeholder="Amount to support">
-                                <button onclick="supportProposal('${proposalAddress}', ${i})">Support</button>
-                            </div>
-                        `;
-                    }
+                switch(proposalType) {
+                    case 'resolution':
+                        await state.factoryContract.methods.createResolutionProposal(description)
+                            .send({ from: state.userAddress });
+                        break;
+                    case 'treasury':
+                        const recipient = document.getElementById('recipient').value;
+                        const amount = state.web3.utils.toWei(document.getElementById('amount').value, 'ether');
+                        const token = document.getElementById('token').value || '0x0000000000000000000000000000000000000000';
+                        const tokenId = document.getElementById('tokenId').value || 0;
+                        
+                        await state.factoryContract.methods.createTreasuryProposal(
+                            description, 
+                            recipient, 
+                            amount, 
+                            token, 
+                            tokenId
+                        ).send({ from: state.userAddress });
+                        break;
+                    case 'mint':
+                        const mintRecipient = document.getElementById('mintRecipient').value;
+                        const mintAmount = state.web3.utils.toWei(document.getElementById('mintAmount').value, 'ether');
+                        
+                        await state.factoryContract.methods.createMintProposal(
+                            description, 
+                            mintRecipient, 
+                            mintAmount
+                        ).send({ from: state.userAddress });
+                        break;
+                    case 'price':
+                        const newPrice = state.web3.utils.toWei(document.getElementById('newPrice').value, 'ether');
+                        
+                        await state.factoryContract.methods.createTokenPriceProposal(
+                            description, 
+                            newPrice
+                        ).send({ from: state.userAddress });
+                        break;
                 }
-                
-                document.getElementById('proposal-list').innerHTML = html || 'No active proposals';
-            } catch (err) {
-                console.error(err);
-                alert('Failed to load proposals');
+                alert(`${proposalType} proposal created successfully!`);
+            } catch (error) {
+                console.error('Proposal creation failed', error);
+                alert('Proposal creation failed: ' + error.message);
             }
         }
 
-        async function supportProposal(proposalAddress, index) {
-            try {
-                const amount = document.getElementById(`support-amount-${index}`).value;
-                const proposalContract = new ethers.Contract(proposalAddress, proposalABI, signer);
-                
-                const tx = await proposalContract.addSupport(amount);
-                await tx.wait();
-                
-                loadActiveProposals();
-            } catch (err) {
-                console.error(err);
-                alert('Failed to support proposal');
-            }
-        }
+        // Event Listeners
+        document.getElementById('connectButton').addEventListener('click', connectWallet);
+        document.getElementById('purchaseTokens').addEventListener('click', purchaseTokens);
+        document.getElementById('createProposal').addEventListener('click', createProposal);
 
-        init();
+        // Proposal Type Selection
+        document.getElementById('proposalType').addEventListener('change', (e) => {
+            // Hide all proposal-specific fields
+            document.getElementById('treasury-fields').style.display = 'none';
+            document.getElementById('mint-fields').style.display = 'none';
+            document.getElementById('price-fields').style.display = 'none';
+
+            // Show relevant fields based on selected proposal type
+            switch(e.target.value) {
+                case 'treasury':
+                    document.getElementById('treasury-fields').style.display = 'block';
+                    break;
+                case 'mint':
+                    document.getElementById('mint-fields').style.display = 'block';
+                    break;
+                case 'price':
+                    document.getElementById('price-fields').style.display = 'block';
+                    break;
+            }
+        });
     </script>
 </body>
 </html>
