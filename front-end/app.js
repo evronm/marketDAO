@@ -1,3 +1,4 @@
+
 // Simple test to verify the script is loading
 console.log("MarketDAO app.js loaded!");
 
