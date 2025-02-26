@@ -1,6 +1,5 @@
-
-// Simple test to verify the script is loading
-console.log("MarketDAO app.js loaded!");
+// MarketDAO Frontend Application
+console.log("MarketDAO app loading...");
 
 // Contract ABIs
 const marketDAOABI = [
@@ -23,6 +22,9 @@ const marketDAOABI = [
     "function acceptsERC721() view returns (bool)",
     "function acceptsERC1155() view returns (bool)",
     "function hasTreasury() view returns (bool)",
+    
+    // Token transfers
+    "function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes data)",
     
     // Events to listen for
     "event TransferSingle(address indexed operator, address indexed from, address indexed to, uint256 id, uint256 value)"
@@ -68,6 +70,8 @@ const proposalABI = [
 // MarketDAO App
 class MarketDAOApp {
     constructor() {
+        console.log("Initializing MarketDAO app...");
+        
         // Contract addresses
         this.marketDAOAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
         this.proposalFactoryAddress = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
@@ -89,25 +93,62 @@ class MarketDAOApp {
         this.purchaseTokensBtn = document.getElementById('purchaseTokens');
         this.purchaseTokensSection = document.getElementById('tokenPurchaseSection');
         
-        // Initialize app
-        this.initApp();
+        // Initialize app when DOM is loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => this.initApp());
+        } else {
+            this.initApp();
+        }
     }
     
     async initApp() {
-        console.log("Initializing MarketDAO app...");
+        console.log("Setting up event listeners...");
         
         // Setup event listeners
         this.connectWalletBtn.addEventListener('click', () => {
             console.log("Connect wallet button clicked");
             this.connectWallet();
         });
+        
         this.proposalTypeSelect.addEventListener('change', () => this.updateProposalFields());
         this.submitProposalBtn.addEventListener('click', () => this.submitProposal());
         this.purchaseTokensBtn.addEventListener('click', () => this.purchaseTokens());
         
+        // Initial field setup
+        this.updateProposalFields();
+        
         // Check if already connected
         if (window.ethereum) {
             console.log("Ethereum provider detected");
+            
+            // Listen for network changes
+            window.ethereum.on('chainChanged', (chainId) => {
+                console.log(`Chain changed to ${chainId}`);
+                // Reload the page on chain change to refresh contract state
+                window.location.reload();
+            });
+            
+            // Listen for account changes
+            window.ethereum.on('accountsChanged', (accounts) => {
+                console.log("Accounts changed:", accounts);
+                if (accounts.length === 0) {
+                    console.log("User disconnected");
+                    // Update UI to reflect disconnected state
+                    this.connectWalletBtn.classList.remove('hidden');
+                    this.accountInfo.classList.add('hidden');
+                    
+                    // Clear contract instances
+                    this.daoContract = null;
+                    this.factoryContract = null;
+                    this.userAddress = null;
+                } else {
+                    console.log(`Switching to account ${accounts[0]}`);
+                    // Reconnect with the new account
+                    this.provider = new ethers.providers.Web3Provider(window.ethereum);
+                    this.setupConnection(accounts[0]);
+                }
+            });
+            
             try {
                 // Check if already connected
                 const accounts = await window.ethereum.request({ method: 'eth_accounts' });
@@ -130,6 +171,8 @@ class MarketDAOApp {
     }
     
     async connectWallet() {
+        console.log("Connecting wallet...");
+        
         if (!window.ethereum) {
             this.showNotification('Please install MetaMask or another Ethereum wallet', 'error');
             return;
@@ -138,6 +181,7 @@ class MarketDAOApp {
         try {
             // Request account access
             const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+            console.log("Accounts:", accounts);
             
             if (accounts.length === 0) {
                 this.showNotification('No accounts found. Please unlock your wallet and try again.', 'error');
@@ -165,8 +209,34 @@ class MarketDAOApp {
         // Create contract instances
         try {
             console.log("Creating contract instances...");
-            this.daoContract = new ethers.Contract(this.marketDAOAddress, marketDAOABI, this.signer);
-            this.factoryContract = new ethers.Contract(this.proposalFactoryAddress, proposalFactoryABI, this.signer);
+            
+            // Verify the provider and network
+            const network = await this.provider.getNetwork();
+            console.log(`Connected to network: ${network.name} (Chain ID: ${network.chainId})`);
+            
+            // Create contract instances with error handling
+            try {
+                this.daoContract = new ethers.Contract(this.marketDAOAddress, marketDAOABI, this.signer);
+                // Test a simple call to verify the contract exists and is accessible
+                const daoName = await this.daoContract.name().catch(error => {
+                    console.error("Error accessing DAO contract:", error);
+                    throw new Error(`Could not access DAO contract at ${this.marketDAOAddress}. Are you on the right network?`);
+                });
+                console.log(`Connected to DAO: ${daoName}`);
+            } catch (error) {
+                console.error("Failed to initialize DAO contract:", error);
+                this.showNotification(`Could not connect to DAO contract: ${error.message}`, 'error');
+                // Continue anyway to show UI
+            }
+            
+            try {
+                this.factoryContract = new ethers.Contract(this.proposalFactoryAddress, proposalFactoryABI, this.signer);
+                // We won't test a call here since it might fail if there are no proposals yet
+            } catch (error) {
+                console.error("Failed to initialize Factory contract:", error);
+                this.showNotification(`Could not connect to ProposalFactory contract: ${error.message}`, 'error');
+                // Continue anyway to show UI
+            }
             
             // Update UI
             this.connectWalletBtn.classList.add('hidden');
@@ -197,6 +267,7 @@ class MarketDAOApp {
     }
     
     async loadDAOInfo() {
+        console.log("Loading DAO info...");
         try {
             const daoName = await this.daoContract.name();
             const supportThreshold = await this.daoContract.supportThreshold();
@@ -206,6 +277,8 @@ class MarketDAOApp {
             const allowMinting = await this.daoContract.allowMinting();
             const tokenPrice = await this.daoContract.tokenPrice();
             const totalSupply = await this.daoContract.totalSupply(0); // Governance token ID is 0
+            
+            console.log("DAO info:", { daoName, supportThreshold, quorumPercentage, totalSupply });
             
             // Update UI
             document.getElementById('daoName').textContent = daoName;
@@ -224,23 +297,39 @@ class MarketDAOApp {
             }
             
         } catch (error) {
+            console.error("Error loading DAO info:", error);
             this.showNotification(`Failed to load DAO info: ${error.message}`, 'error');
         }
     }
     
     async loadUserBalance() {
+        console.log("Loading user balance...");
         try {
             const balance = await this.daoContract.balanceOf(this.userAddress, 0);
             this.accountBalance.textContent = `${ethers.utils.commify(balance)} governance tokens`;
             document.getElementById('userGovernanceTokens').textContent = ethers.utils.commify(balance);
         } catch (error) {
+            console.error("Error loading user balance:", error);
             this.showNotification(`Failed to load user balance: ${error.message}`, 'error');
         }
     }
     
     async loadProposals() {
+        console.log("Loading proposals...");
         try {
-            const proposalCount = await this.factoryContract.proposalCount();
+            // Safer way to check if the proposalCount method exists
+            let proposalCount;
+            try {
+                proposalCount = await this.factoryContract.proposalCount();
+                console.log(`Found ${proposalCount} proposals`);
+            } catch (countError) {
+                console.error("Error getting proposal count:", countError);
+                // Fallback to empty lists if we can't get the count
+                document.querySelector('#proposalsList').innerHTML = '<p class="empty-message">No active proposals found</p>';
+                document.querySelector('#electionsList').innerHTML = '<p class="empty-message">No active elections found</p>';
+                document.querySelector('#pastElectionsList').innerHTML = '<p class="empty-message">No past elections found</p>';
+                return;
+            }
             
             if (proposalCount.toNumber() === 0) {
                 document.querySelector('#proposalsList').innerHTML = '<p class="empty-message">No active proposals found</p>';
@@ -254,6 +343,7 @@ class MarketDAOApp {
             const pastElections = [];
             
             for (let i = 0; i < proposalCount.toNumber(); i++) {
+                console.log(`Loading proposal ${i}...`);
                 const proposalAddress = await this.factoryContract.getProposal(i);
                 const proposalContract = new ethers.Contract(proposalAddress, proposalABI, this.signer);
                 
@@ -264,6 +354,8 @@ class MarketDAOApp {
                 const userSupport = await proposalContract.support(this.userAddress);
                 const electionTriggered = await proposalContract.electionTriggered();
                 const proposalType = await this.determineProposalType(proposalContract);
+                
+                console.log(`Proposal ${i}: ${proposalType}, Election triggered: ${electionTriggered}`);
                 
                 const proposalData = {
                     address: proposalAddress,
@@ -313,18 +405,21 @@ class MarketDAOApp {
                 }
             }
             
+            console.log(`Found ${activeProposals.length} active proposals, ${activeElections.length} active elections, ${pastElections.length} past elections`);
+            
             // Update UI with the proposals
             this.displayActiveProposals(activeProposals);
             this.displayActiveElections(activeElections);
             this.displayPastElections(pastElections);
             
         } catch (error) {
+            console.error("Error loading proposals:", error);
             this.showNotification(`Failed to load proposals: ${error.message}`, 'error');
-            console.error(error);
         }
     }
     
     updateProposalFields() {
+        console.log("Updating proposal fields...");
         const selectedType = this.proposalTypeSelect.value;
         
         // Hide all conditional fields first
@@ -341,6 +436,7 @@ class MarketDAOApp {
     }
     
     async submitProposal() {
+        console.log("Submitting proposal...");
         try {
             const proposalType = this.proposalTypeSelect.value;
             const description = document.getElementById('proposalDescription').value.trim();
@@ -356,6 +452,7 @@ class MarketDAOApp {
             let tx;
             
             if (proposalType === 'resolution') {
+                console.log("Creating resolution proposal...");
                 tx = await this.factoryContract.createResolutionProposal(description);
             } 
             else if (proposalType === 'treasury') {
@@ -378,6 +475,7 @@ class MarketDAOApp {
                     return;
                 }
                 
+                console.log("Creating treasury proposal...");
                 tx = await this.factoryContract.createTreasuryProposal(
                     description,
                     recipient,
@@ -404,6 +502,7 @@ class MarketDAOApp {
                     return;
                 }
                 
+                console.log("Creating mint proposal...");
                 tx = await this.factoryContract.createMintProposal(
                     description,
                     recipient,
@@ -420,6 +519,7 @@ class MarketDAOApp {
                     return;
                 }
                 
+                console.log("Creating token price proposal...");
                 tx = await this.factoryContract.createTokenPriceProposal(
                     description,
                     newPrice
@@ -427,6 +527,7 @@ class MarketDAOApp {
             }
             
             // Wait for transaction confirmation
+            console.log("Waiting for transaction confirmation...");
             await tx.wait();
             
             this.showNotification(`Proposal created successfully!`, 'success');
@@ -445,8 +546,8 @@ class MarketDAOApp {
             await this.loadProposals();
             
         } catch (error) {
+            console.error("Error submitting proposal:", error);
             this.showNotification(`Failed to create proposal: ${error.message}`, 'error');
-            console.error(error);
         } finally {
             this.submitProposalBtn.disabled = false;
             this.submitProposalBtn.textContent = 'Submit Proposal';
@@ -454,6 +555,7 @@ class MarketDAOApp {
     }
     
     async purchaseTokens() {
+        console.log("Purchasing tokens...");
         try {
             const amount = document.getElementById('purchaseAmount').value;
             
@@ -473,10 +575,12 @@ class MarketDAOApp {
             this.purchaseTokensBtn.disabled = true;
             this.purchaseTokensBtn.textContent = 'Purchasing...';
             
+            console.log(`Purchasing ${amount} tokens for ${ethers.utils.formatEther(totalCost)} ETH`);
             const tx = await this.daoContract.purchaseTokens({
                 value: totalCost
             });
             
+            console.log("Waiting for purchase confirmation...");
             await tx.wait();
             
             this.showNotification(`Successfully purchased ${amount} governance tokens!`, 'success');
@@ -486,8 +590,8 @@ class MarketDAOApp {
             await this.loadUserBalance();
             
         } catch (error) {
+            console.error("Error purchasing tokens:", error);
             this.showNotification(`Failed to purchase tokens: ${error.message}`, 'error');
-            console.error(error);
         } finally {
             this.purchaseTokensBtn.disabled = false;
             this.purchaseTokensBtn.textContent = 'Purchase';
@@ -495,8 +599,10 @@ class MarketDAOApp {
     }
     
     setupEventListeners() {
+        console.log("Setting up blockchain event listeners...");
         // Listen for token transfers
         this.daoContract.on("TransferSingle", async (operator, from, to, id, value) => {
+            console.log(`TransferSingle event: ${from} -> ${to}, ID: ${id}, Value: ${value}`);
             // If it involves the current user, refresh their balance
             if (from.toLowerCase() === this.userAddress.toLowerCase() || 
                 to.toLowerCase() === this.userAddress.toLowerCase()) {
@@ -511,6 +617,7 @@ class MarketDAOApp {
     }
     
     displayActiveProposals(proposals) {
+        console.log(`Displaying ${proposals.length} active proposals`);
         const container = document.getElementById('proposalsList');
         
         if (proposals.length === 0) {
@@ -551,6 +658,7 @@ class MarketDAOApp {
                     addSupportBtn.disabled = true;
                     addSupportBtn.textContent = 'Processing...';
                     
+                    console.log(`Adding ${amount} support to proposal ${proposal.address}`);
                     const proposalContract = new ethers.Contract(proposal.address, proposalABI, this.signer);
                     const tx = await proposalContract.addSupport(amount);
                     await tx.wait();
@@ -558,8 +666,8 @@ class MarketDAOApp {
                     this.showNotification(`Successfully added support!`, 'success');
                     await this.loadProposals();
                 } catch (error) {
+                    console.error("Error adding support:", error);
                     this.showNotification(`Failed to add support: ${error.message}`, 'error');
-                    console.error(error);
                 } finally {
                     addSupportBtn.disabled = false;
                     addSupportBtn.textContent = 'Add Support';
@@ -578,6 +686,7 @@ class MarketDAOApp {
                     removeSupportBtn.disabled = true;
                     removeSupportBtn.textContent = 'Processing...';
                     
+                    console.log(`Removing ${amount} support from proposal ${proposal.address}`);
                     const proposalContract = new ethers.Contract(proposal.address, proposalABI, this.signer);
                     const tx = await proposalContract.removeSupport(amount);
                     await tx.wait();
@@ -585,8 +694,8 @@ class MarketDAOApp {
                     this.showNotification(`Successfully removed support!`, 'success');
                     await this.loadProposals();
                 } catch (error) {
+                    console.error("Error removing support:", error);
                     this.showNotification(`Failed to remove support: ${error.message}`, 'error');
-                    console.error(error);
                 } finally {
                     removeSupportBtn.disabled = false;
                     removeSupportBtn.textContent = 'Remove Support';
@@ -598,6 +707,7 @@ class MarketDAOApp {
     }
     
     displayActiveElections(elections) {
+        console.log(`Displaying ${elections.length} active elections`);
         const container = document.getElementById('electionsList');
         
         if (elections.length === 0) {
@@ -625,8 +735,19 @@ class MarketDAOApp {
             const voteNoBtn = element.querySelector('.vote-no');
             const executeBtn = element.querySelector('.execute');
             
-            // Hide execute button during active election
-            executeBtn.classList.add('hidden');
+            // Handle execute button visibility
+            this.provider.getBlockNumber().then(currentBlock => {
+                if (currentBlock >= election.endBlock) {
+                    executeBtn.classList.remove('hidden');
+                    
+                    // Execute action
+                    executeBtn.addEventListener('click', async () => {
+                        await this.executeProposal(election);
+                    });
+                } else {
+                    executeBtn.classList.add('hidden');
+                }
+            });
             
             // Vote Yes action
             voteYesBtn.addEventListener('click', async () => {
@@ -643,6 +764,7 @@ class MarketDAOApp {
     }
     
     displayPastElections(elections) {
+        console.log(`Displaying ${elections.length} past elections`);
         const container = document.getElementById('pastElectionsList');
         
         if (elections.length === 0) {
@@ -673,6 +795,7 @@ class MarketDAOApp {
     }
     
     async vote(election, isYesVote) {
+        console.log(`Voting ${isYesVote ? 'Yes' : 'No'} on election ${election.address}`);
         const voteAddress = isYesVote ? election.yesVoteAddress : election.noVoteAddress;
         const voteType = isYesVote ? 'Yes' : 'No';
         
@@ -682,7 +805,8 @@ class MarketDAOApp {
         }
         
         try {
-            // First, get approval to transfer all voting tokens
+            console.log(`Transferring ${election.userVotingTokens} tokens to ${voteAddress}`);
+            // Transfer voting tokens to the vote address
             const tx = await this.daoContract.safeTransferFrom(
                 this.userAddress,
                 voteAddress,
@@ -696,8 +820,34 @@ class MarketDAOApp {
             this.showNotification(`Successfully voted ${voteType}!`, 'success');
             await this.loadProposals();
         } catch (error) {
+            console.error("Error voting:", error);
             this.showNotification(`Failed to vote: ${error.message}`, 'error');
-            console.error(error);
+        }
+    }
+    
+    // Execute a proposal
+    async executeProposal(election) {
+        console.log(`Executing proposal ${election.address}`);
+        try {
+            const proposalContract = new ethers.Contract(election.address, proposalABI, this.signer);
+            
+            // Check if the proposal can be executed
+            const yesVotes = parseInt(election.yesVotes);
+            const noVotes = parseInt(election.noVotes);
+            
+            if (yesVotes <= noVotes) {
+                this.showNotification('This proposal cannot be executed as it did not pass', 'error');
+                return;
+            }
+            
+            const tx = await proposalContract.execute();
+            await tx.wait();
+            
+            this.showNotification('Proposal executed successfully!', 'success');
+            await this.loadProposals();
+        } catch (error) {
+            console.error("Error executing proposal:", error);
+            this.showNotification(`Failed to execute proposal: ${error.message}`, 'error');
         }
     }
     
@@ -722,45 +872,31 @@ class MarketDAOApp {
         }, 3000);
     }
     
-    // Execute a proposal
-    async executeProposal(election) {
-        try {
-            const proposalContract = new ethers.Contract(election.address, proposalABI, this.signer);
-            
-            // Check if the proposal can be executed
-            const yesVotes = parseInt(election.yesVotes);
-            const noVotes = parseInt(election.noVotes);
-            
-            if (yesVotes <= noVotes) {
-                this.showNotification('This proposal cannot be executed as it did not pass', 'error');
-                return;
-            }
-            
-            const tx = await proposalContract.execute();
-            await tx.wait();
-            
-            this.showNotification('Proposal executed successfully!', 'success');
-            await this.loadProposals();
-        } catch (error) {
-            this.showNotification(`Failed to execute proposal: ${error.message}`, 'error');
-            console.error(error);
-        }
-    }
-    
     // Helper function to get proposal type name from contract address
     async determineProposalType(proposalContract) {
         try {
             // Try to access specific fields to determine type
-            if (await proposalContract.newPrice) {
+            try {
+                const newPrice = await proposalContract.newPrice();
                 return 'Token Price Change';
-            } else if (await proposalContract.token) {
+            } catch (e) {}
+            
+            try {
+                const token = await proposalContract.token();
                 return 'Treasury Transfer';
-            } else if (await proposalContract.recipient && await proposalContract.amount) {
-                return 'Mint Governance Tokens';
-            } else {
-                return 'Resolution';
-            }
+            } catch (e) {}
+            
+            try {
+                const recipient = await proposalContract.recipient();
+                const amount = await proposalContract.amount();
+                if (recipient && amount) {
+                    return 'Mint Governance Tokens';
+                }
+            } catch (e) {}
+            
+            return 'Resolution';
         } catch (error) {
+            console.error("Error determining proposal type:", error);
             return 'Unknown';
         }
     }
@@ -768,5 +904,6 @@ class MarketDAOApp {
 
 // Initialize the app when the page loads
 document.addEventListener('DOMContentLoaded', () => {
+    console.log("DOM loaded - creating MarketDAO app instance");
     const app = new MarketDAOApp();
 });
