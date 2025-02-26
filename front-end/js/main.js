@@ -77,30 +77,48 @@ async function initializeApp() {
  * Enable UI elements that require a wallet connection
  */
 function enableUI() {
-    const interactiveElements = document.querySelectorAll('button:not(#connectWalletBtn), form');
+    console.log("Enabling UI elements...");
     
-    interactiveElements.forEach(element => {
+    // Enable all interactive elements
+    document.querySelectorAll('button:not(#connectWalletBtn)').forEach(button => {
+        button.removeAttribute('disabled');
+    });
+    
+    document.querySelectorAll('input, textarea, select').forEach(element => {
         element.removeAttribute('disabled');
+    });
+    
+    document.querySelectorAll('form').forEach(form => {
+        form.removeAttribute('disabled');
     });
     
     document.querySelectorAll('.panel').forEach(panel => {
         panel.classList.remove('disabled');
     });
+    
+    console.log("UI elements enabled");
 }
 
 /**
  * Disable UI elements that require a wallet connection
  */
 function disableUI() {
-    const interactiveElements = document.querySelectorAll('button:not(#connectWalletBtn), input, textarea, select');
+    console.log("Disabling UI elements due to no wallet connection...");
     
-    interactiveElements.forEach(element => {
-        element.setAttribute('disabled', 'disabled');
+    // Disable form elements except the wallet connect button
+    document.querySelectorAll('button:not(#connectWalletBtn), input:not([readonly]), textarea:not([readonly]), select').forEach(element => {
+        if (element.id !== 'connectWalletBtn') {
+            element.setAttribute('disabled', 'disabled');
+        }
     });
     
     document.querySelectorAll('.panel').forEach(panel => {
-        panel.classList.add('disabled');
+        if (!panel.id.includes('wallet')) {
+            panel.classList.add('disabled');
+        }
     });
+    
+    console.log("UI elements disabled");
 }
 
 /**

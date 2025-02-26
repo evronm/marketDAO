@@ -344,6 +344,19 @@ footer {
     cursor: pointer;
 }
 
+/* Disabled panels */
+.panel.disabled {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.panel.disabled input,
+.panel.disabled textarea,
+.panel.disabled button,
+.panel.disabled select {
+    pointer-events: none;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .dao-stats {

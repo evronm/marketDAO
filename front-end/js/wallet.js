@@ -30,9 +30,13 @@ class WalletManager {
         }
 
         try {
+            console.log("Attempting to connect wallet...");
+            
             // Request account access
             const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
             this.address = accounts[0];
+            
+            console.log("Wallet connected:", this.address);
             
             // Create ethers provider and signer
             this.provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -42,6 +46,8 @@ class WalletManager {
             const network = await this.provider.getNetwork();
             this.networkId = network.chainId;
             
+            console.log("Network connected:", this.networkId);
+            
             // Setup event listeners for MetaMask
             this.setupEventListeners();
             
@@ -49,7 +55,7 @@ class WalletManager {
             this.isConnected = true;
             
             // Initialize contracts
-            contracts.initialize(this.provider, this.signer);
+            window.contracts.initialize(this.provider, this.signer);
             
             // Call the connect callbacks
             this._callCallbacks(this.onConnectCallbacks, this.address);
