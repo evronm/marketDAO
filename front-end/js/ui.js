@@ -1,157 +1,358 @@
-// ui.js - Handles UI initialization and interactions
+// UI interaction for the Market DAO application
 
-/**
- * Initialize the UI components
- * @param {Object} state - Application state
- */
-export function initUI(state) {
-    setupTabs();
-    setupProposalTypeSelector();
-    setupNotificationClose();
-}
+class UIManager {
+    constructor() {
+        this.initialized = false;
+    }
 
-/**
- * Setup tab switching functionality
- */
-function setupTabs() {
-    const tabButtons = document.querySelectorAll('.tab-button');
-    const tabPanes = document.querySelectorAll('.tab-pane');
-    
-    tabButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            const tabId = button.getAttribute('data-tab');
-            
-            // Update active tab button
-            tabButtons.forEach(btn => btn.classList.remove('active'));
-            button.classList.add('active');
-            
-            // Update active tab content
-            tabPanes.forEach(pane => pane.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-        });
-    });
-}
-
-/**
- * Setup proposal type selector to show/hide relevant fields
- */
-function setupProposalTypeSelector() {
-    const proposalTypeSelect = document.getElementById('proposal-type');
-    const proposalFields = document.querySelectorAll('.proposal-field');
-    
-    proposalTypeSelect.addEventListener('change', function() {
-        const selectedType = this.value;
+    /**
+     * Initialize the UI
+     */
+    initialize() {
+        // Only initialize once
+        if (this.initialized) return;
         
-        // Hide all proposal fields
-        proposalFields.forEach(field => field.style.display = 'none');
+        // Setup tabs
+        this.setupTabs();
         
-        // Show fields for the selected proposal type
-        if (selectedType !== 'resolution') {
-            document.querySelectorAll(`.${selectedType}-field`).forEach(field => {
-                field.style.display = 'block';
+        // Setup form submissions
+        this.setupForms();
+        
+        // Setup wallet connection button
+        this.setupWalletButton();
+        
+        this.initialized = true;
+    }
+
+    /**
+     * Setup tab switching
+     */
+    setupTabs() {
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // Remove active class from all buttons and contents
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabContents.forEach(content => content.classList.remove('active'));
+                
+                // Add active class to clicked button
+                button.classList.add('active');
+                
+                // Show corresponding content
+                const tabId = button.getAttribute('data-tab');
+                document.getElementById(tabId).classList.add('active');
             });
-        }
-    });
-}
-
-/**
- * Setup notification close button
- */
-function setupNotificationClose() {
-    const closeButton = document.getElementById('notification-close');
-    if (closeButton) {
-        closeButton.addEventListener('click', () => {
-            document.getElementById('notification').style.display = 'none';
         });
     }
-}
 
-/**
- * Format an address for display (0x1234...5678)
- * @param {string} address - The address to format
- * @returns {string} - Formatted address
- */
-export function formatAddress(address) {
-    if (!address) return '';
-    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
-}
+    /**
+     * Setup form submissions
+     */
+    setupForms() {
+        // Resolution proposal form
+        const resolutionForm = document.getElementById('resolutionForm');
+        resolutionForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            await this.handleResolutionFormSubmit(resolutionForm);
+        });
+        
+        // Treasury proposal form
+        const treasuryForm = document.getElementById('treasuryForm');
+        treasuryForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            await this.handleTreasuryFormSubmit(treasuryForm);
+        });
+        
+        // Mint proposal form
+        const mintForm = document.getElementById('mintForm');
+        mintForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            await this.handleMintFormSubmit(mintForm);
+        });
+        
+        // Token price proposal form
+        const tokenPriceForm = document.getElementById('tokenPriceForm');
+        tokenPriceForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            await this.handleTokenPriceFormSubmit(tokenPriceForm);
+        });
+        
+        // Buy tokens form
+        const buyTokensBtn = document.getElementById('buyTokensBtn');
+        buyTokensBtn.addEventListener('click', async () => {
+            await this.handleBuyTokens();
+        });
+    }
 
-/**
- * Format Wei to Ether
- * @param {ethers.BigNumber} wei - The amount in Wei
- * @returns {string} - Formatted Ether amount
- */
-export function formatEther(wei) {
-    return ethers.utils.formatEther(wei);
-}
+    /**
+     * Setup wallet connection button
+     */
+    setupWalletButton() {
+        const connectWalletBtn = document.getElementById('connectWalletBtn');
+        
+        connectWalletBtn.addEventListener('click', async () => {
+            if (!wallet.isConnected) {
+                try {
+                    await wallet.connect();
+                } catch (error) {
+                    Utils.showNotification(`Failed to connect wallet: ${error.message}`, 'error');
+                }
+            } else {
+                wallet.disconnect();
+            }
+        });
+        
+        // Update button text when wallet connection state changes
+        wallet.onConnect((address) => {
+            connectWalletBtn.textContent = 'Disconnect Wallet';
+            document.getElementById('accountAddress').textContent = Utils.shortenAddress(address);
+            document.getElementById('accountInfo').classList.remove('hidden');
+            
+            // Update wallet balance
+            this.updateWalletBalance();
+            
+            // Refresh balance periodically
+            this.balanceInterval = setInterval(() => {
+                this.updateWalletBalance();
+            }, CONFIG.refreshIntervals.userInfo);
+        });
+        
+        wallet.onDisconnect(() => {
+            connectWalletBtn.textContent = 'Connect Wallet';
+            document.getElementById('accountInfo').classList.add('hidden');
+            
+            if (this.balanceInterval) {
+                clearInterval(this.balanceInterval);
+                this.balanceInterval = null;
+            }
+        });
+    }
 
-/**
- * Update DAO information in the UI
- * @param {Object} daoInfo - DAO information object
- * @param {Object} userInfo - User information object
- */
-export function updateDaoInfo(daoInfo, userInfo) {
-    document.getElementById('dao-name').textContent = daoInfo.name || 'Unknown';
-    document.getElementById('support-threshold').textContent = `${daoInfo.supportThreshold || 0}%`;
-    document.getElementById('quorum').textContent = `${daoInfo.quorumPercentage || 0}%`;
-    document.getElementById('max-proposal-age').textContent = `${daoInfo.maxProposalAge || 0} blocks`;
-    document.getElementById('election-duration').textContent = `${daoInfo.electionDuration || 0} blocks`;
-    document.getElementById('token-price').textContent = daoInfo.tokenPrice ? 
-        `${ethers.utils.formatEther(daoInfo.tokenPrice)} ETH` : '0 ETH';
-    
-    // Update user balance if available
-    if (userInfo) {
-        document.getElementById('governance-balance').textContent = userInfo.balance.toString();
+    /**
+     * Update wallet balance display
+     */
+    async updateWalletBalance() {
+        if (!wallet.isConnected) return;
+        
+        try {
+            const balance = await wallet.getBalance();
+            document.getElementById('accountBalance').textContent = `${parseFloat(balance).toFixed(4)} ETH`;
+        } catch (error) {
+            console.error('Error updating wallet balance:', error);
+        }
+    }
+
+    /**
+     * Handle resolution proposal form submission
+     * @param {HTMLFormElement} form - The form element
+     */
+    async handleResolutionFormSubmit(form) {
+        if (!wallet.isConnected) {
+            Utils.showNotification('Please connect your wallet first', 'error');
+            return;
+        }
+        
+        try {
+            const description = form.elements.resolutionDescription.value.trim();
+            
+            if (!description) {
+                Utils.showNotification('Description is required', 'error');
+                return;
+            }
+            
+            await proposalManager.createProposal(CONFIG.proposalTypes.RESOLUTION, {
+                description
+            });
+            
+            // Reset form
+            form.reset();
+        } catch (error) {
+            console.error('Error creating resolution proposal:', error);
+            Utils.showNotification(`Failed to create proposal: ${error.message}`, 'error');
+        }
+    }
+
+    /**
+     * Handle treasury proposal form submission
+     * @param {HTMLFormElement} form - The form element
+     */
+    async handleTreasuryFormSubmit(form) {
+        if (!wallet.isConnected) {
+            Utils.showNotification('Please connect your wallet first', 'error');
+            return;
+        }
+        
+        try {
+            const description = form.elements.treasuryDescription.value.trim();
+            const recipient = form.elements.treasuryRecipient.value.trim();
+            const amount = form.elements.treasuryAmount.value;
+            const token = form.elements.treasuryToken.value.trim();
+            const tokenId = form.elements.treasuryTokenId.value;
+            
+            if (!description) {
+                Utils.showNotification('Description is required', 'error');
+                return;
+            }
+            
+            if (!Utils.isValidAddress(recipient)) {
+                Utils.showNotification('Invalid recipient address', 'error');
+                return;
+            }
+            
+            if (isNaN(amount) || parseFloat(amount) <= 0) {
+                Utils.showNotification('Amount must be greater than 0', 'error');
+                return;
+            }
+            
+            if (!Utils.isValidAddress(token)) {
+                Utils.showNotification('Invalid token address', 'error');
+                return;
+            }
+            
+            if (isNaN(tokenId) || parseInt(tokenId) < 0) {
+                Utils.showNotification('Token ID must be a non-negative number', 'error');
+                return;
+            }
+            
+            // Convert amount to BigNumber
+            const amountBN = ethers.utils.parseUnits(amount, 'ether');
+            
+            await proposalManager.createProposal(CONFIG.proposalTypes.TREASURY, {
+                description,
+                recipient,
+                amount: amountBN,
+                token,
+                tokenId: parseInt(tokenId)
+            });
+            
+            // Reset form
+            form.reset();
+        } catch (error) {
+            console.error('Error creating treasury proposal:', error);
+            Utils.showNotification(`Failed to create proposal: ${error.message}`, 'error');
+        }
+    }
+
+    /**
+     * Handle mint proposal form submission
+     * @param {HTMLFormElement} form - The form element
+     */
+    async handleMintFormSubmit(form) {
+        if (!wallet.isConnected) {
+            Utils.showNotification('Please connect your wallet first', 'error');
+            return;
+        }
+        
+        try {
+            const description = form.elements.mintDescription.value.trim();
+            const recipient = form.elements.mintRecipient.value.trim();
+            const amount = form.elements.mintAmount.value;
+            
+            if (!description) {
+                Utils.showNotification('Description is required', 'error');
+                return;
+            }
+            
+            if (!Utils.isValidAddress(recipient)) {
+                Utils.showNotification('Invalid recipient address', 'error');
+                return;
+            }
+            
+            if (isNaN(amount) || parseInt(amount) <= 0) {
+                Utils.showNotification('Amount must be greater than 0', 'error');
+                return;
+            }
+            
+            await proposalManager.createProposal(CONFIG.proposalTypes.MINT, {
+                description,
+                recipient,
+                amount: parseInt(amount)
+            });
+            
+            // Reset form
+            form.reset();
+        } catch (error) {
+            console.error('Error creating mint proposal:', error);
+            Utils.showNotification(`Failed to create proposal: ${error.message}`, 'error');
+        }
+    }
+
+    /**
+     * Handle token price proposal form submission
+     * @param {HTMLFormElement} form - The form element
+     */
+    async handleTokenPriceFormSubmit(form) {
+        if (!wallet.isConnected) {
+            Utils.showNotification('Please connect your wallet first', 'error');
+            return;
+        }
+        
+        try {
+            const description = form.elements.priceDescription.value.trim();
+            const newPrice = form.elements.newTokenPrice.value;
+            
+            if (!description) {
+                Utils.showNotification('Description is required', 'error');
+                return;
+            }
+            
+            if (isNaN(newPrice) || parseInt(newPrice) < 0) {
+                Utils.showNotification('New price must be a non-negative number', 'error');
+                return;
+            }
+            
+            await proposalManager.createProposal(CONFIG.proposalTypes.TOKEN_PRICE, {
+                description,
+                newPrice: ethers.BigNumber.from(newPrice)
+            });
+            
+            // Reset form
+            form.reset();
+        } catch (error) {
+            console.error('Error creating token price proposal:', error);
+            Utils.showNotification(`Failed to create proposal: ${error.message}`, 'error');
+        }
+    }
+
+    /**
+     * Handle buy tokens action
+     */
+    async handleBuyTokens() {
+        if (!wallet.isConnected) {
+            Utils.showNotification('Please connect your wallet first', 'error');
+            return;
+        }
+        
+        try {
+            const ethAmount = document.getElementById('tokenAmount').value;
+            
+            if (isNaN(ethAmount) || parseFloat(ethAmount) <= 0) {
+                Utils.showNotification('Please enter a valid amount', 'error');
+                return;
+            }
+            
+            await daoManager.buyTokens(ethAmount);
+            
+            // Reset form
+            document.getElementById('tokenAmount').value = '';
+        } catch (error) {
+            console.error('Error buying tokens:', error);
+            Utils.showNotification(`Failed to buy tokens: ${error.message}`, 'error');
+        }
+    }
+
+    /**
+     * Clean up when disconnecting
+     */
+    cleanup() {
+        if (this.balanceInterval) {
+            clearInterval(this.balanceInterval);
+            this.balanceInterval = null;
+        }
     }
 }
 
-/**
- * Update wallet connection status in the UI
- * @param {boolean} connected - Whether wallet is connected
- * @param {string} account - Connected account address
- */
-export function updateWalletStatus(connected, account) {
-    const walletAddressElement = document.getElementById('wallet-address');
-    const connectWalletButton = document.getElementById('connect-wallet');
-    
-    if (connected && account) {
-        walletAddressElement.textContent = formatAddress(account);
-        connectWalletButton.textContent = 'Connected';
-        connectWalletButton.classList.add('success');
-    } else {
-        walletAddressElement.textContent = 'Not connected';
-        connectWalletButton.textContent = 'Connect Wallet';
-        connectWalletButton.classList.remove('success');
-    }
-}
-
-/**
- * Show a loading spinner or message
- * @param {string} elementId - ID of the element to show loading state
- * @param {string} message - Loading message to display
- */
-export function showLoading(elementId, message = 'Loading...') {
-    const element = document.getElementById(elementId);
-    if (!element) return;
-    
-    element.innerHTML = `
-        <div class="loading">
-            <div class="spinner"></div>
-            <p>${message}</p>
-        </div>
-    `;
-}
-
-/**
- * Hide the loading spinner
- * @param {string} elementId - ID of the element to hide loading state
- */
-export function hideLoading(elementId) {
-    const element = document.getElementById(elementId);
-    if (!element) return;
-    
-    const loading = element.querySelector('.loading');
-    if (loading) {
-        loading.remove();
-    }
-}
+// Create a singleton instance and ensure it's defined in the global scope
+window.uiManager = new UIManager();
