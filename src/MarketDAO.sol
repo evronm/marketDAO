@@ -18,7 +18,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     
     uint256 private constant GOVERNANCE_TOKEN_ID = 0;
     uint256 private nextVotingTokenId = 1;
-    address public activeProposal;
+    mapping(address => bool) public activeProposals;
     
     // Treasury configuration
     bool public hasTreasury;
@@ -88,14 +88,13 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         _addGovernanceTokenHolder(msg.sender);
     }
     
-    // Rest of the contract remains unchanged... 
     // Treasury functions
     receive() external payable {
         require(acceptsETH, "DAO does not accept ETH");
     }
 
     function transferETH(address payable recipient, uint256 amount) external {
-        require(msg.sender == activeProposal, "Only active proposal can transfer");
+        require(activeProposals[msg.sender], "Only active proposal can transfer");
         recipient.transfer(amount);
     }
     
@@ -176,22 +175,25 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     
     // Internal helper to check if a token ID is an active voting token
     function _isActiveVotingToken(uint256 tokenId) internal view returns (bool) {
-        // TODO: Implement check against active elections
+        // Simplified check for testing purposes
         return tokenId > GOVERNANCE_TOKEN_ID && tokenId < nextVotingTokenId;
     }
     
     function getNextVotingTokenId() external returns (uint256) {
-        return nextVotingTokenId++;
+        require(activeProposals[msg.sender], "Only active proposal can request voting token ID");
+        uint256 tokenId = nextVotingTokenId;
+        nextVotingTokenId += 1;
+        return tokenId;
     }
 
     function mintVotingTokens(address to, uint256 tokenId, uint256 amount) external {
-        require(msg.sender == activeProposal, "Only active proposal can mint");
+        require(activeProposals[msg.sender], "Only active proposal can mint");
         _mint(to, tokenId, amount, "");
         tokenSupply[tokenId] += amount;
     }
     
     function mintGovernanceTokens(address to, uint256 amount) external {
-        require(msg.sender == activeProposal, "Only active proposal can mint");
+        require(activeProposals[msg.sender], "Only active proposal can mint");
         require(allowMinting, "Minting not allowed");
         _mint(to, GOVERNANCE_TOKEN_ID, amount, "");
         _addGovernanceTokenHolder(to);
@@ -199,7 +201,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     }
 
     function setTokenPrice(uint256 newPrice) external {
-        require(msg.sender == activeProposal, "Only active proposal can set price");
+        require(activeProposals[msg.sender], "Only active proposal can set price");
         tokenPrice = newPrice;
     }
 
@@ -212,12 +214,16 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     }
 
     function setActiveProposal(address proposal) external {
-        require(activeProposal == address(0), "Proposal already active");
-        activeProposal = proposal;
+        activeProposals[proposal] = true;
     }
 
     function clearActiveProposal() external {
-        require(msg.sender == activeProposal, "Only active proposal can clear");
-        activeProposal = address(0);
+        require(activeProposals[msg.sender], "Only active proposal can clear itself");
+        activeProposals[msg.sender] = false;
+    }
+    
+    // Helper function to check if a proposal is active
+    function isProposalActive(address proposal) external view returns (bool) {
+        return activeProposals[proposal];
     }
 }
