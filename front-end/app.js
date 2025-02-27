@@ -15,7 +15,8 @@ const daoABI = [
   "function totalSupply(uint256 id) view returns (uint256)",
   "function purchaseTokens() payable",
   "function getGovernanceTokenHolders() view returns (address[])",
-  "function isProposalActive(address proposal) view returns (bool)"
+  "function isProposalActive(address proposal) view returns (bool)",
+  "function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes data)"
 ];
 
 const factoryABI = [
@@ -40,6 +41,9 @@ const proposalABI = [
   "function addSupport(uint256 amount)",
   "function removeSupport(uint256 amount)",
   "function canTriggerElection() view returns (bool)",
+  "function votingTokenId() view returns (uint256)",
+  "function yesVoteAddress() view returns (address)",
+  "function noVoteAddress() view returns (address)",
   // Additional fields for specific proposal types
   "function recipient() view returns (address)",
   "function amount() view returns (uint256)",
@@ -323,6 +327,68 @@ async function loadProposal(address, index) {
       } catch (error) {
         console.error('Error removing support:', error);
         alert('Failed to remove support');
+      }
+    });
+    
+    voteYesBtn.addEventListener('click', async () => {
+      try {
+        // Get voting token ID from proposal
+        const votingTokenId = await proposal.votingTokenId();
+        
+        // Transfer voting tokens to the yes vote address
+        const yesVoteAddress = await proposal.yesVoteAddress();
+        const votingBalance = await daoContract.balanceOf(userAddress, votingTokenId);
+        
+        if (votingBalance.isZero()) {
+          alert('You don\'t have any voting tokens for this proposal');
+          return;
+        }
+        
+        const tx = await daoContract.safeTransferFrom(
+          userAddress,
+          yesVoteAddress,
+          votingTokenId,
+          votingBalance,
+          "0x"
+        );
+        
+        await tx.wait();
+        alert('Voted YES successfully!');
+        await loadProposals();
+      } catch (error) {
+        console.error('Error voting yes:', error);
+        alert('Failed to vote yes: ' + error.message);
+      }
+    });
+    
+    voteNoBtn.addEventListener('click', async () => {
+      try {
+        // Get voting token ID from proposal
+        const votingTokenId = await proposal.votingTokenId();
+        
+        // Transfer voting tokens to the no vote address
+        const noVoteAddress = await proposal.noVoteAddress();
+        const votingBalance = await daoContract.balanceOf(userAddress, votingTokenId);
+        
+        if (votingBalance.isZero()) {
+          alert('You don\'t have any voting tokens for this proposal');
+          return;
+        }
+        
+        const tx = await daoContract.safeTransferFrom(
+          userAddress,
+          noVoteAddress,
+          votingTokenId,
+          votingBalance,
+          "0x"
+        );
+        
+        await tx.wait();
+        alert('Voted NO successfully!');
+        await loadProposals();
+      } catch (error) {
+        console.error('Error voting no:', error);
+        alert('Failed to vote no: ' + error.message);
       }
     });
     
