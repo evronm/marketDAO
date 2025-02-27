@@ -100,6 +100,10 @@ class ContractManager {
      * Get the DAO contract instance
      */
     getDAOContract() {
+        if (!this.contracts.dao) {
+            console.warn("DAO contract not initialized, attempting to reconnect");
+            this.createReadOnlyInstances();
+        }
         return this.contracts.dao;
     }
     
@@ -107,6 +111,10 @@ class ContractManager {
      * Get the factory contract instance
      */
     getFactoryContract() {
+        if (!this.contracts.factory) {
+            console.warn("Factory contract not initialized, attempting to reconnect");
+            this.createReadOnlyInstances();
+        }
         return this.contracts.factory;
     }
     
@@ -152,6 +160,22 @@ class ContractManager {
         try {
             const dao = this.getDAOContract();
             
+            // Ensure contract is available
+            if (!dao) {
+                console.error("DAO contract is not initialized");
+                
+                // Try to reconnect contracts
+                this.createReadOnlyInstances();
+                
+                // Check again
+                if (!this.contracts.dao) {
+                    throw new Error("Cannot connect to DAO contract");
+                }
+                
+                // Use the reconnected contract
+                console.log("Successfully reconnected to contracts");
+            }
+            
             const [
                 name,
                 supportThreshold,
@@ -167,19 +191,19 @@ class ContractManager {
                 acceptsERC1155,
                 tokenSupply
             ] = await Promise.all([
-                dao.name(),
-                dao.supportThreshold(),
-                dao.quorumPercentage(),
-                dao.maxProposalAge(),
-                dao.electionDuration(),
-                dao.allowMinting(),
-                dao.tokenPrice(),
-                dao.hasTreasury(),
-                dao.acceptsETH(),
-                dao.acceptsERC20(),
-                dao.acceptsERC721(),
-                dao.acceptsERC1155(),
-                dao.totalSupply(0)
+                this.contracts.dao.name(),
+                this.contracts.dao.supportThreshold(),
+                this.contracts.dao.quorumPercentage(),
+                this.contracts.dao.maxProposalAge(),
+                this.contracts.dao.electionDuration(),
+                this.contracts.dao.allowMinting(),
+                this.contracts.dao.tokenPrice(),
+                this.contracts.dao.hasTreasury(),
+                this.contracts.dao.acceptsETH(),
+                this.contracts.dao.acceptsERC20(),
+                this.contracts.dao.acceptsERC721(),
+                this.contracts.dao.acceptsERC1155(),
+                this.contracts.dao.totalSupply(0)
             ]);
             
             return {
@@ -341,15 +365,15 @@ class ContractManager {
                             proposal.noVoteAddress()
                         ]);
                         
-                        // Get vote counts
+                                                    // Get vote counts
                         const [
                             yesVotes,
                             noVotes,
                             totalVotes
                         ] = await Promise.all([
-                            dao.balanceOf(yesVoteAddress, votingTokenId),
-                            dao.balanceOf(noVoteAddress, votingTokenId),
-                            dao.totalSupply(votingTokenId)
+                            this.contracts.dao.balanceOf(yesVoteAddress, votingTokenId),
+                            this.contracts.dao.balanceOf(noVoteAddress, votingTokenId),
+                            this.contracts.dao.totalSupply(votingTokenId)
                         ]);
                         
                         electionInfo = {
@@ -359,7 +383,7 @@ class ContractManager {
                             yesVotes: yesVotes.toNumber(),
                             noVotes: noVotes.toNumber(),
                             totalVotes: totalVotes.toNumber(),
-                            endBlock: electionStart.toNumber() + await dao.electionDuration()
+                            endBlock: electionStart.toNumber() + await this.contracts.dao.electionDuration()
                         };
                     }
                     

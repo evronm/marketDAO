@@ -45,6 +45,12 @@ class App {
     async refreshData() {
         if (!this.contractsInitialized) {
             console.warn('Cannot refresh data: contracts not initialized');
+            // Try to initialize contracts anyway
+            if (window.Contracts) {
+                Contracts.initialize();
+                // Give it a moment to initialize before trying again
+                setTimeout(() => this.refreshData(), 1000);
+            }
             return;
         }
         
@@ -54,6 +60,18 @@ class App {
                 console.warn('Components not ready yet, delaying refresh');
                 setTimeout(() => this.refreshData(), 500);
                 return;
+            }
+            
+            // Ensure contracts are connected
+            if (!Contracts.contracts.dao || !Contracts.contracts.factory) {
+                console.warn('Contracts not connected, attempting to reconnect...');
+                Contracts.createReadOnlyInstances();
+                
+                // If still not connected, try again later
+                if (!Contracts.contracts.dao || !Contracts.contracts.factory) {
+                    setTimeout(() => this.refreshData(), 1000);
+                    return;
+                }
             }
             
             // Refresh DAO info
