@@ -4,225 +4,400 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Market DAO</title>
-    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/normalize.css@8.0.1/normalize.min.css">
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.2/css/all.min.css">
 </head>
 <body>
-    <header>
-        <div class="container">
-            <h1>Market DAO</h1>
-            <div class="wallet-connect">
-                <button id="connectWalletBtn">Connect Wallet</button>
-                <div id="accountInfo" class="hidden">
-                    <span id="accountAddress"></span>
-                    <span id="accountBalance"></span>
+    <div class="app-container">
+        <div id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <div class="dao-logo">
+                    <i class="fas fa-leaf"></i>
+                </div>
+                <h1 class="dao-name">Market DAO</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <ul>
+                    <li><a href="#" class="nav-link active" data-section="dashboard"><i class="fas fa-chart-line"></i> Dashboard</a></li>
+                    <li><a href="#" class="nav-link" data-section="proposals"><i class="fas fa-file-signature"></i> Proposals</a></li>
+                    <li><a href="#" class="nav-link" data-section="elections"><i class="fas fa-vote-yea"></i> Elections</a></li>
+                    <li><a href="#" class="nav-link" data-section="tokens"><i class="fas fa-coins"></i> Tokens</a></li>
+                    <li><a href="#" class="nav-link" data-section="treasury"><i class="fas fa-vault"></i> Treasury</a></li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="connect-wallet" class="btn-connect">Connect Wallet</button>
+                <div id="wallet-info" class="wallet-info hidden">
+                    <span id="account-address"></span>
+                    <span id="token-balance"></span>
                 </div>
             </div>
         </div>
-    </header>
-
-    <main class="container">
-        <section id="daoInfo" class="panel">
-            <h2>DAO Information</h2>
-            <div class="dao-stats">
-                <div class="stat-item">
-                    <h3>Name</h3>
-                    <p id="daoName">Loading...</p>
-                </div>
-                <div class="stat-item">
-                    <h3>Support Threshold</h3>
-                    <p id="supportThreshold">Loading...</p>
-                </div>
-                <div class="stat-item">
-                    <h3>Quorum</h3>
-                    <p id="quorumPercentage">Loading...</p>
-                </div>
-                <div class="stat-item">
-                    <h3>Max Proposal Age</h3>
-                    <p id="maxProposalAge">Loading...</p>
-                </div>
-                <div class="stat-item">
-                    <h3>Election Duration</h3>
-                    <p id="electionDuration">Loading...</p>
-                </div>
-                <div class="stat-item">
-                    <h3>Current Token Price</h3>
-                    <p id="tokenPrice">Loading...</p>
-                </div>
-                <div class="stat-item">
-                    <h3>Your Tokens</h3>
-                    <p id="userTokens">Loading...</p>
-                </div>
-            </div>
-        </section>
-
-        <section id="tokenManagement" class="panel">
-            <h2>Token Management</h2>
-            <div class="token-actions">
-                <div class="buy-tokens">
-                    <h3>Buy Governance Tokens</h3>
-                    <div class="form-group">
-                        <label for="tokenAmount">Amount (ETH)</label>
-                        <input type="number" id="tokenAmount" min="0" step="0.01">
-                        <button id="buyTokensBtn">Purchase</button>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section id="createProposal" class="panel">
-            <h2>Create a Proposal</h2>
-            <div class="tabs">
-                <button class="tab-btn active" data-tab="resolutionProposal">Resolution</button>
-                <button class="tab-btn" data-tab="treasuryProposal">Treasury</button>
-                <button class="tab-btn" data-tab="mintProposal">Mint Tokens</button>
-                <button class="tab-btn" data-tab="tokenPriceProposal">Change Token Price</button>
-            </div>
+        
+        <main class="main-content">
+            <div id="notification-area" class="notification-area"></div>
             
-            <div id="resolutionProposal" class="tab-content active">
-                <form id="resolutionForm">
-                    <div class="form-group">
-                        <label for="resolutionDescription">Description</label>
-                        <textarea id="resolutionDescription" required></textarea>
+            <section id="dashboard-section" class="content-section active">
+                <div class="section-header">
+                    <h2>Dashboard</h2>
+                </div>
+                <div class="dashboard-grid">
+                    <div class="metric-card">
+                        <h3>Governance</h3>
+                        <div class="metric-value" id="dao-name">Loading...</div>
+                        <div class="metric-info">
+                            <span class="label">Support Threshold:</span>
+                            <span class="value" id="support-threshold">Loading...</span>
+                        </div>
+                        <div class="metric-info">
+                            <span class="label">Quorum:</span>
+                            <span class="value" id="quorum-percentage">Loading...</span>
+                        </div>
                     </div>
-                    <button type="submit">Create Resolution</button>
-                </form>
-            </div>
+                    <div class="metric-card">
+                        <h3>Token Economy</h3>
+                        <div class="metric-value" id="token-supply">Loading...</div>
+                        <div class="metric-info">
+                            <span class="label">Token Price:</span>
+                            <span class="value" id="token-price">Loading...</span>
+                        </div>
+                        <div class="metric-info">
+                            <span class="label">Minting Allowed:</span>
+                            <span class="value" id="allow-minting">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <h3>DAO Activity</h3>
+                        <div class="metric-value" id="proposal-count">Loading...</div>
+                        <div class="metric-info">
+                            <span class="label">Active Elections:</span>
+                            <span class="value" id="active-elections">Loading...</span>
+                        </div>
+                        <div class="metric-info">
+                            <span class="label">Token Holders:</span>
+                            <span class="value" id="token-holders">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Treasury</h3>
+                        <div class="metric-value" id="treasury-balance">Loading...</div>
+                        <div class="metric-info">
+                            <span class="label">Treasury Status:</span>
+                            <span class="value" id="has-treasury">Loading...</span>
+                        </div>
+                        <div class="metric-info">
+                            <span class="label">Assets Types:</span>
+                            <span class="value" id="treasury-types">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
             
-            <div id="treasuryProposal" class="tab-content">
-                <form id="treasuryForm">
-                    <div class="form-group">
-                        <label for="treasuryDescription">Description</label>
-                        <textarea id="treasuryDescription" required></textarea>
+            <section id="proposals-section" class="content-section">
+                <div class="section-header">
+                    <h2>Proposals</h2>
+                    <button id="new-proposal-btn" class="btn-primary">New Proposal</button>
+                </div>
+                
+                <div id="proposal-form" class="proposal-form hidden">
+                    <h3>Create New Proposal</h3>
+                    <form id="create-proposal-form">
+                        <div class="form-group">
+                            <label for="proposal-type">Proposal Type</label>
+                            <select id="proposal-type" class="form-control" required>
+                                <option value="">Select a proposal type</option>
+                                <option value="resolution">Resolution</option>
+                                <option value="treasury">Treasury Transfer</option>
+                                <option value="mint">Mint Governance Tokens</option>
+                                <option value="token-price">Change Token Price</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="proposal-description">Description</label>
+                            <textarea id="proposal-description" class="form-control" rows="3" required></textarea>
+                        </div>
+                        
+                        <div id="recipient-field" class="form-group hidden">
+                            <label for="recipient-address">Recipient Address</label>
+                            <input type="text" id="recipient-address" class="form-control" placeholder="0x...">
+                        </div>
+                        
+                        <div id="amount-field" class="form-group hidden">
+                            <label for="amount">Amount</label>
+                            <input type="number" id="amount" class="form-control" step="any" min="0">
+                        </div>
+                        
+                        <div id="token-address-field" class="form-group hidden">
+                            <label for="token-address">Token Address</label>
+                            <input type="text" id="token-address" class="form-control" placeholder="0x...">
+                        </div>
+                        
+                        <div id="token-id-field" class="form-group hidden">
+                            <label for="token-id">Token ID</label>
+                            <input type="number" id="token-id" class="form-control" min="0">
+                        </div>
+                        
+                        <div id="token-price-field" class="form-group hidden">
+                            <label for="new-token-price">New Token Price (in ETH)</label>
+                            <input type="number" id="new-token-price" class="form-control" step="any" min="0">
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="button" id="cancel-proposal" class="btn-secondary">Cancel</button>
+                            <button type="submit" class="btn-primary">Create Proposal</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="tab-header">
+                    <button class="tab-btn active" data-tab="active-proposals">Active Proposals</button>
+                    <button class="tab-btn" data-tab="my-proposals">My Proposals</button>
+                </div>
+                
+                <div id="active-proposals" class="tab-content active">
+                    <div class="card-grid" id="active-proposals-list">
+                        <div class="empty-state">
+                            <i class="fas fa-file-signature"></i>
+                            <p>No active proposals found</p>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="treasuryRecipient">Recipient Address</label>
-                        <input type="text" id="treasuryRecipient" required>
+                </div>
+                
+                <div id="my-proposals" class="tab-content">
+                    <div class="card-grid" id="my-proposals-list">
+                        <div class="empty-state">
+                            <i class="fas fa-file-signature"></i>
+                            <p>You haven't created any proposals</p>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="treasuryAmount">Amount</label>
-                        <input type="number" id="treasuryAmount" min="0" step="0.000001" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="treasuryToken">Token Address (0x0 for ETH)</label>
-                        <input type="text" id="treasuryToken" required value="0x0000000000000000000000000000000000000000">
-                    </div>
-                    <div class="form-group">
-                        <label for="treasuryTokenId">Token ID (0 for ETH/ERC20)</label>
-                        <input type="number" id="treasuryTokenId" min="0" value="0" required>
-                    </div>
-                    <button type="submit">Create Treasury Proposal</button>
-                </form>
-            </div>
+                </div>
+            </section>
             
-            <div id="mintProposal" class="tab-content">
-                <form id="mintForm">
-                    <div class="form-group">
-                        <label for="mintDescription">Description</label>
-                        <textarea id="mintDescription" required></textarea>
+            <section id="elections-section" class="content-section">
+                <div class="section-header">
+                    <h2>Elections</h2>
+                </div>
+                
+                <div class="tab-header">
+                    <button class="tab-btn active" data-tab="active-elections">Active Elections</button>
+                    <button class="tab-btn" data-tab="past-elections">Past Elections</button>
+                </div>
+                
+                <div id="active-elections" class="tab-content active">
+                    <div class="card-grid" id="active-elections-list">
+                        <div class="empty-state">
+                            <i class="fas fa-vote-yea"></i>
+                            <p>No active elections found</p>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="mintRecipient">Recipient Address</label>
-                        <input type="text" id="mintRecipient" required>
+                </div>
+                
+                <div id="past-elections" class="tab-content">
+                    <div class="card-grid" id="past-elections-list">
+                        <div class="empty-state">
+                            <i class="fas fa-history"></i>
+                            <p>No past elections found</p>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="mintAmount">Amount of Tokens</label>
-                        <input type="number" id="mintAmount" min="1" step="1" required>
-                    </div>
-                    <button type="submit">Create Mint Proposal</button>
-                </form>
-            </div>
+                </div>
+            </section>
             
-            <div id="tokenPriceProposal" class="tab-content">
-                <form id="tokenPriceForm">
-                    <div class="form-group">
-                        <label for="priceDescription">Description</label>
-                        <textarea id="priceDescription" required></textarea>
+            <section id="tokens-section" class="content-section">
+                <div class="section-header">
+                    <h2>Governance Tokens</h2>
+                </div>
+                
+                <div class="token-info-card">
+                    <div class="token-balance-section">
+                        <h3>Your Balance</h3>
+                        <div class="token-balance" id="governance-token-balance">0</div>
+                        <div class="token-price-info">
+                            <span>Price per token: </span>
+                            <span id="current-token-price">Loading...</span>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="newTokenPrice">New Token Price (Wei)</label>
-                        <input type="number" id="newTokenPrice" min="0" step="1" required>
+                    
+                    <div class="token-purchase-section" id="token-purchase-container">
+                        <h3>Purchase Tokens</h3>
+                        <div class="purchase-form">
+                            <div class="form-group">
+                                <label for="purchase-amount">Amount to Purchase</label>
+                                <input type="number" id="purchase-amount" class="form-control" min="1" value="1">
+                            </div>
+                            <div class="form-group">
+                                <label>Total Cost</label>
+                                <div class="total-cost" id="purchase-total-cost">0 ETH</div>
+                            </div>
+                            <button id="purchase-tokens-btn" class="btn-primary">Purchase Tokens</button>
+                        </div>
                     </div>
-                    <button type="submit">Create Price Proposal</button>
-                </form>
-            </div>
-        </section>
-
-        <section id="activeProposals" class="panel">
-            <h2>Active Proposals</h2>
-            <div id="proposalsList" class="proposals-list">
-                <p class="empty-message">Loading proposals...</p>
-            </div>
-        </section>
-
-        <section id="activeElections" class="panel">
-            <h2>Active Elections</h2>
-            <div id="electionsList" class="elections-list">
-                <p class="empty-message">Loading elections...</p>
-            </div>
-        </section>
-
-        <section id="completedElections" class="panel">
-            <h2>Completed Elections</h2>
-            <div id="completedElectionsList" class="elections-list">
-                <p class="empty-message">Loading past elections...</p>
-            </div>
-        </section>
-    </main>
-
-    <footer>
-        <div class="container">
-            <p>Market DAO - A Governance Concept. Bringing market forces to bear on group decisions.</p>
-        </div>
-    </footer>
-
-    <div id="notification" class="notification hidden">
-        <div class="notification-content">
-            <span id="notificationMessage"></span>
-            <button id="notificationClose">×</button>
-        </div>
+                </div>
+                
+                <div class="section-subheader">
+                    <h3>Token Holders</h3>
+                </div>
+                
+                <div class="token-holders-table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Address</th>
+                                <th>Balance</th>
+                                <th>% of Supply</th>
+                            </tr>
+                        </thead>
+                        <tbody id="token-holders-list">
+                            <tr>
+                                <td colspan="3" class="empty-table">Loading token holders...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            
+            <section id="treasury-section" class="content-section">
+                <div class="section-header">
+                    <h2>Treasury</h2>
+                </div>
+                
+                <div class="treasury-info-card">
+                    <div class="treasury-status" id="treasury-status">
+                        <h3>Treasury Status</h3>
+                        <div id="treasury-assets-container">
+                            <div class="treasury-asset-type">
+                                <i class="fas fa-ethereum"></i>
+                                <span>ETH: </span>
+                                <span id="eth-balance">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section-subheader">
+                    <h3>Recent Treasury Transactions</h3>
+                </div>
+                
+                <div class="treasury-transactions-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Transaction</th>
+                                <th>Amount</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="treasury-transactions">
+                            <tr>
+                                <td colspan="4" class="empty-table">No transactions found</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
     </div>
-
-    <div id="modal" class="modal hidden">
+    
+    <!-- Modals -->
+    <div id="modal-container" class="modal-container hidden">
+        <div class="modal-overlay"></div>
         <div class="modal-content">
-            <span class="close-button">&times;</span>
-            <h2 id="modalTitle">Modal Title</h2>
-            <div id="modalContent"></div>
+            <div class="modal-header">
+                <h3 id="modal-title">Modal Title</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div id="modal-body" class="modal-body">
+                <!-- Modal content will be dynamically inserted here -->
+            </div>
         </div>
     </div>
+    
+    <!-- Template for proposal card -->
+    <template id="proposal-card-template">
+        <div class="proposal-card" data-id="">
+            <div class="proposal-header">
+                <span class="proposal-type"></span>
+                <span class="proposal-id"></span>
+            </div>
+            <h3 class="proposal-description"></h3>
+            <div class="proposal-details"></div>
+            <div class="proposal-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
+                <div class="progress-info">
+                    <span class="progress-label">Support: </span>
+                    <span class="progress-value"></span>
+                </div>
+            </div>
+            <div class="proposal-actions">
+                <button class="btn-support">Support</button>
+                <button class="btn-details">Details</button>
+            </div>
+        </div>
+    </template>
+    
+    <!-- Template for election card -->
+    <template id="election-card-template">
+        <div class="election-card" data-id="">
+            <div class="election-header">
+                <span class="election-type"></span>
+                <div class="election-status"></div>
+            </div>
+            <h3 class="election-description"></h3>
+            <div class="election-details"></div>
+            <div class="voting-progress">
+                <div class="votes-bar">
+                    <div class="yes-votes"></div>
+                    <div class="no-votes"></div>
+                </div>
+                <div class="votes-info">
+                    <div class="yes-info">
+                        <span class="votes-label">Yes: </span>
+                        <span class="votes-value yes-value"></span>
+                    </div>
+                    <div class="no-info">
+                        <span class="votes-label">No: </span>
+                        <span class="votes-value no-value"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="election-timer">
+                <span class="timer-label">Ends in: </span>
+                <span class="timer-value"></span>
+            </div>
+            <div class="election-actions">
+                <button class="btn-vote-yes">Vote Yes</button>
+                <button class="btn-vote-no">Vote No</button>
+                <button class="btn-execute hidden">Execute</button>
+            </div>
+        </div>
+    </template>
+
+    <!-- Template for notification -->
+    <template id="notification-template">
+        <div class="notification">
+            <div class="notification-icon"></div>
+            <div class="notification-content">
+                <div class="notification-title"></div>
+                <div class="notification-message"></div>
+            </div>
+            <button class="notification-close">&times;</button>
+        </div>
+    </template>
 
     <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js" type="application/javascript"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
     <script src="js/config.js"></script>
-    <script src="js/utils.js"></script>
-    <script src="js/contracts.js"></script>
     <script src="js/wallet.js"></script>
-    <script src="js/dao.js"></script>
-    <script src="js/proposals.js"></script>
+    <script src="js/contracts.js"></script>
     <script src="js/ui.js"></script>
-    <!-- Make sure all dependencies are loaded before main.js -->
-    <script>
-        // Ensure all scripts are loaded before executing main.js
-        document.addEventListener('DOMContentLoaded', () => {
-            // Make sure all our objects exist before running main.js
-            if (typeof wallet !== 'undefined' && 
-                typeof contracts !== 'undefined' && 
-                typeof daoManager !== 'undefined' && 
-                typeof proposalManager !== 'undefined' && 
-                typeof uiManager !== 'undefined') {
-                
-                // Now load main.js dynamically
-                const mainScript = document.createElement('script');
-                mainScript.src = 'js/main.js';
-                document.body.appendChild(mainScript);
-            } else {
-                console.error('One or more required objects are not defined:',
-                    { wallet: typeof wallet, 
-                      contracts: typeof contracts, 
-                      daoManager: typeof daoManager, 
-                      proposalManager: typeof proposalManager, 
-                      uiManager: typeof uiManager });
-            }
-        });
-    </script>
+    <script src="js/proposals.js"></script>
+    <script src="js/elections.js"></script>
+    <script src="js/tokens.js"></script>
+    <script src="js/treasury.js"></script>
+    <script src="js/app.js"></script>
 </body>
 </html>

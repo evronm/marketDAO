@@ -1,946 +1,696 @@
-// Proposals and elections management for the Market DAO application
-
+/**
+ * Proposal management for Market DAO
+ * Handles creation, display, and interaction with proposals
+ */
 class ProposalManager {
     constructor() {
-        this.activeProposals = [];
-        this.activeElections = [];
-        this.completedElections = [];
-        this.currentBlock = 0;
-        this.proposalsRefreshInterval = null;
-        this.electionsRefreshInterval = null;
+        this.proposals = [];
+        this.daoInfo = null;
+        
+        // Initialize when contracts are ready
+        window.addEventListener('contracts-initialized', () => this.initialize());
+        
+        // Refresh when wallet changes
+        window.addEventListener('wallet-connected', () => this.loadProposals());
+        window.addEventListener('wallet-account-changed', () => this.loadProposals());
+        
+        // Refresh when switching back to proposals tab
+        window.addEventListener('section-changed', (event) => {
+            if (event.detail.section === 'proposals') {
+                this.loadProposals();
+            }
+        });
     }
-
+    
     /**
-     * Initialize the proposal manager
+     * Initialize proposal manager
      */
-    async initialize() {
-        if (!contracts.isInitialized()) {
-            console.warn('Contracts not initialized. Cannot load proposals.');
-            return;
+    initialize() {
+        console.log('Initializing proposal manager');
+        this.setupEventListeners();
+        
+        // Load proposals if on proposals tab
+        if (UI.activeSection === 'proposals') {
+            this.loadProposals();
+        }
+    }
+    
+    /**
+     * Setup event listeners for proposal actions
+     */
+    setupEventListeners() {
+        // Proposal form submission
+        const proposalForm = document.getElementById('create-proposal-form');
+        if (proposalForm) {
+            proposalForm.addEventListener('submit', (event) => {
+                event.preventDefault();
+                this.handleProposalCreation();
+            });
         }
         
-        // Get current block number
-        this.currentBlock = await wallet.getBlockNumber();
+        // Purchase amount change listener for total calculation
+        const purchaseAmount = document.getElementById('purchase-amount');
+        if (purchaseAmount) {
+            purchaseAmount.addEventListener('input', () => this.updatePurchaseTotal());
+        }
         
-        // Load all proposals and elections
-        await this.refreshProposals();
-        await this.refreshElections();
-        
-        // Setup refresh intervals
-        this.setupRefreshIntervals();
+        // Purchase tokens button
+        const purchaseBtn = document.getElementById('purchase-tokens-btn');
+        if (purchaseBtn) {
+            purchaseBtn.addEventListener('click', () => this.handleTokenPurchase());
+        }
     }
-
+    
     /**
-     * Refresh all proposals
+     * Load DAO information
      */
-    async refreshProposals() {
+    async loadDAOInfo() {
         try {
-            // Get current block
-            this.currentBlock = await wallet.getBlockNumber();
+            this.daoInfo = await Contracts.fetchDAOInfo();
             
-            // Get total proposal count
-            const count = await contracts.factoryContract.proposalCount();
+            // Update token price display
+            const currentTokenPrice = document.getElementById('current-token-price');
+            if (currentTokenPrice) {
+                currentTokenPrice.textContent = this.daoInfo.tokenPrice == 0 
+                    ? 'Sales Disabled' 
+                    : UI.formatEth(this.daoInfo.tokenPrice);
+            }
             
-            // Create array to store active proposals
-            const activeProposals = [];
-            
-            // Fetch each proposal
-            for (let i = 0; i < count; i++) {
-                const proposalAddress = await contracts.factoryContract.getProposal(i);
-                const proposal = await this.getProposalInfo(proposalAddress);
-                
-                // Only add to active proposals if not in election and not too old
-                if (!proposal.electionTriggered && 
-                    this.currentBlock - proposal.createdAt < daoManager.daoInfo.maxProposalAge) {
-                    activeProposals.push(proposal);
+            // Enable/disable purchase section
+            const purchaseContainer = document.getElementById('token-purchase-container');
+            if (purchaseContainer) {
+                if (this.daoInfo.tokenPrice == 0) {
+                    purchaseContainer.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-lock"></i>
+                            <p>Token purchases are currently disabled</p>
+                        </div>
+                    `;
                 }
             }
             
-            // Update active proposals
-            this.activeProposals = activeProposals;
+            // Update dashboard
+            UI.updateDashboard(this.daoInfo);
             
-            // Update UI
-            this.updateProposalsUI();
+            // Update purchase total if needed
+            this.updatePurchaseTotal();
+            
+            return this.daoInfo;
         } catch (error) {
-            console.error('Error refreshing proposals:', error);
+            console.error('Error loading DAO info:', error);
+            UI.showNotification('error', 'Error', 'Failed to load DAO information');
+            return null;
         }
     }
-
+    
     /**
-     * Refresh all elections
+     * Load proposals and update UI
      */
-    async refreshElections() {
+    async loadProposals() {
+        // Load DAO info first to get support threshold
+        if (!this.daoInfo) {
+            await this.loadDAOInfo();
+        }
+        
+        // Clear proposals lists
+        const activeProposalsList = document.getElementById('active-proposals-list');
+        const myProposalsList = document.getElementById('my-proposals-list');
+        
+        if (activeProposalsList) {
+            activeProposalsList.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading proposals...</p></div>';
+        }
+        
+        if (myProposalsList) {
+            myProposalsList.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading your proposals...</p></div>';
+        }
+        
         try {
-            // Get current block
-            this.currentBlock = await wallet.getBlockNumber();
+            // Fetch proposals
+            this.proposals = await Contracts.fetchProposals();
             
-            // Get total proposal count
-            const count = await contracts.factoryContract.proposalCount();
+            // Separate active and completed proposals
+            const activeProposals = this.proposals.filter(p => !p.electionTriggered && !p.executed);
+            const myProposals = Wallet.isWalletConnected() 
+                ? this.proposals.filter(p => p.proposer.toLowerCase() === Wallet.getAddress().toLowerCase())
+                : [];
             
-            // Create arrays to store elections
-            const activeElections = [];
-            const completedElections = [];
+            // Update UI
+            this.renderProposalsList(activeProposalsList, activeProposals, 'active');
+            this.renderProposalsList(myProposalsList, myProposals, 'my');
             
-            // Fetch each proposal
-            for (let i = 0; i < count; i++) {
-                const proposalAddress = await contracts.factoryContract.getProposal(i);
-                const proposal = await this.getProposalInfo(proposalAddress);
-                
-                // Check if it's an election
-                if (proposal.electionTriggered) {
-                    // If election is still ongoing
-                    if (this.currentBlock < proposal.electionStart + daoManager.daoInfo.electionDuration) {
-                        activeElections.push(proposal);
-                    } 
-                    // If election is completed
-                    else {
-                        // Only show recent completed elections (within PAST_BLOCKS_TO_QUERY)
-                        if (this.currentBlock - proposal.electionStart < CONFIG.PAST_BLOCKS_TO_QUERY) {
-                            completedElections.push(proposal);
-                        }
-                    }
-                }
+            // Dispatch event for elections
+            window.dispatchEvent(new CustomEvent('proposals-loaded', {
+                detail: { proposals: this.proposals }
+            }));
+            
+            // Update token balance if wallet is connected
+            if (Wallet.isWalletConnected()) {
+                this.updateTokenBalance();
+            }
+        } catch (error) {
+            console.error('Error loading proposals:', error);
+            UI.showNotification('error', 'Error', 'Failed to load proposals');
+            
+            if (activeProposalsList) {
+                activeProposalsList.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle"></i><p>Error loading proposals</p></div>';
             }
             
-            // Update elections arrays
-            this.activeElections = activeElections;
-            this.completedElections = completedElections;
-            
-            // Update UI
-            this.updateElectionsUI();
-        } catch (error) {
-            console.error('Error refreshing elections:', error);
+            if (myProposalsList) {
+                myProposalsList.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-circle"></i><p>Error loading your proposals</p></div>';
+            }
         }
     }
-
+    
     /**
-     * Get detailed information about a proposal
-     * @param {string} address - The proposal contract address
-     * @returns {Object} The proposal information
+     * Render a list of proposals
+     * @param {HTMLElement} container - Container element
+     * @param {Array} proposals - Array of proposal objects
+     * @param {string} listType - Type of list (active, my)
      */
-    async getProposalInfo(address) {
-        // Get proposal type first to determine which contract to use
-        const proposalType = await this.determineProposalType(address);
-        const proposalContract = contracts.getProposalContract(address, proposalType);
+    renderProposalsList(container, proposals, listType) {
+        if (!container) return;
         
-        // Base proposal information
-        const [
-            description,
-            proposer,
-            createdAt,
-            supportTotal,
-            userSupport,
-            electionTriggered,
-            electionStart,
-            votingTokenId,
-            yesVoteAddress,
-            noVoteAddress,
-            executed
-        ] = await Promise.all([
-            proposalContract.description(),
-            proposalContract.proposer(),
-            proposalContract.createdAt(),
-            proposalContract.supportTotal(),
-            proposalContract.support(wallet.address),
-            proposalContract.electionTriggered(),
-            proposalContract.electionStart(),
-            proposalContract.electionTriggered() ? proposalContract.votingTokenId() : 0,
-            proposalContract.electionTriggered() ? proposalContract.yesVoteAddress() : ethers.constants.AddressZero,
-            proposalContract.electionTriggered() ? proposalContract.noVoteAddress() : ethers.constants.AddressZero,
-            proposalContract.executed()
-        ]);
-        
-        // Additional properties based on proposal type
-        let additionalProps = {};
-        
-        if (proposalType === CONFIG.proposalTypes.TREASURY) {
-            const [recipient, amount, token, tokenId] = await Promise.all([
-                proposalContract.recipient(),
-                proposalContract.amount(),
-                proposalContract.token(),
-                proposalContract.tokenId()
-            ]);
-            
-            additionalProps = { recipient, amount, token, tokenId };
-        } else if (proposalType === CONFIG.proposalTypes.MINT) {
-            const [recipient, amount] = await Promise.all([
-                proposalContract.recipient(),
-                proposalContract.amount()
-            ]);
-            
-            additionalProps = { recipient, amount };
-        } else if (proposalType === CONFIG.proposalTypes.TOKEN_PRICE) {
-            const newPrice = await proposalContract.newPrice();
-            additionalProps = { newPrice };
-        }
-        
-        // Get voting information if election is triggered
-        let voteInfo = null;
-        
-        if (electionTriggered && votingTokenId > 0) {
-            const daoContract = contracts.daoContract;
-            
-            // Get vote counts
-            const [yesVotes, noVotes, userVotingTokens, totalVotingTokens] = await Promise.all([
-                daoContract.balanceOf(yesVoteAddress, votingTokenId),
-                daoContract.balanceOf(noVoteAddress, votingTokenId),
-                daoContract.balanceOf(wallet.address, votingTokenId),
-                daoContract.totalSupply(votingTokenId)
-            ]);
-            
-            voteInfo = {
-                yesVotes: yesVotes.toNumber(),
-                noVotes: noVotes.toNumber(),
-                userVotingTokens: userVotingTokens.toNumber(),
-                totalVotingTokens: totalVotingTokens.toNumber()
-            };
-        }
-        
-        // Construct the proposal object
-        return {
-            address,
-            type: proposalType,
-            description,
-            proposer,
-            createdAt: createdAt.toNumber(),
-            supportTotal: supportTotal.toNumber(),
-            userSupport: userSupport.toNumber(),
-            electionTriggered,
-            electionStart: electionStart.toNumber(),
-            votingTokenId: votingTokenId ? votingTokenId.toNumber() : 0,
-            yesVoteAddress,
-            noVoteAddress,
-            executed,
-            voteInfo,
-            ...additionalProps
-        };
-    }
-
-    /**
-     * Determine the type of a proposal contract
-     * @param {string} address - The proposal contract address
-     * @returns {string} The proposal type
-     */
-    async determineProposalType(address) {
-        // We'll try to detect the type based on available methods
-        const tempContract = new ethers.Contract(
-            address,
-            [
-                "function description() view returns (string)",
-                "function recipient() view returns (address)",
-                "function amount() view returns (uint256)",
-                "function token() view returns (address)",
-                "function tokenId() view returns (uint256)",
-                "function newPrice() view returns (uint256)"
-            ],
-            wallet.provider
-        );
-        
-        try {
-            // Try to detect treasury proposal
-            await tempContract.token();
-            return CONFIG.proposalTypes.TREASURY;
-        } catch (error) {
-            // Not a treasury proposal
-        }
-        
-        try {
-            // Try to detect mint proposal (has recipient and amount but no token)
-            await tempContract.recipient();
-            await tempContract.amount();
-            return CONFIG.proposalTypes.MINT;
-        } catch (error) {
-            // Not a mint proposal
-        }
-        
-        try {
-            // Try to detect token price proposal
-            await tempContract.newPrice();
-            return CONFIG.proposalTypes.TOKEN_PRICE;
-        } catch (error) {
-            // Not a token price proposal
-        }
-        
-        // If we couldn't detect a specific type, assume it's a resolution
-        return CONFIG.proposalTypes.RESOLUTION;
-    }
-
-    /**
-     * Update the proposals UI
-     */
-    updateProposalsUI() {
-        const proposalsList = document.getElementById('proposalsList');
-        
-        // Clear the list
-        proposalsList.innerHTML = '';
-        
-        if (this.activeProposals.length === 0) {
-            proposalsList.innerHTML = '<p class="empty-message">No active proposals found.</p>';
+        if (proposals.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-file-signature"></i>
+                    <p>${listType === 'active' ? 'No active proposals found' : 'You haven\'t created any proposals'}</p>
+                </div>
+            `;
             return;
         }
         
-        // Add each proposal to the list
-        for (const proposal of this.activeProposals) {
+        container.innerHTML = '';
+        
+        // Sort proposals by creation date (newest first)
+        proposals.sort((a, b) => b.createdAt - a.createdAt);
+        
+        proposals.forEach(proposal => {
             const card = this.createProposalCard(proposal);
-            proposalsList.appendChild(card);
-        }
+            container.appendChild(card);
+        });
     }
-
+    
     /**
-     * Update the elections UI
-     */
-    updateElectionsUI() {
-        const activeElectionsList = document.getElementById('electionsList');
-        const completedElectionsList = document.getElementById('completedElectionsList');
-        
-        // Clear the lists
-        activeElectionsList.innerHTML = '';
-        completedElectionsList.innerHTML = '';
-        
-        // Active elections
-        if (this.activeElections.length === 0) {
-            activeElectionsList.innerHTML = '<p class="empty-message">No active elections found.</p>';
-        } else {
-            for (const election of this.activeElections) {
-                const card = this.createElectionCard(election);
-                activeElectionsList.appendChild(card);
-            }
-        }
-        
-        // Completed elections
-        if (this.completedElections.length === 0) {
-            completedElectionsList.innerHTML = '<p class="empty-message">No recent completed elections found.</p>';
-        } else {
-            for (const election of this.completedElections) {
-                const card = this.createElectionCard(election, true);
-                completedElectionsList.appendChild(card);
-            }
-        }
-    }
-
-    /**
-     * Create HTML for a proposal card
-     * @param {Object} proposal - The proposal object
-     * @returns {HTMLElement} The proposal card element
+     * Create a proposal card element
+     * @param {Object} proposal - Proposal data
      */
     createProposalCard(proposal) {
-        const card = document.createElement('div');
-        card.className = 'proposal-card';
+        const template = document.getElementById('proposal-card-template');
+        const card = template.content.cloneNode(true).querySelector('.proposal-card');
         
-        // Calculate needed support
-        const supportNeeded = Math.ceil((daoManager.daoInfo.supportThreshold / 100) * daoManager.daoInfo.governanceTokenSupply);
-        const supportPercentage = daoManager.daoInfo.governanceTokenSupply > 0 
-            ? (proposal.supportTotal / daoManager.daoInfo.governanceTokenSupply) * 100 
-            : 0;
+        // Set proposal ID and address
+        card.setAttribute('data-id', proposal.id);
+        card.setAttribute('data-address', proposal.address);
         
-        // Calculate age
-        const age = this.currentBlock - proposal.createdAt;
-        const agePercentage = (age / daoManager.daoInfo.maxProposalAge) * 100;
+        // Update type label
+        const typeLabel = card.querySelector('.proposal-type');
+        let typeText = 'Resolution';
+        let typeClass = 'resolution';
         
-        // Proposal title based on type
-        let proposalTitle = `${proposal.type} Proposal`;
+        switch (proposal.type) {
+            case 'treasury':
+                typeText = 'Treasury';
+                typeClass = 'treasury';
+                break;
+            case 'mint':
+                typeText = 'Mint Tokens';
+                typeClass = 'mint';
+                break;
+            case 'token-price':
+                typeText = 'Token Price';
+                typeClass = 'token-price';
+                break;
+        }
         
-        // Additional details based on proposal type
-        let typeSpecificDetails = '';
+        typeLabel.textContent = typeText;
+        typeLabel.classList.add(typeClass);
         
-        if (proposal.type === CONFIG.proposalTypes.TREASURY) {
-            const tokenType = proposal.token === CONFIG.ZERO_ADDRESS ? 'ETH' : 
-                              proposal.tokenId === 0 ? 'ERC20' : 
-                              proposal.amount === 1 ? 'ERC721' : 'ERC1155';
-            
-            typeSpecificDetails = `
-                <div class="proposal-detail">
-                    <strong>Recipient:</strong> ${Utils.shortenAddress(proposal.recipient)}
+        // Set proposal ID
+        card.querySelector('.proposal-id').textContent = `#${proposal.id}`;
+        
+        // Set description
+        card.querySelector('.proposal-description').textContent = proposal.description;
+        
+        // Set proposal details based on type
+        const detailsElement = card.querySelector('.proposal-details');
+        
+        if (proposal.type === 'treasury') {
+            detailsElement.innerHTML = `
+                <div class="detail-item">
+                    <span class="detail-label">Recipient:</span>
+                    <span class="detail-value">${UI.formatAddress(proposal.recipient)}</span>
                 </div>
-                <div class="proposal-detail">
-                    <strong>Amount:</strong> ${proposal.amount.toString()}
-                </div>
-                <div class="proposal-detail">
-                    <strong>Token Type:</strong> ${tokenType}
-                </div>
-            `;
-            
-            if (proposal.token !== CONFIG.ZERO_ADDRESS) {
-                typeSpecificDetails += `
-                    <div class="proposal-detail">
-                        <strong>Token:</strong> ${Utils.shortenAddress(proposal.token)}
-                    </div>
-                `;
-                
-                if (proposal.tokenId > 0) {
-                    typeSpecificDetails += `
-                        <div class="proposal-detail">
-                            <strong>Token ID:</strong> ${proposal.tokenId.toString()}
-                        </div>
-                    `;
-                }
-            }
-        } else if (proposal.type === CONFIG.proposalTypes.MINT) {
-            typeSpecificDetails = `
-                <div class="proposal-detail">
-                    <strong>Recipient:</strong> ${Utils.shortenAddress(proposal.recipient)}
-                </div>
-                <div class="proposal-detail">
-                    <strong>Amount:</strong> ${proposal.amount.toString()} tokens
+                <div class="detail-item">
+                    <span class="detail-label">Amount:</span>
+                    <span class="detail-value">${UI.formatEth(proposal.amount)}</span>
                 </div>
             `;
-        } else if (proposal.type === CONFIG.proposalTypes.TOKEN_PRICE) {
-            typeSpecificDetails = `
-                <div class="proposal-detail">
-                    <strong>New Price:</strong> ${Utils.formatEth(proposal.newPrice)}
+        } else if (proposal.type === 'mint') {
+            detailsElement.innerHTML = `
+                <div class="detail-item">
+                    <span class="detail-label">Recipient:</span>
+                    <span class="detail-value">${UI.formatAddress(proposal.recipient)}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Amount:</span>
+                    <span class="detail-value">${proposal.amount} tokens</span>
+                </div>
+            `;
+        } else if (proposal.type === 'token-price') {
+            detailsElement.innerHTML = `
+                <div class="detail-item">
+                    <span class="detail-label">New Price:</span>
+                    <span class="detail-value">${UI.formatEth(proposal.newPrice)}</span>
+                </div>
+            `;
+        } else {
+            // Resolution proposal
+            detailsElement.innerHTML = `
+                <div class="detail-item">
+                    <span class="detail-label">Proposer:</span>
+                    <span class="detail-value">${UI.formatAddress(proposal.proposer)}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Created:</span>
+                    <span class="detail-value">Block #${proposal.createdAt}</span>
                 </div>
             `;
         }
         
-        card.innerHTML = `
-            <h3>${proposalTitle}</h3>
-            <div class="proposal-meta">
-                <span>Proposed by: ${Utils.shortenAddress(proposal.proposer)}</span>
-                <span>Age: ${age} blocks (${Utils.blocksToTime(age)})</span>
-            </div>
-            <div class="proposal-description">
-                <p>${proposal.description}</p>
-            </div>
-            ${typeSpecificDetails}
-            <div class="proposal-support">
-                <div class="progress-bar">
-                    <div class="progress-value" style="width: ${supportPercentage}%"></div>
-                </div>
-                <div class="progress-stats">
-                    <span>Current Support: ${proposal.supportTotal} / ${supportNeeded} tokens (${supportPercentage.toFixed(2)}%)</span>
-                    <span>Your Support: ${proposal.userSupport} tokens</span>
-                </div>
-            </div>
-            <div class="proposal-age">
-                <div class="progress-bar">
-                    <div class="progress-value" style="width: ${agePercentage}%"></div>
-                </div>
-                <div class="progress-stats">
-                    <span>Expires in: ${daoManager.daoInfo.maxProposalAge - age} blocks (${Utils.blocksToTime(daoManager.daoInfo.maxProposalAge - age)})</span>
-                </div>
-            </div>
-            <div class="proposal-actions">
-                <button class="add-support-btn" data-address="${proposal.address}">Support</button>
-                <button class="remove-support-btn" data-address="${proposal.address}" ${proposal.userSupport <= 0 ? 'disabled' : ''}>Remove Support</button>
-            </div>
-        `;
+        // Set support progress
+        const progressFill = card.querySelector('.progress-fill');
+        const supportValue = card.querySelector('.progress-value');
         
-        // Add event listeners for the buttons
-        const addSupportBtn = card.querySelector('.add-support-btn');
-        const removeSupportBtn = card.querySelector('.remove-support-btn');
+        if (this.daoInfo && this.daoInfo.tokenSupply > 0) {
+            const supportPercent = (proposal.supportTotal / this.daoInfo.tokenSupply) * 100;
+            const thresholdPercent = this.daoInfo.supportThreshold;
+            
+            progressFill.style.width = `${supportPercent}%`;
+            supportValue.textContent = `${proposal.supportTotal} / ${this.daoInfo.tokenSupply} (${supportPercent.toFixed(1)}%)`;
+            
+            // Add indicator for threshold
+            const progressBar = card.querySelector('.progress-bar');
+            const thresholdIndicator = document.createElement('div');
+            thresholdIndicator.className = 'threshold-indicator';
+            thresholdIndicator.style.left = `${thresholdPercent}%`;
+            thresholdIndicator.setAttribute('title', `${thresholdPercent}% Threshold`);
+            progressBar.appendChild(thresholdIndicator);
+        } else {
+            progressFill.style.width = '0%';
+            supportValue.textContent = `${proposal.supportTotal} / Unknown`;
+        }
         
-        addSupportBtn.addEventListener('click', () => {
-            this.showAddSupportModal(proposal);
+        // Setup action buttons
+        const supportBtn = card.querySelector('.btn-support');
+        const detailsBtn = card.querySelector('.btn-details');
+        
+        supportBtn.addEventListener('click', () => {
+            this.handleSupportProposal(proposal);
         });
         
-        removeSupportBtn.addEventListener('click', () => {
-            this.showRemoveSupportModal(proposal);
+        detailsBtn.addEventListener('click', () => {
+            this.showProposalDetails(proposal);
         });
         
         return card;
     }
-
+    
     /**
-     * Create HTML for an election card
-     * @param {Object} election - The election object
-     * @param {boolean} isCompleted - Whether the election is completed
-     * @returns {HTMLElement} The election card element
+     * Show proposal details in a modal
+     * @param {Object} proposal - Proposal data
      */
-    createElectionCard(election, isCompleted = false) {
-        const card = document.createElement('div');
-        card.className = 'election-card';
-        
-        // Determine if the election can be executed
-        const canExecute = isCompleted && !election.executed &&
-                         election.voteInfo && 
-                         election.voteInfo.yesVotes > election.voteInfo.noVotes &&
-                         (election.voteInfo.yesVotes + election.voteInfo.noVotes) >= 
-                         ((daoManager.daoInfo.quorumPercentage / 100) * election.voteInfo.totalVotingTokens);
-        
-        // Calculate vote percentages
-        const yesVotePercentage = election.voteInfo ? 
-            (election.voteInfo.yesVotes / election.voteInfo.totalVotingTokens) * 100 : 0;
-        const noVotePercentage = election.voteInfo ? 
-            (election.voteInfo.noVotes / election.voteInfo.totalVotingTokens) * 100 : 0;
-        const quorumPercentage = election.voteInfo ? 
-            ((election.voteInfo.yesVotes + election.voteInfo.noVotes) / election.voteInfo.totalVotingTokens) * 100 : 0;
-        
-        // Remaining time for active elections
-        let timeRemaining = '';
-        if (!isCompleted) {
-            const remainingBlocks = (election.electionStart + daoManager.daoInfo.electionDuration) - this.currentBlock;
-            timeRemaining = `
-                <div class="election-remaining-time">
-                    <strong>Time Remaining:</strong> ${remainingBlocks} blocks (${Utils.blocksToTime(remainingBlocks)})
+    showProposalDetails(proposal) {
+        let detailsHtml = `
+            <div class="proposal-details-modal">
+                <div class="detail-item">
+                    <span class="detail-label">Proposal ID:</span>
+                    <span class="detail-value">#${proposal.id}</span>
                 </div>
-            `;
-        }
-        
-        // Election result for completed elections
-        let resultSection = '';
-        if (isCompleted) {
-            let resultText = election.executed ? 'Executed' : 'Pending Execution';
-            
-            if (election.voteInfo && election.voteInfo.yesVotes <= election.voteInfo.noVotes) {
-                resultText = 'Rejected (No votes won)';
-            } else if (election.voteInfo && 
-                     (election.voteInfo.yesVotes + election.voteInfo.noVotes) < 
-                     ((daoManager.daoInfo.quorumPercentage / 100) * election.voteInfo.totalVotingTokens)) {
-                resultText = 'Failed (Quorum not reached)';
-            }
-            
-            resultSection = `
-                <div class="election-result">
-                    <strong>Result:</strong> <span class="badge ${election.executed ? 'badge-success' : ''}">${resultText}</span>
+                <div class="detail-item">
+                    <span class="detail-label">Type:</span>
+                    <span class="detail-value">${proposal.type.charAt(0).toUpperCase() + proposal.type.slice(1)}</span>
                 </div>
-            `;
-        }
-        
-        // Proposal title based on type
-        let proposalTitle = `${election.type} Proposal`;
-        
-        // Additional details based on proposal type
-        let typeSpecificDetails = '';
-        
-        if (election.type === CONFIG.proposalTypes.TREASURY) {
-            const tokenType = election.token === CONFIG.ZERO_ADDRESS ? 'ETH' : 
-                            election.tokenId === 0 ? 'ERC20' : 
-                            election.amount === 1 ? 'ERC721' : 'ERC1155';
-            
-            typeSpecificDetails = `
-                <div class="proposal-detail">
-                    <strong>Recipient:</strong> ${Utils.shortenAddress(election.recipient)}
+                <div class="detail-item">
+                    <span class="detail-label">Proposer:</span>
+                    <span class="detail-value">${proposal.proposer}</span>
                 </div>
-                <div class="proposal-detail">
-                    <strong>Amount:</strong> ${election.amount.toString()}
+                <div class="detail-item">
+                    <span class="detail-label">Created at Block:</span>
+                    <span class="detail-value">#${proposal.createdAt}</span>
                 </div>
-                <div class="proposal-detail">
-                    <strong>Token Type:</strong> ${tokenType}
+                <div class="detail-item">
+                    <span class="detail-label">Description:</span>
+                    <span class="detail-value">${proposal.description}</span>
                 </div>
-            `;
-            
-            if (election.token !== CONFIG.ZERO_ADDRESS) {
-                typeSpecificDetails += `
-                    <div class="proposal-detail">
-                        <strong>Token:</strong> ${Utils.shortenAddress(election.token)}
-                    </div>
-                `;
-                
-                if (election.tokenId > 0) {
-                    typeSpecificDetails += `
-                        <div class="proposal-detail">
-                            <strong>Token ID:</strong> ${election.tokenId.toString()}
-                        </div>
-                    `;
-                }
-            }
-        } else if (election.type === CONFIG.proposalTypes.MINT) {
-            typeSpecificDetails = `
-                <div class="proposal-detail">
-                    <strong>Recipient:</strong> ${Utils.shortenAddress(election.recipient)}
+                <div class="detail-item">
+                    <span class="detail-label">Current Support:</span>
+                    <span class="detail-value">${proposal.supportTotal} tokens</span>
                 </div>
-                <div class="proposal-detail">
-                    <strong>Amount:</strong> ${election.amount.toString()} tokens
-                </div>
-            `;
-        } else if (election.type === CONFIG.proposalTypes.TOKEN_PRICE) {
-            typeSpecificDetails = `
-                <div class="proposal-detail">
-                    <strong>New Price:</strong> ${Utils.formatEth(election.newPrice)}
-                </div>
-            `;
-        }
-        
-        card.innerHTML = `
-            <h3>${proposalTitle} Election</h3>
-            <div class="election-meta">
-                <span>Proposed by: ${Utils.shortenAddress(election.proposer)}</span>
-                <span>Started: ${Utils.getTimeFromBlocks(election.electionStart, this.currentBlock)} ago</span>
-            </div>
-            <div class="election-description">
-                <p>${election.description}</p>
-            </div>
-            ${typeSpecificDetails}
-            ${timeRemaining}
-            ${resultSection}
-            <div class="election-voting">
-                <div class="vote-progress">
-                    <div class="progress-bar">
-                        <div class="progress-value" style="width: ${yesVotePercentage}%; background-color: #27ae60;"></div>
-                    </div>
-                    <div class="progress-stats">
-                        <span>Yes Votes: ${election.voteInfo ? election.voteInfo.yesVotes : 0} (${yesVotePercentage.toFixed(2)}%)</span>
-                    </div>
-                </div>
-                <div class="vote-progress">
-                    <div class="progress-bar">
-                        <div class="progress-value" style="width: ${noVotePercentage}%; background-color: #e74c3c;"></div>
-                    </div>
-                    <div class="progress-stats">
-                        <span>No Votes: ${election.voteInfo ? election.voteInfo.noVotes : 0} (${noVotePercentage.toFixed(2)}%)</span>
-                    </div>
-                </div>
-                <div class="vote-progress">
-                    <div class="progress-bar">
-                        <div class="progress-value" style="width: ${quorumPercentage}%; background-color: #3498db;"></div>
-                    </div>
-                    <div class="progress-stats">
-                        <span>Quorum: ${quorumPercentage.toFixed(2)}% / ${daoManager.daoInfo.quorumPercentage}% needed</span>
-                    </div>
-                </div>
-                <div class="your-tokens">
-                    <span>Your Voting Tokens: ${election.voteInfo ? election.voteInfo.userVotingTokens : 0}</span>
-                </div>
-            </div>
-            <div class="election-actions">
-                ${!isCompleted ? `
-                    <button class="vote-yes-btn" data-address="${election.address}" ${!election.voteInfo || election.voteInfo.userVotingTokens <= 0 ? 'disabled' : ''}>Vote Yes</button>
-                    <button class="vote-no-btn" data-address="${election.address}" ${!election.voteInfo || election.voteInfo.userVotingTokens <= 0 ? 'disabled' : ''}>Vote No</button>
-                ` : ''}
-                ${canExecute ? `
-                    <button class="execute-btn" data-address="${election.address}">Execute Proposal</button>
-                ` : ''}
-            </div>
         `;
         
-        // Add event listeners for the buttons
-        if (!isCompleted) {
-            const voteYesBtn = card.querySelector('.vote-yes-btn');
-            const voteNoBtn = card.querySelector('.vote-no-btn');
-            
-            if (voteYesBtn) {
-                voteYesBtn.addEventListener('click', () => {
-                    this.showVoteModal(election, true);
-                });
-            }
-            
-            if (voteNoBtn) {
-                voteNoBtn.addEventListener('click', () => {
-                    this.showVoteModal(election, false);
-                });
-            }
+        // Add type-specific details
+        if (proposal.type === 'treasury') {
+            detailsHtml += `
+                <div class="detail-item">
+                    <span class="detail-label">Recipient:</span>
+                    <span class="detail-value">${proposal.recipient}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Amount:</span>
+                    <span class="detail-value">${UI.formatEth(proposal.amount)}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Token:</span>
+                    <span class="detail-value">${proposal.token === '0x0000000000000000000000000000000000000000' ? 'ETH' : proposal.token}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Token ID:</span>
+                    <span class="detail-value">${proposal.tokenId || 'N/A'}</span>
+                </div>
+            `;
+        } else if (proposal.type === 'mint') {
+            detailsHtml += `
+                <div class="detail-item">
+                    <span class="detail-label">Recipient:</span>
+                    <span class="detail-value">${proposal.recipient}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Amount:</span>
+                    <span class="detail-value">${proposal.amount} tokens</span>
+                </div>
+            `;
+        } else if (proposal.type === 'token-price') {
+            detailsHtml += `
+                <div class="detail-item">
+                    <span class="detail-label">New Price:</span>
+                    <span class="detail-value">${UI.formatEth(proposal.newPrice)}</span>
+                </div>
+            `;
         }
         
-        if (canExecute) {
-            const executeBtn = card.querySelector('.execute-btn');
-            
-            if (executeBtn) {
-                executeBtn.addEventListener('click', () => {
-                    this.executeProposal(election);
-                });
-            }
+        // Add election information if triggered
+        if (proposal.electionTriggered) {
+            detailsHtml += `
+                <div class="detail-item">
+                    <span class="detail-label">Election Status:</span>
+                    <span class="detail-value">Active</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Election Start Block:</span>
+                    <span class="detail-value">#${proposal.electionStart}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Yes Votes:</span>
+                    <span class="detail-value">${proposal.election ? proposal.election.yesVotes : 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">No Votes:</span>
+                    <span class="detail-value">${proposal.election ? proposal.election.noVotes : 'N/A'}</span>
+                </div>
+            `;
         }
         
-        return card;
+        // Add support actions if not in election and wallet is connected
+        if (!proposal.electionTriggered && Wallet.isWalletConnected()) {
+            detailsHtml += `
+                <div class="modal-actions">
+                    <div class="form-group">
+                        <label for="support-amount">Support Amount:</label>
+                        <input type="number" id="support-amount" class="form-control" min="1" value="1">
+                    </div>
+                    <button id="modal-support-btn" class="btn-primary">Add Support</button>
+                </div>
+            `;
+        }
+        
+        detailsHtml += '</div>';
+        
+        // Show modal
+        UI.showModal(`Proposal Details`, detailsHtml);
+        
+        // Add event listener for support button in modal
+        const modalSupportBtn = document.getElementById('modal-support-btn');
+        if (modalSupportBtn) {
+            modalSupportBtn.addEventListener('click', () => {
+                const amount = parseInt(document.getElementById('support-amount').value);
+                this.supportProposal(proposal.address, amount);
+            });
+        }
     }
-
+    
     /**
-     * Show modal to add support to a proposal
-     * @param {Object} proposal - The proposal object
+     * Handle support action for a proposal
+     * @param {Object} proposal - Proposal data
      */
-    showAddSupportModal(proposal) {
-        const modalContent = document.createElement('div');
+    async handleSupportProposal(proposal) {
+        if (!Wallet.isWalletConnected()) {
+            UI.showNotification('warning', 'Connect Wallet', 'Please connect your wallet to support proposals');
+            return;
+        }
         
-        modalContent.innerHTML = `
-            <p>How much support would you like to add to this proposal?</p>
-            <p>Your governance tokens: ${daoManager.userTokens}</p>
-            <p>Your current support: ${proposal.userSupport}</p>
-            
-            <div class="form-group">
-                <label for="supportAmount">Support Amount</label>
-                <input type="number" id="supportAmount" min="1" max="${daoManager.userTokens - proposal.userSupport}" value="1">
+        // Show support dialog
+        UI.showModal('Support Proposal', `
+            <div class="support-proposal-modal">
+                <p>Add support to proposal "${proposal.description}"</p>
+                <div class="form-group">
+                    <label for="support-amount">Support Amount:</label>
+                    <input type="number" id="support-amount" class="form-control" min="1" value="1">
+                </div>
+                <div class="form-actions">
+                    <button id="modal-support-btn" class="btn-primary">Add Support</button>
+                </div>
             </div>
-            
-            <button id="confirmAddSupport">Add Support</button>
-        `;
+        `);
         
-        Utils.showModal('Add Support', modalContent);
-        
-        // Add event listener for the confirm button
-        document.getElementById('confirmAddSupport').addEventListener('click', async () => {
-            const amount = parseInt(document.getElementById('supportAmount').value);
-            
-            if (isNaN(amount) || amount <= 0 || amount > (daoManager.userTokens - proposal.userSupport)) {
-                Utils.showNotification('Invalid amount', 'error');
-                return;
-            }
-            
-            try {
-                Utils.hideModal();
-                await this.addSupport(proposal.address, amount);
-            } catch (error) {
-                console.error('Error adding support:', error);
-            }
-        });
+        // Add event listener for support button
+        const supportBtn = document.getElementById('modal-support-btn');
+        if (supportBtn) {
+            supportBtn.addEventListener('click', () => {
+                const amount = parseInt(document.getElementById('support-amount').value);
+                this.supportProposal(proposal.address, amount);
+            });
+        }
     }
-
-    /**
-     * Show modal to remove support from a proposal
-     * @param {Object} proposal - The proposal object
-     */
-    showRemoveSupportModal(proposal) {
-        const modalContent = document.createElement('div');
-        
-        modalContent.innerHTML = `
-            <p>How much support would you like to remove from this proposal?</p>
-            <p>Your current support: ${proposal.userSupport}</p>
-            
-            <div class="form-group">
-                <label for="supportAmount">Support Amount to Remove</label>
-                <input type="number" id="supportAmount" min="1" max="${proposal.userSupport}" value="${proposal.userSupport}">
-            </div>
-            
-            <button id="confirmRemoveSupport">Remove Support</button>
-        `;
-        
-        Utils.showModal('Remove Support', modalContent);
-        
-        // Add event listener for the confirm button
-        document.getElementById('confirmRemoveSupport').addEventListener('click', async () => {
-            const amount = parseInt(document.getElementById('supportAmount').value);
-            
-            if (isNaN(amount) || amount <= 0 || amount > proposal.userSupport) {
-                Utils.showNotification('Invalid amount', 'error');
-                return;
-            }
-            
-            try {
-                Utils.hideModal();
-                await this.removeSupport(proposal.address, amount);
-            } catch (error) {
-                console.error('Error removing support:', error);
-            }
-        });
-    }
-
-    /**
-     * Show modal to vote on an election
-     * @param {Object} election - The election object
-     * @param {boolean} voteYes - Whether to vote yes or no
-     */
-    showVoteModal(election, voteYes) {
-        const modalContent = document.createElement('div');
-        
-        modalContent.innerHTML = `
-            <p>How many tokens would you like to use to vote ${voteYes ? 'YES' : 'NO'} on this proposal?</p>
-            <p>Your voting tokens: ${election.voteInfo ? election.voteInfo.userVotingTokens : 0}</p>
-            
-            <div class="form-group">
-                <label for="voteAmount">Vote Amount</label>
-                <input type="number" id="voteAmount" min="1" max="${election.voteInfo ? election.voteInfo.userVotingTokens : 0}" value="${election.voteInfo ? election.voteInfo.userVotingTokens : 0}">
-            </div>
-            
-            <button id="confirmVote">Cast Vote</button>
-        `;
-        
-        Utils.showModal(`Vote ${voteYes ? 'YES' : 'NO'}`, modalContent);
-        
-        // Add event listener for the confirm button
-        document.getElementById('confirmVote').addEventListener('click', async () => {
-            const amount = parseInt(document.getElementById('voteAmount').value);
-            
-            if (isNaN(amount) || amount <= 0 || amount > election.voteInfo.userVotingTokens) {
-                Utils.showNotification('Invalid amount', 'error');
-                return;
-            }
-            
-            try {
-                Utils.hideModal();
-                await this.vote(election, voteYes, amount);
-            } catch (error) {
-                console.error('Error voting:', error);
-            }
-        });
-    }
-
+    
     /**
      * Add support to a proposal
-     * @param {string} proposalAddress - The proposal contract address
-     * @param {number} amount - The amount of support to add
+     * @param {string} proposalAddress - Address of the proposal
+     * @param {number} amount - Amount of support to add
      */
-    async addSupport(proposalAddress, amount) {
-        try {
-            const proposalContract = contracts.getProposalContract(proposalAddress);
-            
-            await Utils.waitForTransaction(
-                proposalContract.addSupport(amount),
-                `Adding ${amount} support to proposal...`,
-                `Successfully added ${amount} support to proposal!`
-            );
-            
-            // Refresh proposals
-            await this.refreshProposals();
-            await this.refreshElections();
-        } catch (error) {
-            console.error('Error adding support:', error);
-            throw error;
+    async supportProposal(proposalAddress, amount) {
+        if (!Wallet.isWalletConnected()) {
+            UI.showNotification('warning', 'Connect Wallet', 'Please connect your wallet to support proposals');
+            return;
         }
-    }
-
-    /**
-     * Remove support from a proposal
-     * @param {string} proposalAddress - The proposal contract address
-     * @param {number} amount - The amount of support to remove
-     */
-    async removeSupport(proposalAddress, amount) {
+        
         try {
-            const proposalContract = contracts.getProposalContract(proposalAddress);
-            
-            await Utils.waitForTransaction(
-                proposalContract.removeSupport(amount),
-                `Removing ${amount} support from proposal...`,
-                `Successfully removed ${amount} support from proposal!`
-            );
-            
-            // Refresh proposals
-            await this.refreshProposals();
-        } catch (error) {
-            console.error('Error removing support:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Vote on an election
-     * @param {Object} election - The election object
-     * @param {boolean} voteYes - Whether to vote yes or no
-     * @param {number} amount - The amount of tokens to vote with
-     */
-    async vote(election, voteYes, amount) {
-        try {
-            const voteAddress = voteYes ? election.yesVoteAddress : election.noVoteAddress;
-            
-            await Utils.waitForTransaction(
-                contracts.daoContract.safeTransferFrom(
-                    wallet.address,
-                    voteAddress,
-                    election.votingTokenId,
-                    amount,
-                    "0x"
-                ),
-                `Casting ${voteYes ? 'YES' : 'NO'} vote with ${amount} tokens...`,
-                `Successfully voted ${voteYes ? 'YES' : 'NO'} with ${amount} tokens!`
-            );
-            
-            // Refresh elections
-            await this.refreshElections();
-        } catch (error) {
-            console.error('Error voting:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Execute a proposal after a successful election
-     * @param {Object} election - The election object
-     */
-    async executeProposal(election) {
-        try {
-            const proposalContract = contracts.getProposalContract(election.address);
-            
-            await Utils.waitForTransaction(
-                proposalContract.execute(),
-                `Executing proposal...`,
-                `Successfully executed proposal!`
-            );
-            
-            // Refresh elections and DAO info
-            await this.refreshElections();
-            await daoManager.refreshDAOInfo();
-        } catch (error) {
-            console.error('Error executing proposal:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Create a new proposal
-     * @param {string} type - The proposal type
-     * @param {Object} data - The proposal data
-     */
-    async createProposal(type, data) {
-        try {
-            let tx;
-            
-            if (type === CONFIG.proposalTypes.RESOLUTION) {
-                tx = await contracts.factoryContract.createResolutionProposal(
-                    data.description
-                );
-            } else if (type === CONFIG.proposalTypes.TREASURY) {
-                tx = await contracts.factoryContract.createTreasuryProposal(
-                    data.description,
-                    data.recipient,
-                    data.amount,
-                    data.token,
-                    data.tokenId
-                );
-            } else if (type === CONFIG.proposalTypes.MINT) {
-                tx = await contracts.factoryContract.createMintProposal(
-                    data.description,
-                    data.recipient,
-                    data.amount
-                );
-            } else if (type === CONFIG.proposalTypes.TOKEN_PRICE) {
-                tx = await contracts.factoryContract.createTokenPriceProposal(
-                    data.description,
-                    data.newPrice
-                );
-            } else {
-                throw new Error(`Unknown proposal type: ${type}`);
+            // Check if amount is valid
+            if (!amount || amount <= 0) {
+                UI.showNotification('warning', 'Invalid Amount', 'Please enter a valid support amount');
+                return;
             }
             
-            await Utils.waitForTransaction(
-                tx,
-                `Creating ${type} proposal...`,
-                `Successfully created ${type} proposal!`
-            );
+            // Get proposal contract
+            const proposalContract = Contracts.getProposalContract(proposalAddress);
             
-            // Refresh proposals
-            await this.refreshProposals();
+            // Check if approval is needed
+            const daoContract = Contracts.getDAOContract();
+            const isApproved = await daoContract.isApprovedForAll(Wallet.getAddress(), proposalAddress);
+            
+            if (!isApproved) {
+                UI.showNotification('info', 'Approval Required', 'Approving proposal to manage your tokens...');
+                
+                // Approve proposal
+                const approveTx = await daoContract.setApprovalForAll(proposalAddress, true);
+                await approveTx.wait();
+                
+                UI.showNotification('success', 'Approved', 'Proposal approved to manage your tokens');
+            }
+            
+            // Add support
+            UI.showNotification('info', 'Processing', 'Adding support to proposal...');
+            const tx = await proposalContract.addSupport(amount);
+            await tx.wait();
+            
+            // Close modal
+            document.getElementById('modal-container').classList.add('hidden');
+            
+            // Show success notification
+            UI.showNotification('success', 'Support Added', `Successfully added ${amount} support to the proposal`);
+            
+            // Reload proposals
+            this.loadProposals();
+        } catch (error) {
+            console.error('Error supporting proposal:', error);
+            UI.showNotification('error', 'Support Failed', error.message || 'Failed to support proposal');
+        }
+    }
+    
+    /**
+     * Handle proposal creation form submission
+     */
+    async handleProposalCreation() {
+        if (!Wallet.isWalletConnected()) {
+            UI.showNotification('warning', 'Connect Wallet', 'Please connect your wallet to create a proposal');
+            return;
+        }
+        
+        try {
+            const proposalType = document.getElementById('proposal-type').value;
+            const description = document.getElementById('proposal-description').value;
+            
+            if (!proposalType || !description) {
+                UI.showNotification('warning', 'Missing Fields', 'Please fill in all required fields');
+                return;
+            }
+            
+            const factory = Contracts.getFactoryContract();
+            let tx;
+            
+            switch (proposalType) {
+                case 'resolution':
+                    UI.showNotification('info', 'Creating Proposal', 'Creating resolution proposal...');
+                    tx = await factory.createResolutionProposal(description);
+                    break;
+                
+                case 'treasury':
+                    const recipient = document.getElementById('recipient-address').value;
+                    const amount = ethers.utils.parseEther(document.getElementById('amount').value.toString());
+                    const token = document.getElementById('token-address').value || ethers.constants.AddressZero;
+                    const tokenId = parseInt(document.getElementById('token-id').value || '0');
+                    
+                    if (!recipient || amount.lte(0)) {
+                        UI.showNotification('warning', 'Missing Fields', 'Please fill in all required fields');
+                        return;
+                    }
+                    
+                    UI.showNotification('info', 'Creating Proposal', 'Creating treasury proposal...');
+                    tx = await factory.createTreasuryProposal(description, recipient, amount, token, tokenId);
+                    break;
+                
+                case 'mint':
+                    const mintRecipient = document.getElementById('recipient-address').value;
+                    const mintAmount = parseInt(document.getElementById('amount').value);
+                    
+                    if (!mintRecipient || mintAmount <= 0) {
+                        UI.showNotification('warning', 'Missing Fields', 'Please fill in all required fields');
+                        return;
+                    }
+                    
+                    UI.showNotification('info', 'Creating Proposal', 'Creating mint proposal...');
+                    tx = await factory.createMintProposal(description, mintRecipient, mintAmount);
+                    break;
+                
+                case 'token-price':
+                    const newPrice = ethers.utils.parseEther(document.getElementById('new-token-price').value.toString());
+                    
+                    UI.showNotification('info', 'Creating Proposal', 'Creating token price proposal...');
+                    tx = await factory.createTokenPriceProposal(description, newPrice);
+                    break;
+                
+                default:
+                    UI.showNotification('error', 'Invalid Type', 'Invalid proposal type selected');
+                    return;
+            }
+            
+            await tx.wait();
+            
+            // Hide form and show success message
+            document.getElementById('proposal-form').classList.add('hidden');
+            document.getElementById('new-proposal-btn').classList.remove('hidden');
+            document.getElementById('create-proposal-form').reset();
+            
+            UI.showNotification('success', 'Proposal Created', 'Your proposal has been created successfully');
+            
+            // Reload proposals
+            this.loadProposals();
         } catch (error) {
             console.error('Error creating proposal:', error);
-            throw error;
+            UI.showNotification('error', 'Creation Failed', error.message || 'Failed to create proposal');
         }
     }
-
+    
     /**
-     * Setup refresh intervals
+     * Update token balance display
      */
-    setupRefreshIntervals() {
-        // Clear any existing intervals
-        if (this.proposalsRefreshInterval) {
-            clearInterval(this.proposalsRefreshInterval);
+    async updateTokenBalance() {
+        if (!Wallet.isWalletConnected()) return;
+        
+        try {
+            const balance = await Contracts.fetchTokenBalance(Wallet.getAddress());
+            
+            // Update in sidebar
+            const tokenBalance = document.getElementById('token-balance');
+            if (tokenBalance) {
+                tokenBalance.textContent = `${balance} Governance Tokens`;
+            }
+            
+            // Update in tokens section
+            const governanceTokenBalance = document.getElementById('governance-token-balance');
+            if (governanceTokenBalance) {
+                governanceTokenBalance.textContent = balance;
+            }
+        } catch (error) {
+            console.error('Error updating token balance:', error);
         }
-        
-        if (this.electionsRefreshInterval) {
-            clearInterval(this.electionsRefreshInterval);
-        }
-        
-        // Setup periodic refreshes
-        this.proposalsRefreshInterval = setInterval(async () => {
-            await this.refreshProposals();
-        }, CONFIG.refreshIntervals.proposals);
-        
-        this.electionsRefreshInterval = setInterval(async () => {
-            await this.refreshElections();
-        }, CONFIG.refreshIntervals.elections);
     }
-
+    
     /**
-     * Clean up when disconnecting
+     * Update purchase total when amount changes
      */
-    cleanup() {
-        if (this.proposalsRefreshInterval) {
-            clearInterval(this.proposalsRefreshInterval);
-            this.proposalsRefreshInterval = null;
+    updatePurchaseTotal() {
+        if (!this.daoInfo || this.daoInfo.tokenPrice == 0) return;
+        
+        const purchaseAmount = document.getElementById('purchase-amount');
+        const totalCost = document.getElementById('purchase-total-cost');
+        
+        if (purchaseAmount && totalCost) {
+            const amount = parseInt(purchaseAmount.value) || 0;
+            const cost = amount * parseFloat(this.daoInfo.tokenPrice);
+            totalCost.textContent = UI.formatEth(cost);
+        }
+    }
+    
+    /**
+     * Handle token purchase
+     */
+    async handleTokenPurchase() {
+        if (!Wallet.isWalletConnected()) {
+            UI.showNotification('warning', 'Connect Wallet', 'Please connect your wallet to purchase tokens');
+            return;
         }
         
-        if (this.electionsRefreshInterval) {
-            clearInterval(this.electionsRefreshInterval);
-            this.electionsRefreshInterval = null;
+        if (!this.daoInfo || this.daoInfo.tokenPrice == 0) {
+            UI.showNotification('warning', 'Purchases Disabled', 'Token purchases are currently disabled');
+            return;
+        }
+        
+        try {
+            const amount = parseInt(document.getElementById('purchase-amount').value);
+            
+            if (!amount || amount <= 0) {
+                UI.showNotification('warning', 'Invalid Amount', 'Please enter a valid purchase amount');
+                return;
+            }
+            
+            UI.showNotification('info', 'Processing', 'Processing token purchase...');
+            
+            await Contracts.purchaseTokens(amount, this.daoInfo.tokenPrice);
+            
+            UI.showNotification('success', 'Purchase Complete', `Successfully purchased ${amount} governance tokens`);
+            
+            // Update balance
+            this.updateTokenBalance();
+            
+            // Reload DAO info to update token supply
+            this.loadDAOInfo();
+        } catch (error) {
+            console.error('Error purchasing tokens:', error);
+            UI.showNotification('error', 'Purchase Failed', error.message || 'Failed to purchase tokens');
         }
     }
 }
 
-// Create a singleton instance and ensure it's defined in the global scope
-window.proposalManager = new ProposalManager();
+// Create global proposal manager
+const Proposals = new ProposalManager();

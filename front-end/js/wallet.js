@@ -1,191 +1,201 @@
-// Wallet connection and management for the Market DAO application
-
+/**
+ * Wallet management for Market DAO
+ * Handles connection to MetaMask or other web3 providers
+ */
 class WalletManager {
     constructor() {
         this.provider = null;
         this.signer = null;
-        this.address = null;
-        this.networkId = null;
-        this.isConnected = false;
-        this.onConnectCallbacks = [];
-        this.onDisconnectCallbacks = [];
-        this.onNetworkChangeCallbacks = [];
-    }
-
-    /**
-     * Check if MetaMask is available in the browser
-     * @returns {boolean} - True if MetaMask is available
-     */
-    isMetaMaskAvailable() {
-        return window.ethereum !== undefined;
-    }
-
-    /**
-     * Connect to MetaMask wallet
-     * @returns {Promise<string>} - The connected wallet address
-     */
-    async connect() {
-        if (!this.isMetaMaskAvailable()) {
-            throw new Error('MetaMask is not installed. Please install it to use this application.');
-        }
-
-        try {
-            console.log("Attempting to connect wallet...");
-            
-            // Request account access
-            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-            this.address = accounts[0];
-            
-            console.log("Wallet connected:", this.address);
-            
-            // Create ethers provider and signer
-            this.provider = new ethers.providers.Web3Provider(window.ethereum);
-            this.signer = this.provider.getSigner();
-            
-            // Get network information
-            const network = await this.provider.getNetwork();
-            this.networkId = network.chainId;
-            
-            console.log("Network connected:", this.networkId);
-            
-            // Setup event listeners for MetaMask
-            this.setupEventListeners();
-            
-            // Mark as connected
-            this.isConnected = true;
-            
-            // Initialize contracts
-            window.contracts.initialize(this.provider, this.signer);
-            
-            // Call the connect callbacks
-            this._callCallbacks(this.onConnectCallbacks, this.address);
-            
-            return this.address;
-        } catch (error) {
-            console.error('Error connecting to wallet:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Disconnect from the wallet
-     */
-    disconnect() {
-        this.provider = null;
-        this.signer = null;
-        this.address = null;
-        this.networkId = null;
+        this.account = null;
+        this.chainId = null;
         this.isConnected = false;
         
-        // Reset contracts
-        contracts.reset();
+        // Setup connect button event listener
+        this.connectButton = document.getElementById('connect-wallet');
+        this.connectButton.addEventListener('click', () => this.connectWallet());
         
-        // Call the disconnect callbacks
-        this._callCallbacks(this.onDisconnectCallbacks);
+        // Setup event listeners for account changes
+        this.setupEventListeners();
     }
-
+    
     /**
-     * Setup event listeners for MetaMask
+     * Setup Web3 event listeners for account and chain changes
      */
     setupEventListeners() {
-        if (!window.ethereum) return;
-        
-        // Handle account changes
-        window.ethereum.on('accountsChanged', (accounts) => {
-            if (accounts.length === 0) {
-                // User disconnected their wallet
-                this.disconnect();
+        // If already in a browser with ethereum provider
+        if (window.ethereum) {
+            window.ethereum.on('accountsChanged', (accounts) => {
+                console.log('Account changed:', accounts[0]);
+                this.handleAccountChange(accounts);
+            });
+            
+            window.ethereum.on('chainChanged', (chainId) => {
+                console.log('Chain changed:', parseInt(chainId, 16));
+                window.location.reload();
+            });
+            
+            // Check if already connected
+            this.checkExistingConnection();
+        }
+    }
+    
+    /**
+     * Check for existing connection when page loads
+     */
+    async checkExistingConnection() {
+        if (window.ethereum) {
+            const provider = new ethers.providers.Web3Provider(window.ethereum);
+            const accounts = await provider.listAccounts();
+            
+            if (accounts.length > 0) {
+                this.provider = provider;
+                this.signer = this.provider.getSigner();
+                this.account = accounts[0];
+                this.isConnected = true;
+                this.updateUI();
+                
+                // Get chain ID
+                const network = await this.provider.getNetwork();
+                this.chainId = network.chainId;
+                
+                // Dispatch connected event
+                window.dispatchEvent(new CustomEvent('wallet-connected', {
+                    detail: { address: this.account }
+                }));
+            }
+        }
+    }
+    
+    /**
+     * Connect to the wallet
+     */
+    async connectWallet() {
+        try {
+            if (window.ethereum) {
+                this.provider = new ethers.providers.Web3Provider(window.ethereum);
+                const accounts = await this.provider.send('eth_requestAccounts', []);
+                
+                if (accounts.length > 0) {
+                    this.signer = this.provider.getSigner();
+                    this.account = accounts[0];
+                    this.isConnected = true;
+                    
+                    // Get chain ID
+                    const network = await this.provider.getNetwork();
+                    this.chainId = network.chainId;
+                    
+                    this.updateUI();
+                    
+                    // Dispatch connected event
+                    window.dispatchEvent(new CustomEvent('wallet-connected', {
+                        detail: { address: this.account }
+                    }));
+                    
+                    // Show success notification
+                    UI.showNotification('success', 'Wallet Connected', 'Connected to account ' + this.formatAddress(this.account));
+                }
             } else {
-                // User switched accounts
-                this.address = accounts[0];
-                this._callCallbacks(this.onConnectCallbacks, this.address);
+                UI.showNotification('error', 'No Provider Found', 'Please install MetaMask or another Web3 wallet');
             }
-        });
-        
-        // Handle network changes
-        window.ethereum.on('chainChanged', (chainId) => {
-            // Network was changed, refresh the page
-            this.networkId = parseInt(chainId, 16);
-            this._callCallbacks(this.onNetworkChangeCallbacks, this.networkId);
+        } catch (error) {
+            console.error('Error connecting wallet:', error);
+            UI.showNotification('error', 'Connection Failed', error.message || 'Could not connect to wallet');
+        }
+    }
+    
+    /**
+     * Handle account change from wallet
+     */
+    handleAccountChange(accounts) {
+        if (accounts.length === 0) {
+            // Disconnected
+            this.disconnectWallet();
+        } else {
+            // Account changed
+            this.account = accounts[0];
+            this.updateUI();
             
-            // Refresh provider and signer
-            this.provider = new ethers.providers.Web3Provider(window.ethereum);
-            this.signer = this.provider.getSigner();
+            // Dispatch event for account change
+            window.dispatchEvent(new CustomEvent('wallet-account-changed', {
+                detail: { address: this.account }
+            }));
             
-            // Reinitialize contracts
-            contracts.initialize(this.provider, this.signer);
-        });
-    }
-
-    /**
-     * Get the wallet's ETH balance
-     * @returns {Promise<string>} - The balance in ETH
-     */
-    async getBalance() {
-        if (!this.isConnected) return '0';
-        
-        const balance = await this.provider.getBalance(this.address);
-        return ethers.utils.formatEther(balance);
-    }
-
-    /**
-     * Get the current block number
-     * @returns {Promise<number>} - The current block number
-     */
-    async getBlockNumber() {
-        if (!this.isConnected) return 0;
-        return await this.provider.getBlockNumber();
-    }
-
-    /**
-     * Register callback function to be called when wallet is connected
-     * @param {Function} callback - The callback function
-     */
-    onConnect(callback) {
-        this.onConnectCallbacks.push(callback);
-        
-        // If already connected, call the callback immediately
-        if (this.isConnected) {
-            callback(this.address);
+            // Refresh data
+            window.dispatchEvent(new CustomEvent('refresh-data'));
         }
     }
-
+    
     /**
-     * Register callback function to be called when wallet is disconnected
-     * @param {Function} callback - The callback function
+     * Disconnect wallet (UI only, cannot force disconnect MetaMask)
      */
-    onDisconnect(callback) {
-        this.onDisconnectCallbacks.push(callback);
-    }
-
-    /**
-     * Register callback function to be called when network changes
-     * @param {Function} callback - The callback function
-     */
-    onNetworkChange(callback) {
-        this.onNetworkChangeCallbacks.push(callback);
+    disconnectWallet() {
+        this.provider = null;
+        this.signer = null;
+        this.account = null;
+        this.isConnected = false;
+        this.updateUI();
         
-        // If already connected, call the callback immediately
-        if (this.isConnected) {
-            callback(this.networkId);
+        // Dispatch disconnected event
+        window.dispatchEvent(new CustomEvent('wallet-disconnected'));
+        
+        // Show notification
+        UI.showNotification('warning', 'Wallet Disconnected', 'Your wallet has been disconnected');
+    }
+    
+    /**
+     * Update UI based on connection state
+     */
+    updateUI() {
+        const connectButton = document.getElementById('connect-wallet');
+        const walletInfo = document.getElementById('wallet-info');
+        const accountAddress = document.getElementById('account-address');
+        
+        if (this.isConnected && this.account) {
+            connectButton.classList.add('hidden');
+            walletInfo.classList.remove('hidden');
+            accountAddress.textContent = this.formatAddress(this.account);
+        } else {
+            connectButton.classList.remove('hidden');
+            walletInfo.classList.add('hidden');
         }
     }
-
+    
     /**
-     * Helper method to call all registered callbacks
-     * @param {Array<Function>} callbacks - The callbacks to call
-     * @param {...any} args - Arguments to pass to the callbacks
+     * Format address for display (0x1234...5678)
      */
-    _callCallbacks(callbacks, ...args) {
-        for (const callback of callbacks) {
-            try {
-                callback(...args);
-            } catch (error) {
-                console.error('Error in callback:', error);
-            }
-        }
+    formatAddress(address) {
+        if (!address) return '';
+        return address.substring(0, 6) + '...' + address.substring(address.length - 4);
+    }
+    
+    /**
+     * Get current connected address
+     */
+    getAddress() {
+        return this.account;
+    }
+    
+    /**
+     * Get current signer
+     */
+    getSigner() {
+        return this.signer;
+    }
+    
+    /**
+     * Get current provider
+     */
+    getProvider() {
+        return this.provider;
+    }
+    
+    /**
+     * Check if wallet is connected
+     */
+    isWalletConnected() {
+        return this.isConnected;
     }
 }
 
-// Create a singleton instance and ensure it's defined in the global scope
-window.wallet = new WalletManager();
+// Create global wallet instance
+const Wallet = new WalletManager();

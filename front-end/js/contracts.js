@@ -1,171 +1,418 @@
-// Contract interfaces and functionality for the Market DAO application
-
-// ABI definitions
-const DAO_ABI = [
-    // General info
-    "function name() view returns (string)",
-    "function supportThreshold() view returns (uint256)",
-    "function quorumPercentage() view returns (uint256)",
-    "function maxProposalAge() view returns (uint256)",
-    "function electionDuration() view returns (uint256)",
-    "function allowMinting() view returns (bool)",
-    "function tokenPrice() view returns (uint256)",
-    "function hasTreasury() view returns (bool)",
-    "function acceptsETH() view returns (bool)",
-    "function acceptsERC20() view returns (bool)",
-    "function acceptsERC721() view returns (bool)",
-    "function acceptsERC1155() view returns (bool)",
-    "function activeProposal() view returns (address)",
-    "function getGovernanceTokenHolders() view returns (address[])",
-    "function totalSupply(uint256 tokenId) view returns (uint256)",
-    "function balanceOf(address account, uint256 id) view returns (uint256)",
-    
-    // Actions
-    "function purchaseTokens() payable",
-    "function setActiveProposal(address proposal)",
-    "function clearActiveProposal()",
-    "function mintGovernanceTokens(address to, uint256 amount)",
-    "function mintVotingTokens(address to, uint256 tokenId, uint256 amount)",
-    "function transferETH(address recipient, uint256 amount)",
-    "function setTokenPrice(uint256 newPrice)",
-    "function getNextVotingTokenId() returns (uint256)",
-    "function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes data)"
-];
-
-const FACTORY_ABI = [
-    "function dao() view returns (address)",
-    "function proposalCount() view returns (uint256)",
-    "function proposals(uint256) view returns (address)",
-    "function getProposal(uint256 index) view returns (address)",
-    
-    // Create proposal functions
-    "function createResolutionProposal(string description) returns (address)",
-    "function createTreasuryProposal(string description, address recipient, uint256 amount, address token, uint256 tokenId) returns (address)",
-    "function createMintProposal(string description, address recipient, uint256 amount) returns (address)",
-    "function createTokenPriceProposal(string description, uint256 newPrice) returns (address)"
-];
-
-const PROPOSAL_ABI = [
-    // Base proposal fields
-    "function dao() view returns (address)",
-    "function proposer() view returns (address)",
-    "function createdAt() view returns (uint256)",
-    "function description() view returns (string)",
-    "function supportTotal() view returns (uint256)",
-    "function support(address) view returns (uint256)",
-    "function electionTriggered() view returns (bool)",
-    "function electionStart() view returns (uint256)",
-    "function votingTokenId() view returns (uint256)",
-    "function yesVoteAddress() view returns (address)",
-    "function noVoteAddress() view returns (address)",
-    "function executed() view returns (bool)",
-    
-    // Actions
-    "function addSupport(uint256 amount)",
-    "function removeSupport(uint256 amount)",
-    "function canTriggerElection() view returns (bool)",
-    "function execute()"
-];
-
-// Additional ABIs for different proposal types
-const TREASURY_PROPOSAL_ABI = [
-    ...PROPOSAL_ABI,
-    "function recipient() view returns (address)",
-    "function amount() view returns (uint256)",
-    "function token() view returns (address)",
-    "function tokenId() view returns (uint256)"
-];
-
-const MINT_PROPOSAL_ABI = [
-    ...PROPOSAL_ABI,
-    "function recipient() view returns (address)",
-    "function amount() view returns (uint256)"
-];
-
-const TOKEN_PRICE_PROPOSAL_ABI = [
-    ...PROPOSAL_ABI,
-    "function newPrice() view returns (uint256)"
-];
-
-// Contract class to manage contracts interaction
-class Contracts {
+/**
+ * Contract interaction layer for Market DAO
+ * Provides access to the DAO and proposal contracts
+ */
+class ContractManager {
     constructor() {
-        this.provider = null;
-        this.signer = null;
-        this.daoContract = null;
-        this.factoryContract = null;
-        this.proposalContracts = {};
+        this.contracts = {
+            dao: null,
+            factory: null
+        };
+        this.initialized = false;
+        
+        // Initialize when ABIs are loaded
+        window.addEventListener('abis-loaded', () => this.initialize());
+        
+        // Reconnect contracts when wallet changes
+        window.addEventListener('wallet-connected', () => {
+            if (AppConfig.abis.daoAbi) {
+                this.connectContracts();
+            }
+        });
+        
+        window.addEventListener('wallet-account-changed', () => {
+            if (this.initialized) {
+                this.connectContracts();
+            }
+        });
     }
-
+    
     /**
-     * Initialize the contract instances
-     * @param {ethers.providers.Web3Provider} provider - The Ethereum provider
-     * @param {ethers.Signer} signer - The signer to use for transactions
+     * Initialize contract manager
      */
-    initialize(provider, signer) {
-        this.provider = provider;
-        this.signer = signer;
+    initialize() {
+        console.log('Initializing contract manager');
+        // Create read-only contract instances
+        this.createReadOnlyInstances();
+        this.initialized = true;
         
-        // Create contract instances
-        this.daoContract = new ethers.Contract(
-            CONFIG.contracts.dao,
-            DAO_ABI,
-            this.signer
-        );
+        // Check if wallet is already connected
+        if (Wallet.isWalletConnected()) {
+            this.connectContracts();
+        }
         
-        this.factoryContract = new ethers.Contract(
-            CONFIG.contracts.factory,
-            FACTORY_ABI,
-            this.signer
-        );
+        // Dispatch event indicating contracts are ready
+        window.dispatchEvent(new CustomEvent('contracts-initialized'));
     }
-
+    
     /**
-     * Get a proposal contract instance by address
+     * Create read-only contract instances using ethers.js
+     */
+    createReadOnlyInstances() {
+        const provider = new ethers.providers.JsonRpcProvider(AppConfig.rpcUrl);
+        
+        // Create DAO contract instance
+        this.contracts.dao = new ethers.Contract(
+            AppConfig.contracts.daoAddress,
+            AppConfig.abis.daoAbi,
+            provider
+        );
+        
+        // Create factory contract instance
+        this.contracts.factory = new ethers.Contract(
+            AppConfig.contracts.factoryAddress,
+            AppConfig.abis.factoryAbi,
+            provider
+        );
+        
+        console.log('Read-only contract instances created');
+    }
+    
+    /**
+     * Connect contracts with signer for write operations
+     */
+    connectContracts() {
+        if (!Wallet.isWalletConnected() || !Wallet.getSigner()) {
+            console.warn('Cannot connect contracts: wallet not connected');
+            return;
+        }
+        
+        const signer = Wallet.getSigner();
+        
+        // Connect DAO contract with signer
+        this.contracts.dao = new ethers.Contract(
+            AppConfig.contracts.daoAddress,
+            AppConfig.abis.daoAbi,
+            signer
+        );
+        
+        // Connect factory contract with signer
+        this.contracts.factory = new ethers.Contract(
+            AppConfig.contracts.factoryAddress,
+            AppConfig.abis.factoryAbi,
+            signer
+        );
+        
+        console.log('Contract instances connected with signer');
+    }
+    
+    /**
+     * Get the DAO contract instance
+     */
+    getDAOContract() {
+        return this.contracts.dao;
+    }
+    
+    /**
+     * Get the factory contract instance
+     */
+    getFactoryContract() {
+        return this.contracts.factory;
+    }
+    
+    /**
+     * Create a contract instance for a proposal
      * @param {string} address - The proposal contract address
-     * @param {string} type - The proposal type (optional, used for specific ABIs)
-     * @returns {ethers.Contract} The proposal contract
+     * @param {string} type - The proposal type (optional)
      */
     getProposalContract(address, type = null) {
-        if (this.proposalContracts[address]) {
-            return this.proposalContracts[address];
+        if (!address) {
+            throw new Error('Proposal address is required');
         }
         
-        let abi = PROPOSAL_ABI;
+        let abi = AppConfig.abis.proposalAbi; // Default to base proposal ABI
         
-        // Use the appropriate ABI based on the proposal type
-        if (type === CONFIG.proposalTypes.TREASURY) {
-            abi = TREASURY_PROPOSAL_ABI;
-        } else if (type === CONFIG.proposalTypes.MINT) {
-            abi = MINT_PROPOSAL_ABI;
-        } else if (type === CONFIG.proposalTypes.TOKEN_PRICE) {
-            abi = TOKEN_PRICE_PROPOSAL_ABI;
+        // Use specific ABI if type is provided
+        if (type) {
+            switch (type.toLowerCase()) {
+                case 'resolution':
+                    abi = AppConfig.abis.resolutionProposalAbi;
+                    break;
+                case 'treasury':
+                    abi = AppConfig.abis.treasuryProposalAbi;
+                    break;
+                case 'mint':
+                    abi = AppConfig.abis.mintProposalAbi;
+                    break;
+                case 'token-price':
+                    abi = AppConfig.abis.tokenPriceProposalAbi;
+                    break;
+            }
         }
         
-        const contract = new ethers.Contract(address, abi, this.signer);
-        this.proposalContracts[address] = contract;
-        return contract;
+        // Create contract instance
+        const provider = Wallet.isWalletConnected() ? Wallet.getSigner() : new ethers.providers.JsonRpcProvider(AppConfig.rpcUrl);
+        return new ethers.Contract(address, abi, provider);
     }
-
+    
     /**
-     * Reset the contract instances
+     * Fetch basic DAO information
      */
-    reset() {
-        this.provider = null;
-        this.signer = null;
-        this.daoContract = null;
-        this.factoryContract = null;
-        this.proposalContracts = {};
+    async fetchDAOInfo() {
+        try {
+            const dao = this.getDAOContract();
+            
+            const [
+                name,
+                supportThreshold,
+                quorumPercentage,
+                maxProposalAge,
+                electionDuration,
+                allowMinting,
+                tokenPrice,
+                hasTreasury,
+                acceptsETH,
+                acceptsERC20,
+                acceptsERC721,
+                acceptsERC1155,
+                tokenSupply
+            ] = await Promise.all([
+                dao.name(),
+                dao.supportThreshold(),
+                dao.quorumPercentage(),
+                dao.maxProposalAge(),
+                dao.electionDuration(),
+                dao.allowMinting(),
+                dao.tokenPrice(),
+                dao.hasTreasury(),
+                dao.acceptsETH(),
+                dao.acceptsERC20(),
+                dao.acceptsERC721(),
+                dao.acceptsERC1155(),
+                dao.totalSupply(0)
+            ]);
+            
+            return {
+                name,
+                supportThreshold: supportThreshold.toNumber(),
+                quorumPercentage: quorumPercentage.toNumber(),
+                maxProposalAge: maxProposalAge.toNumber(),
+                electionDuration: electionDuration.toNumber(),
+                allowMinting,
+                tokenPrice: ethers.utils.formatEther(tokenPrice),
+                hasTreasury,
+                acceptsETH,
+                acceptsERC20,
+                acceptsERC721,
+                acceptsERC1155,
+                tokenSupply: tokenSupply.toNumber()
+            };
+        } catch (error) {
+            console.error('Error fetching DAO info:', error);
+            throw error;
+        }
     }
-
+    
     /**
-     * Check if contracts are initialized
-     * @returns {boolean} True if initialized
+     * Fetch governance token balance for an address
+     * @param {string} address - The address to check
      */
-    isInitialized() {
-        return this.daoContract !== null && this.factoryContract !== null;
+    async fetchTokenBalance(address) {
+        try {
+            if (!address) {
+                return 0;
+            }
+            
+            const dao = this.getDAOContract();
+            const balance = await dao.balanceOf(address, 0);
+            return balance.toNumber();
+        } catch (error) {
+            console.error('Error fetching token balance:', error);
+            return 0;
+        }
+    }
+    
+    /**
+     * Fetch token holders and their balances
+     */
+    async fetchTokenHolders() {
+        try {
+            const dao = this.getDAOContract();
+            const holders = await dao.getGovernanceTokenHolders();
+            
+            const balances = await Promise.all(
+                holders.map(async (holder) => {
+                    const balance = await dao.balanceOf(holder, 0);
+                    return {
+                        address: holder,
+                        balance: balance.toNumber()
+                    };
+                })
+            );
+            
+            return balances;
+        } catch (error) {
+            console.error('Error fetching token holders:', error);
+            return [];
+        }
+    }
+    
+    /**
+     * Fetch proposals from the factory
+     */
+    async fetchProposals() {
+        try {
+            const factory = this.getFactoryContract();
+            const count = await factory.proposalCount();
+            
+            const proposals = [];
+            
+            for (let i = 0; i < count; i++) {
+                try {
+                    const proposalAddress = await factory.getProposal(i);
+                    const proposal = this.getProposalContract(proposalAddress);
+                    
+                    // Fetch basic proposal info
+                    const [
+                        description,
+                        proposer,
+                        createdAt,
+                        supportTotal,
+                        electionTriggered,
+                        electionStart,
+                        executed
+                    ] = await Promise.all([
+                        proposal.description(),
+                        proposal.proposer(),
+                        proposal.createdAt(),
+                        proposal.supportTotal(),
+                        proposal.electionTriggered(),
+                        proposal.electionStart(),
+                        proposal.executed()
+                    ]);
+                    
+                    // Determine proposal type by checking for type-specific properties
+                    let proposalType = 'resolution';
+                    let additionalInfo = {};
+                    
+                    try {
+                        // Try to get recipient - for treasury and mint proposals
+                        const recipient = await proposal.recipient();
+                        if (recipient) {
+                            const amount = await proposal.amount();
+                            
+                            try {
+                                // Try to get token and tokenId - for treasury proposals
+                                const token = await proposal.token();
+                                const tokenId = await proposal.tokenId();
+                                
+                                proposalType = 'treasury';
+                                additionalInfo = {
+                                    recipient,
+                                    amount: ethers.utils.formatEther(amount),
+                                    token,
+                                    tokenId: tokenId.toNumber()
+                                };
+                            } catch (e) {
+                                // If token/tokenId fail, it's a mint proposal
+                                proposalType = 'mint';
+                                additionalInfo = {
+                                    recipient,
+                                    amount: amount.toNumber()
+                                };
+                            }
+                        }
+                    } catch (e) {
+                        // Not a treasury or mint proposal
+                        try {
+                            // Try to get newPrice - for token price proposals
+                            const newPrice = await proposal.newPrice();
+                            if (newPrice) {
+                                proposalType = 'token-price';
+                                additionalInfo = {
+                                    newPrice: ethers.utils.formatEther(newPrice)
+                                };
+                            }
+                        } catch (e2) {
+                            // It's a resolution proposal
+                        }
+                    }
+                    
+                    // Get detailed election info if triggered
+                    let electionInfo = {};
+                    if (electionTriggered) {
+                        const [
+                            votingTokenId,
+                            yesVoteAddress,
+                            noVoteAddress
+                        ] = await Promise.all([
+                            proposal.votingTokenId(),
+                            proposal.yesVoteAddress(),
+                            proposal.noVoteAddress()
+                        ]);
+                        
+                        // Get vote counts
+                        const [
+                            yesVotes,
+                            noVotes,
+                            totalVotes
+                        ] = await Promise.all([
+                            dao.balanceOf(yesVoteAddress, votingTokenId),
+                            dao.balanceOf(noVoteAddress, votingTokenId),
+                            dao.totalSupply(votingTokenId)
+                        ]);
+                        
+                        electionInfo = {
+                            votingTokenId: votingTokenId.toNumber(),
+                            yesVoteAddress,
+                            noVoteAddress,
+                            yesVotes: yesVotes.toNumber(),
+                            noVotes: noVotes.toNumber(),
+                            totalVotes: totalVotes.toNumber(),
+                            endBlock: electionStart.toNumber() + await dao.electionDuration()
+                        };
+                    }
+                    
+                    proposals.push({
+                        id: i,
+                        address: proposalAddress,
+                        description,
+                        proposer,
+                        createdAt: createdAt.toNumber(),
+                        supportTotal: supportTotal.toNumber(),
+                        electionTriggered,
+                        electionStart: electionTriggered ? electionStart.toNumber() : 0,
+                        executed,
+                        type: proposalType,
+                        ...additionalInfo,
+                        election: electionTriggered ? electionInfo : null
+                    });
+                } catch (error) {
+                    console.error(`Error fetching proposal ${i}:`, error);
+                }
+            }
+            
+            return proposals;
+        } catch (error) {
+            console.error('Error fetching proposals:', error);
+            return [];
+        }
+    }
+    
+    /**
+     * Purchase governance tokens
+     * @param {number} amount - Number of tokens to purchase
+     * @param {string} price - Price per token in ETH
+     */
+    async purchaseTokens(amount, price) {
+        try {
+            if (!Wallet.isWalletConnected()) {
+                throw new Error('Wallet not connected');
+            }
+            
+            const dao = this.getDAOContract();
+            const totalCost = ethers.utils.parseEther(
+                (parseFloat(amount) * parseFloat(price)).toString()
+            );
+            
+            const tx = await dao.purchaseTokens({
+                value: totalCost
+            });
+            
+            return await tx.wait();
+        } catch (error) {
+            console.error('Error purchasing tokens:', error);
+            throw error;
+        }
     }
 }
-
-// Create a singleton instance and ensure it's defined in the global scope
-window.contracts = new Contracts();
