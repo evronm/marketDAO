@@ -19,57 +19,107 @@ document.addEventListener('DOMContentLoaded', function() {
     const activeElections = document.getElementById('active-elections');
     const proposalHistory = document.getElementById('proposal-history');
     
-    // Tab switching
-    const tabs = document.querySelectorAll('.tab');
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            const tabName = tab.getAttribute('data-tab');
-            
-            // Update active tab
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            
-            // Show active content
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-            document.getElementById(`${tabName}-tab`).classList.add('active');
+    // Improved Tab switching - more robust implementation
+    function setupTabs() {
+        const tabs = document.querySelectorAll('.tab');
+        if (tabs.length === 0) {
+            console.warn('No tabs found in the document');
+            return;
+        }
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', function() {
+                const tabName = this.getAttribute('data-tab');
+                if (!tabName) {
+                    console.warn('Tab missing data-tab attribute:', this);
+                    return;
+                }
+
+                // Update active tab
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Show active content
+                const tabContentElements = document.querySelectorAll('.tab-content');
+                tabContentElements.forEach(content => content.classList.remove('active'));
+                
+                const targetTab = document.getElementById(`${tabName}-tab`);
+                if (targetTab) {
+                    targetTab.classList.add('active');
+                } else {
+                    console.warn(`Tab content element not found: #${tabName}-tab`);
+                }
+            });
         });
-    });
+        
+        console.log('Tab switching initialized successfully');
+    }
+    
+    // Initialize tabs immediately and again after wallet connection
+    setupTabs();
     
     // Treasury form token type changes
     const treasuryToken = document.getElementById('treasury-token');
     const tokenAddressGroup = document.getElementById('token-address-group');
     const tokenIdGroup = document.getElementById('token-id-group');
     
-    treasuryToken.addEventListener('change', () => {
-        const tokenType = treasuryToken.value;
-        
-        if (tokenType === 'eth') {
-            tokenAddressGroup.style.display = 'none';
-            tokenIdGroup.style.display = 'none';
-        } else if (tokenType === 'erc20') {
-            tokenAddressGroup.style.display = 'block';
-            tokenIdGroup.style.display = 'none';
-        } else {
-            tokenAddressGroup.style.display = 'block';
-            tokenIdGroup.style.display = 'block';
-        }
-    });
+    if (treasuryToken && tokenAddressGroup && tokenIdGroup) {
+        treasuryToken.addEventListener('change', () => {
+            const tokenType = treasuryToken.value;
+            
+            if (tokenType === 'eth') {
+                tokenAddressGroup.style.display = 'none';
+                tokenIdGroup.style.display = 'none';
+            } else if (tokenType === 'erc20') {
+                tokenAddressGroup.style.display = 'block';
+                tokenIdGroup.style.display = 'none';
+            } else {
+                tokenAddressGroup.style.display = 'block';
+                tokenIdGroup.style.display = 'block';
+            }
+        });
+    } else {
+        console.warn('Treasury form elements not found');
+    }
     
     // Connect wallet
-    connectWalletButton.addEventListener('click', connectWallet);
+    if (connectWalletButton) {
+        connectWalletButton.addEventListener('click', connectWallet);
+    } else {
+        console.warn('Connect wallet button not found');
+    }
     
     // Token purchase calculation
     const purchaseAmount = document.getElementById('purchase-amount');
     const purchaseCost = document.getElementById('purchase-cost');
     
-    purchaseAmount.addEventListener('input', updatePurchaseCost);
+    if (purchaseAmount && purchaseCost) {
+        purchaseAmount.addEventListener('input', updatePurchaseCost);
+    } else {
+        console.warn('Purchase amount or cost elements not found');
+    }
     
-    // Form submissions
-    document.getElementById('resolution-form').addEventListener('submit', createResolutionProposal);
-    document.getElementById('treasury-form').addEventListener('submit', createTreasuryProposal);
-    document.getElementById('mint-form').addEventListener('submit', createMintProposal);
-    document.getElementById('price-form').addEventListener('submit', createTokenPriceProposal);
-    document.getElementById('purchase-tokens').addEventListener('click', purchaseTokens);
+    // Form submissions - with error handling
+    function addFormEventListener(formId, handler) {
+        const form = document.getElementById(formId);
+        if (form) {
+            form.addEventListener('submit', handler);
+        } else {
+            console.warn(`Form not found: #${formId}`);
+        }
+    }
+    
+    addFormEventListener('resolution-form', createResolutionProposal);
+    addFormEventListener('treasury-form', createTreasuryProposal);
+    addFormEventListener('mint-form', createMintProposal);
+    addFormEventListener('price-form', createTokenPriceProposal);
+    
+    const purchaseTokensButton = document.getElementById('purchase-tokens');
+    if (purchaseTokensButton) {
+        purchaseTokensButton.addEventListener('click', purchaseTokens);
+    } else {
+        console.warn('Purchase tokens button not found');
+    }
     
     // DAO Contract ABI - Simplified for essential functions
     const daoAbi = [
@@ -145,6 +195,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Helper Functions
     function showNotification(message, type = '') {
         const notification = document.getElementById('notification');
+        if (!notification) {
+            console.warn('Notification element not found');
+            return;
+        }
+        
         notification.textContent = message;
         notification.className = 'notification';
         
@@ -200,6 +255,9 @@ document.addEventListener('DOMContentLoaded', function() {
             activeElections.style.display = 'block';
             proposalHistory.style.display = 'block';
             
+            // Reinitialize tabs after UI elements are shown
+            setupTabs();
+            
             // Load DAO data
             await loadDaoInfo();
             await loadActiveProposals();
@@ -210,7 +268,7 @@ document.addEventListener('DOMContentLoaded', function() {
             showNotification('Wallet connected successfully!', 'success');
         } catch (error) {
             console.error('Error connecting wallet:', error);
-            showNotification('Failed to connect wallet: ' + error.message, 'error');
+            showNotification('Failed to connect wallet: ' + (error.message || 'Unknown error'), 'error');
         }
     }
     
@@ -249,17 +307,26 @@ document.addEventListener('DOMContentLoaded', function() {
             // Get total token supply
             const tokenSupply = await daoContract.totalSupply(0);
             
-            // Update UI
-            document.getElementById('dao-name').textContent = name;
-            document.getElementById('token-balance').textContent = tokenBalance.toString();
-            document.getElementById('token-supply').textContent = tokenSupply.toString();
-            document.getElementById('token-price').textContent = formatEther(tokenPrice) + ' ETH';
+            // Update UI - with error checking for all elements
+            const updateElementText = (id, text) => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.textContent = text;
+                } else {
+                    console.warn(`Element not found: #${id}`);
+                }
+            };
             
-            document.getElementById('support-threshold').textContent = supportThreshold + '%';
-            document.getElementById('quorum-percentage').textContent = quorumPercentage + '%';
-            document.getElementById('election-duration').textContent = electionDuration + ' blocks';
-            document.getElementById('max-proposal-age').textContent = maxProposalAge + ' blocks';
-            document.getElementById('allow-minting').textContent = allowMinting ? 'Yes' : 'No';
+            updateElementText('dao-name', name);
+            updateElementText('token-balance', tokenBalance.toString());
+            updateElementText('token-supply', tokenSupply.toString());
+            updateElementText('token-price', formatEther(tokenPrice) + ' ETH');
+            
+            updateElementText('support-threshold', supportThreshold + '%');
+            updateElementText('quorum-percentage', quorumPercentage + '%');
+            updateElementText('election-duration', electionDuration + ' blocks');
+            updateElementText('max-proposal-age', maxProposalAge + ' blocks');
+            updateElementText('allow-minting', allowMinting ? 'Yes' : 'No');
             
             // Build treasury config string
             let treasuryConfig = hasTreasury ? 'Yes (' : 'No';
@@ -271,17 +338,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (acceptsERC1155) configs.push('ERC1155');
                 treasuryConfig += configs.join(', ') + ')';
             }
-            document.getElementById('treasury-config').textContent = treasuryConfig;
+            updateElementText('treasury-config', treasuryConfig);
             
             // Update token purchase section
-            if (tokenPrice.toString() === '0') {
-                document.getElementById('token-purchase').style.display = 'none';
+            const tokenPurchase = document.getElementById('token-purchase');
+            if (tokenPurchase) {
+                tokenPurchase.style.display = tokenPrice.toString() === '0' ? 'none' : 'block';
             } else {
-                document.getElementById('token-purchase').style.display = 'block';
+                console.warn('Token purchase section not found');
             }
         } catch (error) {
             console.error('Error loading DAO info:', error);
-            showNotification('Failed to load DAO information', 'error');
+            showNotification('Failed to load DAO information: ' + (error.message || 'Unknown error'), 'error');
         }
     }
     
@@ -294,6 +362,7 @@ document.addEventListener('DOMContentLoaded', function() {
             purchaseCost.textContent = `${cost.toFixed(4)} ETH`;
         } catch (error) {
             console.error('Error updating purchase cost:', error);
+            purchaseCost.textContent = 'Error calculating cost';
         }
     }
     
@@ -318,7 +387,7 @@ document.addEventListener('DOMContentLoaded', function() {
             await loadDaoInfo();
         } catch (error) {
             console.error('Error purchasing tokens:', error);
-            showNotification('Failed to purchase tokens: ' + error.message, 'error');
+            showNotification('Failed to purchase tokens: ' + (error.message || 'Unknown error'), 'error');
         }
     }
     
@@ -334,6 +403,11 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Clear existing proposals
             const proposalsGrid = document.getElementById('proposals-grid');
+            if (!proposalsGrid) {
+                console.warn('Proposals grid element not found');
+                return;
+            }
+            
             proposalsGrid.innerHTML = '';
             
             if (proposalCount.toNumber() === 0) {
@@ -576,6 +650,11 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Update Active Elections section
             const electionsGrid = document.getElementById('elections-grid');
+            if (!electionsGrid) {
+                console.warn('Elections grid element not found');
+                return;
+            }
+            
             electionsGrid.innerHTML = '';
             
             if (activeElectionsData.length === 0) {
@@ -648,7 +727,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         } catch (error) {
             console.error('Error loading proposals:', error);
-            showNotification('Failed to load proposals: ' + error.message, 'error');
+            showNotification('Failed to load proposals: ' + (error.message || 'Unknown error'), 'error');
         }
     }
     
@@ -673,7 +752,7 @@ document.addEventListener('DOMContentLoaded', function() {
             loadActiveProposals();
         } catch (error) {
             console.error('Error adding support:', error);
-            showNotification('Failed to add support: ' + error.message, 'error');
+            showNotification('Failed to add support: ' + (error.message || 'Unknown error'), 'error');
         }
     }
     
@@ -695,7 +774,7 @@ document.addEventListener('DOMContentLoaded', function() {
             loadActiveProposals();
         } catch (error) {
             console.error('Error removing support:', error);
-            showNotification('Failed to remove support: ' + error.message, 'error');
+            showNotification('Failed to remove support: ' + (error.message || 'Unknown error'), 'error');
         }
     }
     
@@ -749,7 +828,7 @@ document.addEventListener('DOMContentLoaded', function() {
             loadActiveProposals();
         } catch (error) {
             console.error('Error casting vote:', error);
-            showNotification('Failed to cast vote: ' + error.message, 'error');
+            showNotification('Failed to cast vote: ' + (error.message || 'Unknown error'), 'error');
         }
     }
     
@@ -768,7 +847,7 @@ document.addEventListener('DOMContentLoaded', function() {
             loadDaoInfo();
         } catch (error) {
             console.error('Error executing proposal:', error);
-            showNotification('Failed to execute proposal: ' + error.message, 'error');
+            showNotification('Failed to execute proposal: ' + (error.message || 'Unknown error'), 'error');
         }
     }
     
@@ -798,7 +877,7 @@ document.addEventListener('DOMContentLoaded', function() {
             loadActiveProposals();
         } catch (error) {
             console.error('Error creating resolution proposal:', error);
-            showNotification('Failed to create proposal: ' + error.message, 'error');
+            showNotification('Failed to create proposal: ' + (error.message || 'Unknown error'), 'error');
         }
     }
     
@@ -864,7 +943,7 @@ document.addEventListener('DOMContentLoaded', function() {
             loadActiveProposals();
         } catch (error) {
             console.error('Error creating treasury proposal:', error);
-            showNotification('Failed to create treasury proposal: ' + error.message, 'error');
+            showNotification('Failed to create treasury proposal: ' + (error.message || 'Unknown error'), 'error');
         }
     }
     
@@ -901,7 +980,7 @@ document.addEventListener('DOMContentLoaded', function() {
             loadActiveProposals();
         } catch (error) {
             console.error('Error creating mint proposal:', error);
-            showNotification('Failed to create mint proposal: ' + error.message, 'error');
+            showNotification('Failed to create mint proposal: ' + (error.message || 'Unknown error'), 'error');
         }
     }
     
@@ -937,7 +1016,7 @@ document.addEventListener('DOMContentLoaded', function() {
             loadActiveProposals();
         } catch (error) {
             console.error('Error creating token price proposal:', error);
-            showNotification('Failed to create token price proposal: ' + error.message, 'error');
+            showNotification('Failed to create token price proposal: ' + (error.message || 'Unknown error'), 'error');
         }
     }
 });
