@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market DAO</title>
+    <style>
+        :root {
+            --primary-color: #2e7d32;
+            --primary-light: #60ad5e;
+            --primary-dark: #005005;
+            --secondary-color: #e8f5e9;
+            --text-color: #212121;
+            --text-light: #757575;
+            --background-color: #f5f5f5;
+            --card-color: #ffffff;
+            --accent-color: #66bb6a;
+            --danger-color: #d32f2f;
+            --success-color: #388e3c;
+            --border-radius: 8px;
+            --box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+        
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: var(--box-shadow);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 1.5rem;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 0;
+            border-bottom: 2px solid transparent;
+            transition: border-color 0.3s;
+        }
+        
+        .nav-links a:hover, .nav-links a.active {
+            border-color: white;
+        }
+        
+        main {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+        
+        .section-title {
+            margin-bottom: 1rem;
+            color: var(--primary-dark);
+            border-bottom: 2px solid var(--primary-light);
+            padding-bottom: 0.5rem;
+        }
+        
+        .card {
+            background-color: var(--card-color);
+            border-radius: var(--border-radius);
+            box-shadow: var(--box-shadow);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .stat-card {
+            background-color: var(--secondary-color);
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary-dark);
+            margin-bottom: 0.25rem;
+        }
+        
+        .stat-label {
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+        
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--primary-light);
+            margin-bottom: 1.5rem;
+        }
+        
+        .tab {
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+        }
+        
+        .tab.active {
+            border-color: var(--primary-color);
+            color: var(--primary-dark);
+            font-weight: 500;
+        }
+        
+        .tab:hover:not(.active) {
+            background-color: var(--secondary-color);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+        }
+        
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: var(--primary-dark);
+        }
+        
+        button.secondary {
+            background-color: var(--secondary-color);
+            color: var(--primary-dark);
+            border: 1px solid var(--primary-light);
+        }
+        
+        button.secondary:hover {
+            background-color: #d7edd9;
+        }
+        
+        button.danger {
+            background-color: var(--danger-color);
+        }
+        
+        button.danger:hover {
+            background-color: #b71c1c;
+        }
+        
+        .proposal-card {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        
+        .proposal-header {
+            margin-bottom: 0.75rem;
+        }
+        
+        .proposal-type {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            background-color: var(--primary-light);
+            color: white;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .proposal-title {
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+        
+        .proposal-details {
+            flex-grow: 1;
+            margin-bottom: 1rem;
+        }
+        
+        .proposal-detail {
+            display: flex;
+            margin-bottom: 0.5rem;
+        }
+        
+        .detail-label {
+            width: 40%;
+            font-weight: 500;
+            color: var(--text-light);
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background-color: var(--primary-color);
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+        
+        .proposal-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .address {
+            font-family: monospace;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            background-color: #f1f1f1;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        
+        .election-status {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            display: inline-block;
+            margin-bottom: 0.5rem;
+        }
+        
+        .status-active {
+            background-color: #FFF176;
+            color: #F57F17;
+        }
+        
+        .status-pending {
+            background-color: #BBDEFB;
+            color: #0D47A1;
+        }
+        
+        .status-completed {
+            background-color: #C8E6C9;
+            color: #1B5E20;
+        }
+        
+        .status-failed {
+            background-color: #FFCDD2;
+            color: #B71C1C;
+        }
+        
+        .vote-options {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .vote-button {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            border: 1px solid #ddd;
+            transition: all 0.3s;
+        }
+        
+        .vote-yes {
+            background-color: rgba(56, 142, 60, 0.1);
+            border-color: var(--success-color);
+            color: var(--success-color);
+        }
+        
+        .vote-yes:hover {
+            background-color: rgba(56, 142, 60, 0.2);
+        }
+        
+        .vote-no {
+            background-color: rgba(211, 47, 47, 0.1);
+            border-color: var(--danger-color);
+            color: var(--danger-color);
+        }
+        
+        .vote-no:hover {
+            background-color: rgba(211, 47, 47, 0.2);
+        }
+        
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top: 4px solid var(--primary-color);
+            width: 32px;
+            height: 32px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .accordion {
+            border: 1px solid #ddd;
+            border-radius: var(--border-radius);
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }
+        
+        .accordion-header {
+            padding: 1rem;
+            background-color: #f9f9f9;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .accordion-content {
+            padding: 1rem;
+            display: none;
+            border-top: 1px solid #ddd;
+        }
+        
+        .accordion.active .accordion-content {
+            display: block;
+        }
+        
+        .accordion-icon {
+            transition: transform 0.3s;
+        }
+        
+        .accordion.active .accordion-icon {
+            transform: rotate(180deg);
+        }
+        
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 1rem;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+        
+        .notification.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        .notification.error {
+            background-color: var(--danger-color);
+        }
+        
+        .notification.success {
+            background-color: var(--success-color);
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .grid, .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .nav-links {
+                display: none;
+            }
+            
+            .mobile-menu {
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav>
+            <div class="logo">Market DAO</div>
+            <div class="nav-links">
+                <a href="#" class="active">Dashboard</a>
+                <a href="#">Proposals</a>
+                <a href="#">Elections</a>
+                <a href="#">History</a>
+            </div>
+        </nav>
+    </header>
+    
+    <main>
+        <!-- Connection Status -->
+        <div class="card" id="connection-card">
+            <div class="connection-status">
+                <p>Please connect your wallet to interact with Market DAO</p>
+                <button id="connect-wallet">Connect Wallet</button>
+            </div>
+        </div>
+
+        <!-- DAO Information -->
+        <section id="dao-info" style="display:none;">
+            <h2 class="section-title">DAO Information</h2>
+            <div class="card">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="dao-name">-</div>
+                        <div class="stat-label">DAO Name</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="token-balance">-</div>
+                        <div class="stat-label">Your Token Balance</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="token-supply">-</div>
+                        <div class="stat-label">Total Token Supply</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="token-price">-</div>
+                        <div class="stat-label">Token Price</div>
+                    </div>
+                </div>
+                
+                <div id="dao-parameters">
+                    <h3>Governance Parameters</h3>
+                    <div class="proposal-details">
+                        <div class="proposal-detail">
+                            <div class="detail-label">Support Threshold:</div>
+                            <div id="support-threshold">-</div>
+                        </div>
+                        <div class="proposal-detail">
+                            <div class="detail-label">Quorum Percentage:</div>
+                            <div id="quorum-percentage">-</div>
+                        </div>
+                        <div class="proposal-detail">
+                            <div class="detail-label">Election Duration:</div>
+                            <div id="election-duration">-</div>
+                        </div>
+                        <div class="proposal-detail">
+                            <div class="detail-label">Max Proposal Age:</div>
+                            <div id="max-proposal-age">-</div>
+                        </div>
+                        <div class="proposal-detail">
+                            <div class="detail-label">Allow Minting:</div>
+                            <div id="allow-minting">-</div>
+                        </div>
+                        <div class="proposal-detail">
+                            <div class="detail-label">Treasury:</div>
+                            <div id="treasury-config">-</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="token-purchase" style="margin-top: 1.5rem;">
+                    <h3>Purchase Tokens</h3>
+                    <div class="form-group">
+                        <label for="purchase-amount">Amount of tokens to purchase</label>
+                        <input type="number" id="purchase-amount" min="1" step="1" placeholder="Enter number of tokens">
+                    </div>
+                    <div class="form-group">
+                        <label>Total cost: <span id="purchase-cost">0 ETH</span></label>
+                    </div>
+                    <button id="purchase-tokens">Purchase Tokens</button>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Create Proposal -->
+        <section id="create-proposal" style="display:none;">
+            <h2 class="section-title">Create Proposal</h2>
+            <div class="card">
+                <div class="tabs">
+                    <div class="tab active" data-tab="resolution">Resolution</div>
+                    <div class="tab" data-tab="treasury">Treasury</div>
+                    <div class="tab" data-tab="mint">Mint Tokens</div>
+                    <div class="tab" data-tab="price">Change Token Price</div>
+                </div>
+                
+                <div class="tab-content active" id="resolution-tab">
+                    <form id="resolution-form">
+                        <div class="form-group">
+                            <label for="resolution-description">Description</label>
+                            <textarea id="resolution-description" rows="4" placeholder="Enter the resolution text" required></textarea>
+                        </div>
+                        <button type="submit">Create Resolution Proposal</button>
+                    </form>
+                </div>
+                
+                <div class="tab-content" id="treasury-tab">
+                    <form id="treasury-form">
+                        <div class="form-group">
+                            <label for="treasury-description">Description</label>
+                            <textarea id="treasury-description" rows="4" placeholder="Enter a description for this treasury transfer" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="treasury-recipient">Recipient Address</label>
+                            <input type="text" id="treasury-recipient" placeholder="0x..." required>
+                        </div>
+                        <div class="form-group">
+                            <label for="treasury-amount">Amount</label>
+                            <input type="number" id="treasury-amount" min="0" step="any" placeholder="Amount to transfer" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="treasury-token">Token Type</label>
+                            <select id="treasury-token" required>
+                                <option value="eth">ETH</option>
+                                <option value="erc20">ERC20</option>
+                                <option value="erc721">ERC721</option>
+                                <option value="erc1155">ERC1155</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="token-address-group" style="display:none;">
+                            <label for="treasury-token-address">Token Address</label>
+                            <input type="text" id="treasury-token-address" placeholder="0x...">
+                        </div>
+                        <div class="form-group" id="token-id-group" style="display:none;">
+                            <label for="treasury-token-id">Token ID</label>
+                            <input type="number" id="treasury-token-id" min="0" step="1" placeholder="Token ID">
+                        </div>
+                        <button type="submit">Create Treasury Proposal</button>
+                    </form>
+                </div>
+                
+                <div class="tab-content" id="mint-tab">
+                    <form id="mint-form">
+                        <div class="form-group">
+                            <label for="mint-description">Description</label>
+                            <textarea id="mint-description" rows="4" placeholder="Enter a description for minting new tokens" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="mint-recipient">Recipient Address</label>
+                            <input type="text" id="mint-recipient" placeholder="0x..." required>
+                        </div>
+                        <div class="form-group">
+                            <label for="mint-amount">Amount</label>
+                            <input type="number" id="mint-amount" min="1" step="1" placeholder="Number of tokens to mint" required>
+                        </div>
+                        <button type="submit">Create Mint Proposal</button>
+                    </form>
+                </div>
+                
+                <div class="tab-content" id="price-tab">
+                    <form id="price-form">
+                        <div class="form-group">
+                            <label for="price-description">Description</label>
+                            <textarea id="price-description" rows="4" placeholder="Enter a description for changing the token price" required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="new-price">New Token Price (in ETH)</label>
+                            <input type="number" id="new-price" min="0" step="any" placeholder="Enter new token price (0 to disable direct sales)" required>
+                        </div>
+                        <button type="submit">Create Token Price Proposal</button>
+                    </form>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Active Proposals -->
+        <section id="active-proposals" style="display:none;">
+            <h2 class="section-title">Active Proposals</h2>
+            <div class="loading">
+                <div class="spinner"></div>
+            </div>
+            <div id="proposals-grid" class="grid">
+                <!-- Proposal cards will be inserted here dynamically -->
+            </div>
+        </section>
+        
+        <!-- Active Elections -->
+        <section id="active-elections" style="display:none;">
+            <h2 class="section-title">Active Elections</h2>
+            <div class="loading">
+                <div class="spinner"></div>
+            </div>
+            <div id="elections-grid" class="grid">
+                <!-- Election cards will be inserted here dynamically -->
+            </div>
+        </section>
+        
+        <!-- Proposal History -->
+        <section id="proposal-history" style="display:none;">
+            <h2 class="section-title">Proposal History</h2>
+            <div class="loading">
+                <div class="spinner"></div>
+            </div>
+            <div id="history-list">
+                <!-- History items will be inserted here dynamically -->
+            </div>
+        </section>
+    </main>
+    
+    <div class="notification" id="notification">Notification message</div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
