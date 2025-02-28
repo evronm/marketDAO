@@ -474,6 +474,105 @@ document.addEventListener('DOMContentLoaded', function() {
                 const supportTotal = await proposalContract.supportTotal();
                 const electionTriggered = await proposalContract.electionTriggered();
                 
+                // Skip proposals that are in active election - those will be shown only in the Elections tab
+                if (electionTriggered) {
+                    // This is an active election - collect data for the elections section but don't show in proposals
+                    const electionStart = await proposalContract.electionStart();
+                    const votingTokenId = await proposalContract.votingTokenId();
+                    const yesVoteAddress = await proposalContract.yesVoteAddress();
+                    const noVoteAddress = await proposalContract.noVoteAddress();
+                    
+                    // Calculate blocks remaining
+                    const electionDuration = await daoContract.electionDuration();
+                    const electionEndBlock = electionStart.add(electionDuration);
+                    const blocksRemaining = electionEndBlock.sub(currentBlock);
+                    
+                    // Get current vote counts
+                    const yesVotes = await daoContract.balanceOf(yesVoteAddress, votingTokenId);
+                    const noVotes = await daoContract.balanceOf(noVoteAddress, votingTokenId);
+                    const totalVotes = yesVotes.add(noVotes);
+                    const totalVotingTokens = await daoContract.totalSupply(votingTokenId);
+                    
+                    // Calculate percentages
+                    const yesPercentage = totalVotes.gt(0) ? (yesVotes.mul(100).div(totalVotingTokens)).toString() : '0';
+                    const noPercentage = totalVotes.gt(0) ? (noVotes.mul(100).div(totalVotingTokens)).toString() : '0';
+                    const participationPercentage = totalVotes.gt(0) ? (totalVotes.mul(100).div(totalVotingTokens)).toString() : '0';
+                    
+                    // Determine proposal type and get additional details
+                    let proposalType = 'Resolution';
+                    let additionalDetails = '';
+                    
+                    try {
+                        // Check if it's a TreasuryProposal
+                        const treasuryContract = new ethers.Contract(proposalAddress, treasuryProposalAbi, signer);
+                        const recipient = await treasuryContract.recipient();
+                        if (recipient) {
+                            proposalType = 'Treasury';
+                            const amount = await treasuryContract.amount();
+                            const token = await treasuryContract.token();
+                            const tokenId = await treasuryContract.tokenId();
+                            
+                            if (token === ethers.constants.AddressZero) {
+                                additionalDetails = `Send ${formatEther(amount)} ETH to ${shortenAddress(recipient)}`;
+                            } else if (tokenId.toString() === '0') {
+                                additionalDetails = `Send ${amount} ERC20 tokens at ${shortenAddress(token)} to ${shortenAddress(recipient)}`;
+                            } else {
+                                additionalDetails = `Send ${amount} of token ID ${tokenId} from ${shortenAddress(token)} to ${shortenAddress(recipient)}`;
+                            }
+                        }
+                    } catch (error) {
+                        // Not a treasury proposal
+                    }
+                    
+                    if (proposalType === 'Resolution') {
+                        try {
+                            // Check if it's a MintProposal
+                            const mintContract = new ethers.Contract(proposalAddress, mintProposalAbi, signer);
+                            const recipient = await mintContract.recipient();
+                            if (recipient) {
+                                proposalType = 'Mint';
+                                const amount = await mintContract.amount();
+                                additionalDetails = `Mint ${amount} governance tokens to ${shortenAddress(recipient)}`;
+                            }
+                        } catch (error) {
+                            // Not a mint proposal
+                        }
+                    }
+                    
+                    if (proposalType === 'Resolution') {
+                        try {
+                            // Check if it's a TokenPriceProposal
+                            const priceContract = new ethers.Contract(proposalAddress, tokenPriceProposalAbi, signer);
+                            const newPrice = await priceContract.newPrice();
+                            if (newPrice !== undefined) {
+                                proposalType = 'Token Price';
+                                additionalDetails = `Change token price to ${formatEther(newPrice)} ETH`;
+                            }
+                        } catch (error) {
+                            // Not a token price proposal
+                        }
+                    }
+                    
+                    // Store election data for the elections section
+                    activeElectionsData.push({
+                        address: proposalAddress,
+                        description: description,
+                        type: proposalType,
+                        details: additionalDetails,
+                        electionStart: electionStart.toString(),
+                        blocksRemaining: blocksRemaining.toString(),
+                        yesVotes: yesVotes.toString(),
+                        noVotes: noVotes.toString(),
+                        yesPercentage: yesPercentage,
+                        noPercentage: noPercentage,
+                        participationPercentage: participationPercentage,
+                        votingTokenId: votingTokenId.toString()
+                    });
+                    
+                    continue; // Skip to next proposal - don't show active elections in the proposals tab
+                }
+                
+                // Process proposals that haven't triggered an election yet
                 let proposalType = 'Resolution';
                 let additionalDetails = '';
                 
@@ -532,7 +631,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Get user's support for this proposal
                 const userSupport = await proposalContract.support(connectedAddress);
                 
-                // Create proposal card HTML
+                // Create proposal card HTML for non-election proposals
                 let proposalCard = `
                     <div class="card proposal-card" data-address="${proposalAddress}">
                         <div class="proposal-header">
@@ -567,113 +666,30 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                 `;
                 
-                if (electionTriggered) {
-                    // This is an active election
-                    const electionStart = await proposalContract.electionStart();
-                    const votingTokenId = await proposalContract.votingTokenId();
-                    const yesVoteAddress = await proposalContract.yesVoteAddress();
-                    const noVoteAddress = await proposalContract.noVoteAddress();
-                    
-                    // Calculate blocks remaining
-                    const electionDuration = await daoContract.electionDuration();
-                    const electionEndBlock = electionStart.add(electionDuration);
-                    const blocksRemaining = electionEndBlock.sub(currentBlock);
-                    
-                    // Get voting token balance
-                    const votingTokens = await daoContract.balanceOf(connectedAddress, votingTokenId);
-                    
-                    // Get current vote counts
-                    const yesVotes = await daoContract.balanceOf(yesVoteAddress, votingTokenId);
-                    const noVotes = await daoContract.balanceOf(noVoteAddress, votingTokenId);
-                    const totalVotes = yesVotes.add(noVotes);
-                    const totalVotingTokens = await daoContract.totalSupply(votingTokenId);
-                    
-                    // Calculate percentages
-                    const yesPercentage = totalVotes.gt(0) ? (yesVotes.mul(100).div(totalVotingTokens)).toString() : '0';
-                    const noPercentage = totalVotes.gt(0) ? (noVotes.mul(100).div(totalVotingTokens)).toString() : '0';
-                    const participationPercentage = totalVotes.gt(0) ? (totalVotes.mul(100).div(totalVotingTokens)).toString() : '0';
-                    
-                    proposalCard += `
-                        <div class="election-status status-active">Active Election</div>
-                        <div class="proposal-detail">
-                            <div class="detail-label">Voting Ends:</div>
-                            <div>In ${blocksRemaining.toString()} blocks</div>
-                        </div>
-                        <div class="proposal-detail">
-                            <div class="detail-label">Your Voting Tokens:</div>
-                            <div>${votingTokens.toString()}</div>
-                        </div>
-                        <div class="proposal-detail">
-                            <div class="detail-label">Yes Votes:</div>
-                            <div>${yesVotes.toString()} (${yesPercentage}%)</div>
-                        </div>
-                        <div class="proposal-detail">
-                            <div class="detail-label">No Votes:</div>
-                            <div>${noVotes.toString()} (${noPercentage}%)</div>
-                        </div>
-                        <div class="proposal-detail">
-                            <div class="detail-label">Participation:</div>
-                            <div>${participationPercentage}%</div>
-                        </div>
-                        
-                        <div class="vote-options">
-                            <div class="vote-button vote-yes" data-proposal="${proposalAddress}" data-vote="yes" data-token-id="${votingTokenId}">
-                                Vote Yes
-                            </div>
-                            <div class="vote-button vote-no" data-proposal="${proposalAddress}" data-vote="no" data-token-id="${votingTokenId}">
-                                Vote No
-                            </div>
-                        </div>
-                    `;
-                    
-                    // If election is completed but not executed
-                    if (blocksRemaining.lte(0)) {
-                        proposalCard += `
-                            <button class="execute-proposal" data-address="${proposalAddress}">Execute Proposal</button>
-                        `;
-                    }
-                    
-                    // Store election data for the elections section
-                    activeElectionsData.push({
-                        address: proposalAddress,
-                        description: description,
-                        type: proposalType,
-                        details: additionalDetails,
-                        electionStart: electionStart.toString(),
-                        blocksRemaining: blocksRemaining.toString(),
-                        yesVotes: yesVotes.toString(),
-                        noVotes: noVotes.toString(),
-                        yesPercentage: yesPercentage,
-                        noPercentage: noPercentage,
-                        participationPercentage: participationPercentage,
-                        votingTokenId: votingTokenId.toString()
-                    });
-                } else {
-                    // This is a proposal that hasn't triggered an election yet
-                    // Get DAO parameters for threshold calculation
-                    const supportThreshold = await daoContract.supportThreshold();
-                    const totalSupply = await daoContract.totalSupply(0);
-                    const requiredSupport = totalSupply.mul(supportThreshold).div(100);
-                    const supportPercentage = supportTotal.mul(100).div(requiredSupport);
-                    
-                    proposalCard += `
-                        <div class="election-status status-pending">Awaiting Support</div>
-                        <div class="proposal-detail">
-                            <div class="detail-label">Required Support:</div>
-                            <div>${requiredSupport.toString()} tokens</div>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${Math.min(supportPercentage.toString(), 100)}%"></div>
-                        </div>
-                        <div class="proposal-actions">
-                            <input type="number" min="1" placeholder="Support amount" class="support-amount" />
-                            <button class="secondary add-support" data-address="${proposalAddress}">Add Support</button>
-                            ${userSupport.toString() !== '0' ? `
-                            <button class="danger remove-support" data-address="${proposalAddress}">Remove Support</button>
-                            ` : ''}
-                        </div>
-                    `;
-                }
+                // This is a proposal that hasn't triggered an election yet
+                // Get DAO parameters for threshold calculation
+                const supportThreshold = await daoContract.supportThreshold();
+                const totalSupply = await daoContract.totalSupply(0);
+                const requiredSupport = totalSupply.mul(supportThreshold).div(100);
+                const supportPercentage = supportTotal.mul(100).div(requiredSupport);
+                
+                proposalCard += `
+                    <div class="election-status status-pending">Awaiting Support</div>
+                    <div class="proposal-detail">
+                        <div class="detail-label">Required Support:</div>
+                        <div>${requiredSupport.toString()} tokens</div>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${Math.min(supportPercentage.toString(), 100)}%"></div>
+                    </div>
+                    <div class="proposal-actions">
+                        <input type="number" min="1" placeholder="Support amount" class="support-amount" />
+                        <button class="secondary add-support" data-address="${proposalAddress}">Add Support</button>
+                        ${userSupport.toString() !== '0' ? `
+                        <button class="danger remove-support" data-address="${proposalAddress}">Remove Support</button>
+                        ` : ''}
+                    </div>
+                `;
                 
                 proposalCard += `</div>`;
                 
