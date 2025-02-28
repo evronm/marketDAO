@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Contract addresses
-    const DAO_ADDRESS = '0x5fbdb2315678afecb367f032d93f642f64180aa3';
-    const FACTORY_ADDRESS = '0xe7f1725e7734ce288f8367e1bb143e90bb3f0512';
+    const DAO_ADDRESS = '0xb7f8bc63bbcad18155201308c8f3540b07f84f5e';
+    const FACTORY_ADDRESS = '0xa51c1fc2f0d1a1b8494ed1fe312d7c3a78ed91c0';
     
     // Contract interfaces
     let provider;
@@ -553,6 +553,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                     
+                    // Get user's voting tokens
+                    const userVotingTokens = await daoContract.balanceOf(connectedAddress, votingTokenId);
+                    const totalVotingTokensSupply = await daoContract.totalSupply(votingTokenId);
+                    const votingTokensRemaining = totalVotingTokensSupply.sub(totalVotes);
+                    
                     // Store election data for the elections section
                     activeElectionsData.push({
                         address: proposalAddress,
@@ -566,7 +571,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         yesPercentage: yesPercentage,
                         noPercentage: noPercentage,
                         participationPercentage: participationPercentage,
-                        votingTokenId: votingTokenId.toString()
+                        votingTokenId: votingTokenId.toString(),
+                        userVotingTokens: userVotingTokens.toString(),
+                        totalVotingTokensSupply: totalVotingTokensSupply.toString(),
+                        votingTokensUsed: totalVotes.toString(),
+                        votingTokensRemaining: votingTokensRemaining.toString()
                     });
                     
                     continue; // Skip to next proposal - don't show active elections in the proposals tab
@@ -729,12 +738,28 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <div>${election.blocksRemaining} blocks</div>
                                 </div>
                                 <div class="proposal-detail">
+                                    <div class="detail-label">Voting Token ID:</div>
+                                    <div>${election.votingTokenId}</div>
+                                </div>
+                                <div class="proposal-detail">
+                                    <div class="detail-label">Your Voting Tokens:</div>
+                                    <div>${election.userVotingTokens}</div>
+                                </div>
+                                <div class="proposal-detail">
                                     <div class="detail-label">Yes Votes:</div>
                                     <div>${election.yesVotes} (${election.yesPercentage}%)</div>
                                 </div>
                                 <div class="proposal-detail">
                                     <div class="detail-label">No Votes:</div>
                                     <div>${election.noVotes} (${election.noPercentage}%)</div>
+                                </div>
+                                <div class="proposal-detail">
+                                    <div class="detail-label">Tokens Used/Total:</div>
+                                    <div>${election.votingTokensUsed} / ${election.totalVotingTokensSupply}</div>
+                                </div>
+                                <div class="proposal-detail">
+                                    <div class="detail-label">Tokens Remaining:</div>
+                                    <div>${election.votingTokensRemaining}</div>
                                 </div>
                                 <div class="proposal-detail">
                                     <div class="detail-label">Participation:</div>
@@ -835,6 +860,23 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Get the proposal contract
             const proposalContract = new ethers.Contract(proposalAddress, proposalAbi, signer);
+            
+            // Check if election is still active
+            const electionTriggered = await proposalContract.electionTriggered();
+            const electionStart = await proposalContract.electionStart();
+            const electionDuration = await daoContract.electionDuration();
+            const currentBlock = await provider.getBlockNumber();
+            
+            // Make sure election is active and not expired
+            if (!electionTriggered) {
+                showNotification('This proposal does not have an active election', 'error');
+                return;
+            }
+            
+            if (currentBlock >= electionStart.add(electionDuration)) {
+                showNotification('This election has already ended', 'error');
+                return;
+            }
             
             // Get the vote address based on vote type
             let voteAddress;

@@ -2,6 +2,9 @@
 pragma solidity ^0.8.20;
 
 import "./Proposal.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 
 contract ResolutionProposal is Proposal {
     constructor(
@@ -14,6 +17,8 @@ contract ResolutionProposal is Proposal {
     function _execute() internal override {
         super._execute();
         executed = true;
+        // The DAO needs to keep track of active proposals for vote validation
+        // Only clear the active proposal status at the very end
         dao.clearActiveProposal();
     }
 }
@@ -63,6 +68,7 @@ contract TreasuryProposal is Proposal {
             }
         }
         executed = true;
+        // Clear the active proposal status at the very end of execution
         dao.clearActiveProposal();
     }
 }
@@ -89,6 +95,7 @@ contract MintProposal is Proposal {
         super._execute();
         dao.mintGovernanceTokens(recipient, amount);
         executed = true;
+        // Clear the active proposal status at the very end of execution
         dao.clearActiveProposal();
     }
 }
@@ -109,6 +116,7 @@ contract TokenPriceProposal is Proposal {
         super._execute();
         dao.setTokenPrice(newPrice);
         executed = true;
+        // Clear the active proposal status at the very end of execution
         dao.clearActiveProposal();
     }
 }

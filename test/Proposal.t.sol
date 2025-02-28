@@ -48,6 +48,7 @@ contract ProposalTest is Test {
         ResolutionProposal proposal = new ResolutionProposal(dao, "Test Resolution");
         dao.setApprovalForAll(address(proposal), true);
         
+        console.log("Adding support to proposal");
         proposal.addSupport(40); // 20% of 200 total tokens needed
         assertTrue(proposal.electionTriggered());
         
@@ -55,6 +56,7 @@ contract ProposalTest is Test {
         assertEq(dao.balanceOf(voter1, 1), 50);
         assertEq(dao.balanceOf(voter2, 1), 50);
         
+        console.log("Transferring votes (Yes)");
         dao.safeTransferFrom(proposer, proposal.yesVoteAddress(), 1, 100, "");
         
         vm.stopPrank();
@@ -64,7 +66,17 @@ contract ProposalTest is Test {
         dao.safeTransferFrom(voter1, proposal.yesVoteAddress(), 1, 50, "");
         vm.stopPrank();
         
+        console.log("Rolling forward to end of election");
         vm.roll(block.number + 50);
+        
+        console.log("Checking election status:");
+        console.log("Election active:", proposal.isElectionActive());
+        console.log("Election triggered:", proposal.electionTriggered());
+        console.log("Block.number:", block.number);
+        console.log("Election start:", proposal.electionStart());
+        console.log("Election duration:", dao.electionDuration());
+        
+        console.log("About to execute proposal");
         proposal.execute();
         assertTrue(proposal.executed());
     }

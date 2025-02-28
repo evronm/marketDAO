@@ -35,6 +35,20 @@ abstract contract Proposal {
         _;
     }
     
+    // Helper function for MarketDAO to check if an address is a vote address
+    function isVoteAddress(address addr) external view returns (bool) {
+        return addr == yesVoteAddress || addr == noVoteAddress;
+    }
+    
+    // Helper function for MarketDAO to check if the election is active
+    function isElectionActive() external virtual view returns (bool) {
+        if (!electionTriggered) return false;
+        if (executed) return false;
+        if (block.number < electionStart) return false;
+        if (block.number >= electionStart + dao.electionDuration()) return false;
+        return true;
+    }
+    
     constructor(
         MarketDAO _dao,
         string memory _description
@@ -138,5 +152,6 @@ abstract contract Proposal {
     
     function _execute() internal virtual {
         require(!executed, "Already executed");
+        // We don't set executed=true here as it's done in the derived classes
     }
 }
