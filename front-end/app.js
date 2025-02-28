@@ -749,7 +749,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     Vote No
                                 </div>
                             </div>
-                            ${parseInt(election.blocksRemaining) <= 0 ? `
+                            ${parseInt(election.blocksRemaining) <= 0 && parseInt(election.yesPercentage) > parseInt(election.noPercentage) ? `
                                 <button class="execute-proposal" data-address="${election.address}">Execute Proposal</button>
                             ` : ''}
                         </div>
