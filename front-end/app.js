@@ -19,6 +19,39 @@ document.addEventListener('DOMContentLoaded', function() {
     const activeElections = document.getElementById('active-elections');
     const proposalHistory = document.getElementById('proposal-history');
     
+    // Navigation Links - Add event listeners
+    document.querySelectorAll('.nav-links a').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Remove active class from all links
+            document.querySelectorAll('.nav-links a').forEach(l => l.classList.remove('active'));
+            
+            // Add active class to clicked link
+            this.classList.add('active');
+            
+            // Hide all sections
+            daoInfo.style.display = 'none';
+            createProposal.style.display = 'none';
+            activeProposals.style.display = 'none';
+            activeElections.style.display = 'none';
+            proposalHistory.style.display = 'none';
+            
+            // Show the appropriate section based on the clicked link
+            const linkText = this.textContent.trim();
+            if (linkText === 'Dashboard') {
+                daoInfo.style.display = 'block';
+                createProposal.style.display = 'block';
+            } else if (linkText === 'Proposals') {
+                activeProposals.style.display = 'block';
+            } else if (linkText === 'Elections') {
+                activeElections.style.display = 'block';
+            } else if (linkText === 'History') {
+                proposalHistory.style.display = 'block';
+            }
+        });
+    });
+    
     // Improved Tab switching - more robust implementation
     function setupTabs() {
         const tabs = document.querySelectorAll('.tab');
@@ -30,10 +63,6 @@ document.addEventListener('DOMContentLoaded', function() {
         tabs.forEach(tab => {
             tab.addEventListener('click', function() {
                 const tabName = this.getAttribute('data-tab');
-                if (!tabName) {
-                    console.warn('Tab missing data-tab attribute:', this);
-                    return;
-                }
 
                 // Update active tab
                 document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -51,8 +80,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         });
-        
-        console.log('Tab switching initialized successfully');
     }
     
     // Initialize tabs immediately and again after wallet connection
@@ -83,11 +110,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Connect wallet
-    if (connectWalletButton) {
-        connectWalletButton.addEventListener('click', connectWallet);
-    } else {
-        console.warn('Connect wallet button not found');
-    }
+    connectWalletButton.addEventListener('click', connectWallet);
     
     // Token purchase calculation
     const purchaseAmount = document.getElementById('purchase-amount');
@@ -249,11 +272,21 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Update UI
             connectionCard.style.display = 'none';
+            
+            // Default view is Dashboard - show only relevant sections
             daoInfo.style.display = 'block';
             createProposal.style.display = 'block';
-            activeProposals.style.display = 'block';
-            activeElections.style.display = 'block';
-            proposalHistory.style.display = 'block';
+            activeProposals.style.display = 'none';
+            activeElections.style.display = 'none';
+            proposalHistory.style.display = 'none';
+            
+            // Make sure Dashboard nav link is active
+            document.querySelectorAll('.nav-links a').forEach(link => {
+                link.classList.remove('active');
+                if (link.textContent.trim() === 'Dashboard') {
+                    link.classList.add('active');
+                }
+            });
             
             // Reinitialize tabs after UI elements are shown
             setupTabs();

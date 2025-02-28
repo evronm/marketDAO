@@ -1,3 +1,6 @@
+.hidden {
+  display:none;
+}
 :root {
     --primary-color: #2e7d32;
     --primary-light: #60ad5e;
