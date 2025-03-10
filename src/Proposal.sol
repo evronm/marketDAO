@@ -122,7 +122,12 @@ abstract contract Proposal {
         }
     }
     
-    function _checkEarlyTermination() internal {
+    function checkEarlyTermination() external virtual {
+        require(electionTriggered, "Election not triggered");
+        require(!executed, "Already executed");
+        require(block.number >= electionStart, "Election not started");
+        require(block.number < electionStart + dao.electionDuration(), "Election ended");
+        
         uint256 totalVotes = dao.totalSupply(votingTokenId);
         uint256 halfVotes = totalVotes / 2;
         

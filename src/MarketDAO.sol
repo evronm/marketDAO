@@ -129,6 +129,8 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
                         if (!isActive) {
                             revert("Election has ended");
                         }
+                        // Check for early termination after vote
+                        try Proposal(proposalAddr).checkEarlyTermination() {} catch {}
                     } catch {
                         revert("Error checking election status");
                     }
@@ -177,6 +179,8 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
                             if (!isActive) {
                                 revert("Election has ended");
                             }
+                            // Check for early termination after vote
+                            try Proposal(proposalAddr).checkEarlyTermination() {} catch {}
                         } catch {
                             revert("Error checking election status");
                         }
