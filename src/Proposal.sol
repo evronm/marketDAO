@@ -134,9 +134,14 @@ abstract contract Proposal {
         uint256 yesVotes = dao.balanceOf(yesVoteAddress, votingTokenId);
         uint256 noVotes = dao.balanceOf(noVoteAddress, votingTokenId);
         
-        if(yesVotes > halfVotes) {
+        // For early termination, we need a strict majority (> 50%)
+        // For odd total votes, halfVotes + 1 is a majority
+        // For even total votes, halfVotes + 1 is a majority
+        uint256 majorityThreshold = halfVotes + 1;
+        
+        if(yesVotes >= majorityThreshold) {
             _execute();
-        } else if(noVotes > halfVotes) {
+        } else if(noVotes >= majorityThreshold) {
             electionStart = 0; // End election
         }
     }

@@ -98,7 +98,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         require(acceptsETH, "DAO does not accept ETH");
     }
 
-    function transferETH(address payable recipient, uint256 amount) external {
+    function transferETH(address payable recipient, uint256 amount) external nonReentrant {
         require(activeProposals[msg.sender], "Only active proposal can transfer");
         recipient.transfer(amount);
     }
@@ -224,9 +224,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     
     // Internal helper to check if a token ID is an active voting token
     function _isActiveVotingToken(uint256 tokenId) internal view returns (bool) {
-        // Simplified check for testing purposes
-        // Special case for tests: allow token ID 1 explicitly for tests
-        if (tokenId == 1) return true;
+        // Check if the token ID is in the valid range for voting tokens
         return tokenId > GOVERNANCE_TOKEN_ID && tokenId < nextVotingTokenId;
     }
     
@@ -301,6 +299,13 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     }
 
     function setActiveProposal(address proposal) external {
+        // Only allow this function to be called from a contract that's being constructed
+        // by checking if the caller's code size is 0 (it's still being created)
+        uint256 codeSize;
+        assembly {
+            codeSize := extcodesize(caller())
+        }
+        require(codeSize == 0, "Only contracts being deployed can call this");
         activeProposals[proposal] = true;
     }
 

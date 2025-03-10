@@ -52,18 +52,19 @@ contract ProposalTest is Test {
         proposal.addSupport(40); // 20% of 200 total tokens needed
         assertTrue(proposal.electionTriggered());
         
-        assertEq(dao.balanceOf(proposer, 1), 100);
-        assertEq(dao.balanceOf(voter1, 1), 50);
-        assertEq(dao.balanceOf(voter2, 1), 50);
+        uint256 votingTokenId = proposal.votingTokenId();
+        assertEq(dao.balanceOf(proposer, votingTokenId), 100);
+        assertEq(dao.balanceOf(voter1, votingTokenId), 50);
+        assertEq(dao.balanceOf(voter2, votingTokenId), 50);
         
         console.log("Transferring votes (Yes)");
-        dao.safeTransferFrom(proposer, proposal.yesVoteAddress(), 1, 100, "");
+        dao.safeTransferFrom(proposer, proposal.yesVoteAddress(), votingTokenId, 100, "");
         
         vm.stopPrank();
         
         vm.startPrank(voter1);
         dao.setApprovalForAll(address(proposal), true);
-        dao.safeTransferFrom(voter1, proposal.yesVoteAddress(), 1, 50, "");
+        dao.safeTransferFrom(voter1, proposal.yesVoteAddress(), votingTokenId, 50, "");
         vm.stopPrank();
         
         console.log("Rolling forward to end of election");
@@ -98,12 +99,13 @@ contract ProposalTest is Test {
         proposal.addSupport(40);
         assertTrue(proposal.electionTriggered());
         
-        dao.safeTransferFrom(proposer, proposal.yesVoteAddress(), 1, 100, "");
+        uint256 votingTokenId = proposal.votingTokenId();
+        dao.safeTransferFrom(proposer, proposal.yesVoteAddress(), votingTokenId, 100, "");
         vm.stopPrank();
         
         vm.startPrank(voter1);
         dao.setApprovalForAll(address(proposal), true);
-        dao.safeTransferFrom(voter1, proposal.yesVoteAddress(), 1, 50, "");
+        dao.safeTransferFrom(voter1, proposal.yesVoteAddress(), votingTokenId, 50, "");
         vm.stopPrank();
         
         vm.roll(block.number + 50);
@@ -126,12 +128,13 @@ contract ProposalTest is Test {
         proposal.addSupport(40);
         assertTrue(proposal.electionTriggered());
         
-        dao.safeTransferFrom(proposer, proposal.yesVoteAddress(), 1, 100, "");
+        uint256 votingTokenId = proposal.votingTokenId();
+        dao.safeTransferFrom(proposer, proposal.yesVoteAddress(), votingTokenId, 100, "");
         vm.stopPrank();
         
         vm.startPrank(voter1);
         dao.setApprovalForAll(address(proposal), true);
-        dao.safeTransferFrom(voter1, proposal.yesVoteAddress(), 1, 50, "");
+        dao.safeTransferFrom(voter1, proposal.yesVoteAddress(), votingTokenId, 50, "");
         vm.stopPrank();
         
         vm.roll(block.number + 50);

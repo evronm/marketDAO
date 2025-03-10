@@ -61,13 +61,14 @@ contract TokenPriceProposalTest is Test {
         proposal.addSupport(40); // 20% of 200 total tokens needed
         assertTrue(proposal.electionTriggered());
         
-        // Vote yes 
-        dao.safeTransferFrom(proposer, proposal.yesVoteAddress(), 1, 100, "");
+        // Vote yes
+        uint256 votingTokenId = proposal.votingTokenId();
+        dao.safeTransferFrom(proposer, proposal.yesVoteAddress(), votingTokenId, 100, "");
         vm.stopPrank();
         
         vm.startPrank(voter1);
         dao.setApprovalForAll(address(proposal), true);
-        dao.safeTransferFrom(voter1, proposal.yesVoteAddress(), 1, 50, "");
+        dao.safeTransferFrom(voter1, proposal.yesVoteAddress(), votingTokenId, 50, "");
         vm.stopPrank();
         
         // Execute the proposal after election period
