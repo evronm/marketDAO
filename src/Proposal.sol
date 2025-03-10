@@ -108,6 +108,10 @@ abstract contract Proposal {
             abi.encodePacked(salt, "no")
         ))));
         
+        // Register vote addresses with the DAO
+        dao.registerVoteAddress(yesVoteAddress);
+        dao.registerVoteAddress(noVoteAddress);
+        
         // Mint voting tokens to all governance token holders
         address[] memory holders = dao.getGovernanceTokenHolders();
         for(uint i = 0; i < holders.length; i++) {

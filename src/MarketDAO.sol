@@ -21,6 +21,10 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     uint256 private nextVotingTokenId = 1;
     mapping(address => bool) public activeProposals;
     
+    // Vote address tracking
+    mapping(address => bool) public isVoteAddress;
+    mapping(address => address) public voteAddressToProposal;
+    
     // Treasury configuration
     bool public hasTreasury;
     bool public acceptsETH;
@@ -114,130 +118,19 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         
         // Add check for vote transfers to ensure election is still active
         if (_isActiveVotingToken(id) && msg.sender == from) {
-            // First, let's directly check the destination to see if it's a vote address
-            bool foundVoteAddress = false;
-            bool electionActive = false;
-            
-            // Get all active proposals from our internal map
-            for (uint i = 0; i < governanceTokenHolders.length; i++) {
-                address proposalAddr = governanceTokenHolders[i];
+            // Check if destination is a registered vote address
+            if (isVoteAddress[to]) {
+                // Get the associated proposal
+                address proposalAddr = voteAddressToProposal[to];
                 
-                if (activeProposals[proposalAddr]) {
-                    // Check if we're transferring to a vote address for this proposal
-                    try Proposal(proposalAddr).isVoteAddress(to) returns (bool isVoteAddr) {
-                        if (isVoteAddr) {
-                            foundVoteAddress = true;
-                            // Check if election is still active
-                            try Proposal(proposalAddr).isElectionActive() returns (bool isActive) {
-                                if (isActive) {
-                                    electionActive = true;
-                                    break; // Found active election for this vote address
-                                }
-                            } catch {}
+                // Check if the election is still active
+                if (proposalAddr != address(0) && activeProposals[proposalAddr]) {
+                    try Proposal(proposalAddr).isElectionActive() returns (bool isActive) {
+                        if (!isActive) {
+                            revert("Election has ended");
                         }
-                    } catch {}
-                }
-            }
-            
-            // We need to specifically check the mock proposal in our test case
-            // This addresses an issue where the mock proposal might not be in the governanceTokenHolders list
-            for (uint i = 0; i < 10; i++) { // Just checking a few addresses for mock proposals
-                address testProposalAddr = address(uint160(0x2000 + i));
-                if (activeProposals[testProposalAddr]) {
-                    try Proposal(testProposalAddr).isVoteAddress(to) returns (bool isVoteAddr) {
-                        if (isVoteAddr) {
-                            foundVoteAddress = true;
-                            try Proposal(testProposalAddr).isElectionActive() returns (bool isActive) {
-                                if (isActive) {
-                                    electionActive = true;
-                                    break;
-                                }
-                            } catch {}
-                        }
-                    } catch {}
-                }
-            }
-            
-            // CRITICAL: Directly check if the destination is a vote address on ANY active proposal
-            // This is important for our test case where our proposal may not be in usual arrays
-            for (uint i = 0; i < 10; i++) {
-                // Get a potential proposal address from our map - iterating since we can't enumerate mappings
-                address potentialProposal = this.getProposal(i);
-                if (potentialProposal != address(0) && activeProposals[potentialProposal]) {
-                    try Proposal(potentialProposal).isVoteAddress(to) returns (bool isVoteAddr) {
-                        if (isVoteAddr) {
-                            foundVoteAddress = true;
-                            try Proposal(potentialProposal).isElectionActive() returns (bool isActive) {
-                                if (isActive) {
-                                    electionActive = true;
-                                    break;
-                                }
-                            } catch {}
-                        }
-                    } catch {}
-                }
-            }
-            
-            // We don't want to try calling the vote address as if it were a contract
-            // That part was a bug in our testing
-            
-            // SPECIAL CASE: direct check for TestProposal in VotingPeriod.t.sol test
-            // For any proposal that's registered as active in our system
-            for (uint i = 0; i < governanceTokenHolders.length; i++) {
-                address addr = governanceTokenHolders[i];
-                if (activeProposals[addr]) {
-                    // Add a direct check for this specific proposal's yes/no vote addresses
-                    try Proposal(addr).yesVoteAddress() returns (address yesAddr) {
-                        if (to == yesAddr) {
-                            foundVoteAddress = true;
-                            try Proposal(addr).isElectionActive() returns (bool isActive) {
-                                if (isActive) {
-                                    electionActive = true;
-                                }
-                            } catch {}
-                        }
-                    } catch {}
-                    
-                    try Proposal(addr).noVoteAddress() returns (address noAddr) {
-                        if (to == noAddr) {
-                            foundVoteAddress = true;
-                            try Proposal(addr).isElectionActive() returns (bool isActive) {
-                                if (isActive) {
-                                    electionActive = true;
-                                }
-                            } catch {}
-                        }
-                    } catch {}
-                }
-            }
-            
-            // If we found a vote address but no active election, reject the transfer
-            if (foundVoteAddress && !electionActive) {
-                revert("Election has ended");
-            }
-            
-            // Special double-check for our tests - check using the factory
-            if (!foundVoteAddress) {
-                // Look for active proposals through the factory or other means
-                // But DON'T try to call the vote address directly
-                
-                // Try at most 3 proposals from the factory
-                for (uint j = 0; j < 3; j++) {
-                    address proposalAddr = this.getProposal(j);
-                    if (proposalAddr != address(0) && activeProposals[proposalAddr]) {
-                        // Now check this proposal
-                        try Proposal(proposalAddr).isVoteAddress(to) returns (bool isVoteAddr) {
-                            if (isVoteAddr) {
-                                foundVoteAddress = true;
-                                try Proposal(proposalAddr).isElectionActive() returns (bool isActive) {
-                                    if (!isActive) {
-                                        revert("Election has ended");
-                                    } else {
-                                        electionActive = true;
-                                    }
-                                } catch {}
-                            }
-                        } catch {}
+                    } catch {
+                        revert("Error checking election status");
                     }
                 }
             }
@@ -273,131 +166,19 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
             
             // Add check for vote transfers to ensure election is still active
             if (_isActiveVotingToken(ids[i]) && msg.sender == from) {
-                // If this is a voting token and user-initiated transfer (not a contract)
-                bool foundVoteAddress = false;
-                bool electionActive = false;
-                
-                // 1. Check all governance token holders that might be proposals
-                for (uint j = 0; j < governanceTokenHolders.length && !electionActive; j++) {
-                    address proposalAddr = governanceTokenHolders[j]; // Reusing array to avoid creating new one
-                    if (activeProposals[proposalAddr]) {
-                        // Check if we're transferring to a vote address for this proposal
-                        try Proposal(proposalAddr).isVoteAddress(to) returns (bool isVoteAddr) {
-                            if (isVoteAddr) {
-                                foundVoteAddress = true;
-                                // Check if election is still active
-                                try Proposal(proposalAddr).isElectionActive() returns (bool isActive) {
-                                    if (isActive) {
-                                        electionActive = true;
-                                        break; // Found active election for this vote address
-                                    }
-                                } catch {}
-                            }
-                        } catch {}
-                    }
-                }
-                
-                // 2. Check test addresses (for our test scenarios)
-                for (uint j = 0; j < 10 && !electionActive; j++) {
-                    address testProposalAddr = address(uint160(0x2000 + j));
-                    if (activeProposals[testProposalAddr]) {
-                        try Proposal(testProposalAddr).isVoteAddress(to) returns (bool isVoteAddr) {
-                            if (isVoteAddr) {
-                                foundVoteAddress = true;
-                                try Proposal(testProposalAddr).isElectionActive() returns (bool isActive) {
-                                    if (isActive) {
-                                        electionActive = true;
-                                        break;
-                                    }
-                                } catch {}
-                            }
-                        } catch {}
-                    }
-                }
-                
-                // 3. Check proposals from the getProposal function
-                for (uint j = 0; j < 10 && !electionActive; j++) {
-                    address potentialProposal = this.getProposal(j);
-                    if (potentialProposal != address(0) && activeProposals[potentialProposal]) {
-                        try Proposal(potentialProposal).isVoteAddress(to) returns (bool isVoteAddr) {
-                            if (isVoteAddr) {
-                                foundVoteAddress = true;
-                                try Proposal(potentialProposal).isElectionActive() returns (bool isActive) {
-                                    if (isActive) {
-                                        electionActive = true;
-                                        break;
-                                    }
-                                } catch {}
-                            }
-                        } catch {}
-                    }
-                }
-                
-                // 4. Special case for our test - try the destination itself
-                try Proposal(to).isVoteAddress(to) returns (bool isVoteAddr) {
-                    if (isVoteAddr) {
-                        foundVoteAddress = true; 
-                    }
-                } catch {}
-                
-                // 5. Special case for TestProposal in VotingPeriod.t.sol test
-                for (uint j = 0; j < governanceTokenHolders.length && !electionActive; j++) {
-                    address addr = governanceTokenHolders[j];
-                    if (activeProposals[addr]) {
-                        // Direct check for yes/no vote addresses
-                        try Proposal(addr).yesVoteAddress() returns (address yesAddr) {
-                            if (to == yesAddr) {
-                                foundVoteAddress = true;
-                                try Proposal(addr).isElectionActive() returns (bool isActive) {
-                                    if (isActive) {
-                                        electionActive = true;
-                                        break;
-                                    }
-                                } catch {}
-                            }
-                        } catch {}
-                        
-                        try Proposal(addr).noVoteAddress() returns (address noAddr) {
-                            if (to == noAddr) {
-                                foundVoteAddress = true;
-                                try Proposal(addr).isElectionActive() returns (bool isActive) {
-                                    if (isActive) {
-                                        electionActive = true;
-                                        break;
-                                    }
-                                } catch {}
-                            }
-                        } catch {}
-                    }
-                }
-                
-                // If we found a vote address but no active election, reject the transfer
-                if (foundVoteAddress && !electionActive) {
-                    revert("Election has ended");
-                }
-                
-                // Special double-check for our tests - check using the factory
-                if (!foundVoteAddress) {
-                    // Look for active proposals through the factory or other means
-                    // But DON'T try to call the vote address directly
+                // Check if destination is a registered vote address
+                if (isVoteAddress[to]) {
+                    // Get the associated proposal
+                    address proposalAddr = voteAddressToProposal[to];
                     
-                    // Try at most 3 proposals from the factory 
-                    for (uint j = 0; j < 3; j++) { 
-                        address proposalAddr = this.getProposal(j);
-                        if (proposalAddr != address(0) && activeProposals[proposalAddr]) {
-                            // Now check this proposal
-                            try Proposal(proposalAddr).isVoteAddress(to) returns (bool isVoteAddr) {
-                                if (isVoteAddr) {
-                                    foundVoteAddress = true;
-                                    try Proposal(proposalAddr).isElectionActive() returns (bool isActive) {
-                                        if (!isActive) {
-                                            revert("Election has ended");
-                                        } else {
-                                            electionActive = true;
-                                        }
-                                    } catch {}
-                                }
-                            } catch {}
+                    // Check if the election is still active
+                    if (proposalAddr != address(0) && activeProposals[proposalAddr]) {
+                        try Proposal(proposalAddr).isElectionActive() returns (bool isActive) {
+                            if (!isActive) {
+                                revert("Election has ended");
+                            }
+                        } catch {
+                            revert("Error checking election status");
                         }
                     }
                 }
@@ -522,6 +303,12 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     function clearActiveProposal() external {
         require(activeProposals[msg.sender], "Only active proposal can clear itself");
         activeProposals[msg.sender] = false;
+    }
+    
+    function registerVoteAddress(address voteAddr) external {
+        require(activeProposals[msg.sender], "Only active proposal can register vote address");
+        isVoteAddress[voteAddr] = true;
+        voteAddressToProposal[voteAddr] = msg.sender;
     }
     
     // Helper function to check if a proposal is active
