@@ -22,3 +22,4 @@
 - **Tests**: Name tests with "test" prefix, group related tests in the same contract
 
 - For CDN, use jsdeliver
+- Do not use tailwind, but feel free to use semantic frameworks like Bulma or Foundation

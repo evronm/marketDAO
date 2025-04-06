@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Market DAO</title>
+  <!-- React and ReactDOM from CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <!-- Babel for JSX transformation -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Ethers.js -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      line-height: 1.5;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    button {
+      background-color: #0066cc;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background-color: #0055aa;
+    }
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background-color: #f5f5f5;
+      padding: 16px;
+      border-radius: 4px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+    }
+    .stat-label {
+      font-size: 14px;
+      color: #666;
+    }
+    .navbar {
+      display: flex;
+      margin-bottom: 20px;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 10px;
+    }
+    .nav-item {
+      padding: 8px 16px;
+      cursor: pointer;
+      margin-right: 8px;
+    }
+    .nav-item.active {
+      font-weight: bold;
+      border-bottom: 2px solid #0066cc;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 16px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    // Constants with actual addresses from the latest deployment
+    const DAO_ADDRESS = '0x5fbdb2315678afecb367f032d93f642f64180aa3';
+    const FACTORY_ADDRESS = '0xe7f1725e7734ce288f8367e1bb143e90bb3f0512';
+    
+    // Main App Component
+    function App() {
+      const [activeTab, setActiveTab] = React.useState('dashboard');
+      const [isConnected, setIsConnected] = React.useState(false);
+      const [walletAddress, setWalletAddress] = React.useState('');
+      const [purchaseAmount, setPurchaseAmount] = React.useState(1);
+      const [proposalType, setProposalType] = React.useState('resolution');
+      const [proposalDescription, setProposalDescription] = React.useState('');
+      const [proposals, setProposals] = React.useState([]);
+      
+      // Treasury proposal state
+      const [treasuryData, setTreasuryData] = React.useState({
+        description: '',
+        recipient: '',
+        amount: '',
+        tokenType: 'eth',
+        tokenAddress: '',
+        tokenId: ''
+      });
+      
+      // Mint proposal state
+      const [mintData, setMintData] = React.useState({
+        description: '',
+        recipient: '',
+        amount: ''
+      });
+      
+      // Token price proposal state
+      const [priceData, setPriceData] = React.useState({
+        description: '',
+        newPrice: ''
+      });
+      
+      const [daoInfo, setDaoInfo] = React.useState({
+        name: 'Loading...',
+        tokenBalance: '0',
+        tokenSupply: '0',
+        tokenPrice: '0'
+      });
+      const [notification, setNotification] = React.useState({
+        show: false,
+        message: '',
+        type: ''
+      });
+      
+      // Store references to ethers.js objects
+      const providerRef = React.useRef(null);
+      const signerRef = React.useRef(null);
+      const daoContractRef = React.useRef(null);
+      const factoryContractRef = React.useRef(null);
+      
+      // Show notification helper
+      const showNotification = (message, type = 'info') => {
+        setNotification({
+          show: true,
+          message,
+          type
+        });
+        
+        setTimeout(() => {
+          setNotification({
+            show: false,
+            message: '',
+            type: ''
+          });
+        }, 3000);
+      };
+      
+      // Purchase tokens function
+      const purchaseTokens = async () => {
+        try {
+          if (!daoContractRef.current) {
+            showNotification('Please connect your wallet first', 'error');
+            return;
+          }
+          
+          // Get token price from contract 
+          const tokenPrice = await daoContractRef.current.tokenPrice();
+          
+          // Check if token purchases are disabled
+          if (tokenPrice.toString() === '0') {
+            showNotification('Direct token purchases are disabled', 'error');
+            return;
+          }
+          
+          // Validate amount
+          const amount = Number(purchaseAmount);
+          if (isNaN(amount) || amount <= 0) {
+            showNotification('Please enter a valid amount', 'error');
+            return;
+          }
+          
+          // Calculate total cost
+          const totalCost = tokenPrice.mul(amount);
+          
+          showNotification('Submitting transaction...', 'info');
+          
+          // Execute purchase
+          const tx = await daoContractRef.current.purchaseTokens({ value: totalCost });
+          
+          showNotification('Transaction submitted, waiting for confirmation...', 'info');
+          
+          // Wait for transaction confirmation
+          const receipt = await tx.wait();
+          
+          showNotification(`Successfully purchased ${amount} tokens!`, 'success');
+          
+          // Update user's token balance
+          const newBalance = await daoContractRef.current.balanceOf(walletAddress, 0);
+          
+          // Create copy of current state without using spread operator
+          const updatedDaoInfo = Object.assign({}, daoInfo);
+          updatedDaoInfo.tokenBalance = newBalance.toString();
+          setDaoInfo(updatedDaoInfo);
+          
+        } catch (error) {
+          console.error('Error purchasing tokens:', error);
+          showNotification('Failed to purchase tokens: ' + (error.message || error), 'error');
+        }
+      };
+      
+      // Create resolution proposal
+      const createResolutionProposal = async () => {
+        try {
+          if (!factoryContractRef.current) {
+            showNotification('Please connect your wallet first', 'error');
+            return;
+          }
+          
+          // Validate description
+          if (!proposalDescription.trim()) {
+            showNotification('Please enter a proposal description', 'error');
+            return;
+          }
+          
+          showNotification('Creating resolution proposal...', 'info');
+          
+          // Call the factory contract to create the proposal
+          const tx = await factoryContractRef.current.createResolutionProposal(proposalDescription);
+          
+          showNotification('Transaction submitted, waiting for confirmation...', 'info');
+          
+          // Wait for transaction confirmation
+          const receipt = await tx.wait();
+          
+          showNotification('Resolution proposal created successfully!', 'success');
+          
+          // Clear the description field
+          setProposalDescription('');
+          
+          // Reload the proposals list
+          loadProposals();
+          
+        } catch (error) {
+          console.error('Error creating resolution proposal:', error);
+          showNotification('Failed to create proposal: ' + (error.message || error), 'error');
+        }
+      };
+      
+      // Create treasury proposal
+      const createTreasuryProposal = async () => {
+        try {
+          if (!factoryContractRef.current) {
+            showNotification('Please connect your wallet first', 'error');
+            return;
+          }
+          
+          // Validate required fields
+          if (!treasuryData.description.trim()) {
+            showNotification('Please enter a proposal description', 'error');
+            return;
+          }
+          
+          if (!treasuryData.recipient.trim()) {
+            showNotification('Please enter a recipient address', 'error');
+            return;
+          }
+          
+          if (!treasuryData.amount.trim()) {
+            showNotification('Please enter an amount', 'error');
+            return;
+          }
+          
+          // Prepare parameters
+          let tokenAddress = ethers.constants.AddressZero; // Default for ETH
+          let tokenId = 0;
+          
+          // Handle token type
+          if (treasuryData.tokenType !== 'eth') {
+            if (!treasuryData.tokenAddress.trim()) {
+              showNotification('Please enter a token address', 'error');
+              return;
+            }
+            tokenAddress = treasuryData.tokenAddress;
+            
+            if (treasuryData.tokenType === 'erc721' || treasuryData.tokenType === 'erc1155') {
+              if (!treasuryData.tokenId.trim()) {
+                showNotification('Please enter a token ID', 'error');
+                return;
+              }
+              tokenId = parseInt(treasuryData.tokenId);
+            }
+          }
+          
+          // Convert amount to appropriate format
+          const amount = ethers.utils.parseEther(treasuryData.amount);
+          
+          showNotification('Creating treasury proposal...', 'info');
+          
+          // Call the factory contract to create the proposal
+          const tx = await factoryContractRef.current.createTreasuryProposal(
+            treasuryData.description,
+            treasuryData.recipient,
+            amount,
+            tokenAddress,
+            tokenId
+          );
+          
+          showNotification('Transaction submitted, waiting for confirmation...', 'info');
+          
+          // Wait for transaction confirmation
+          const receipt = await tx.wait();
+          
+          showNotification('Treasury proposal created successfully!', 'success');
+          
+          // Clear the form
+          setTreasuryData({
+            description: '',
+            recipient: '',
+            amount: '',
+            tokenType: 'eth',
+            tokenAddress: '',
+            tokenId: ''
+          });
+          
+          // Reload the proposals list
+          loadProposals();
+          
+        } catch (error) {
+          console.error('Error creating treasury proposal:', error);
+          showNotification('Failed to create proposal: ' + (error.message || error), 'error');
+        }
+      };
+      
+      // Create mint proposal
+      const createMintProposal = async () => {
+        try {
+          if (!factoryContractRef.current) {
+            showNotification('Please connect your wallet first', 'error');
+            return;
+          }
+          
+          // Validate required fields
+          if (!mintData.description.trim()) {
+            showNotification('Please enter a proposal description', 'error');
+            return;
+          }
+          
+          if (!mintData.recipient.trim()) {
+            showNotification('Please enter a recipient address', 'error');
+            return;
+          }
+          
+          if (!mintData.amount.trim()) {
+            showNotification('Please enter an amount', 'error');
+            return;
+          }
+          
+          showNotification('Creating mint proposal...', 'info');
+          
+          // Call the factory contract to create the proposal
+          const tx = await factoryContractRef.current.createMintProposal(
+            mintData.description,
+            mintData.recipient,
+            mintData.amount
+          );
+          
+          showNotification('Transaction submitted, waiting for confirmation...', 'info');
+          
+          // Wait for transaction confirmation
+          const receipt = await tx.wait();
+          
+          showNotification('Mint proposal created successfully!', 'success');
+          
+          // Clear the form
+          setMintData({
+            description: '',
+            recipient: '',
+            amount: ''
+          });
+          
+          // Reload the proposals list
+          loadProposals();
+          
+        } catch (error) {
+          console.error('Error creating mint proposal:', error);
+          showNotification('Failed to create proposal: ' + (error.message || error), 'error');
+        }
+      };
+      
+      // Create token price proposal
+      const createTokenPriceProposal = async () => {
+        try {
+          if (!factoryContractRef.current) {
+            showNotification('Please connect your wallet first', 'error');
+            return;
+          }
+          
+          // Validate required fields
+          if (!priceData.description.trim()) {
+            showNotification('Please enter a proposal description', 'error');
+            return;
+          }
+          
+          if (priceData.newPrice === '') {
+            showNotification('Please enter a new token price', 'error');
+            return;
+          }
+          
+          // Convert new price to wei
+          const newPrice = ethers.utils.parseEther(priceData.newPrice);
+          
+          showNotification('Creating token price proposal...', 'info');
+          
+          // Call the factory contract to create the proposal
+          const tx = await factoryContractRef.current.createTokenPriceProposal(
+            priceData.description,
+            newPrice
+          );
+          
+          showNotification('Transaction submitted, waiting for confirmation...', 'info');
+          
+          // Wait for transaction confirmation
+          const receipt = await tx.wait();
+          
+          showNotification('Token price proposal created successfully!', 'success');
+          
+          // Clear the form
+          setPriceData({
+            description: '',
+            newPrice: ''
+          });
+          
+          // Reload the proposals list
+          loadProposals();
+          
+        } catch (error) {
+          console.error('Error creating token price proposal:', error);
+          showNotification('Failed to create proposal: ' + (error.message || error), 'error');
+        }
+      };
+      
+      // Add support to a proposal
+      const addSupport = async (proposalAddress) => {
+        try {
+          if (!signerRef.current) {
+            showNotification('Please connect your wallet first', 'error');
+            return;
+          }
+          
+          // Get the amount from the input field
+          const inputField = document.getElementById(`support-amount-${proposalAddress}`);
+          if (!inputField) {
+            showNotification('Input field not found', 'error');
+            return;
+          }
+          
+          const amount = parseInt(inputField.value);
+          if (isNaN(amount) || amount <= 0) {
+            showNotification('Please enter a valid amount', 'error');
+            return;
+          }
+          
+          // Create proposal contract instance with the addSupport function
+          const fullProposalAbi = proposalAbi.concat(["function addSupport(uint256 amount)"]);
+          const proposalContract = new ethers.Contract(
+            proposalAddress,
+            fullProposalAbi,
+            signerRef.current
+          );
+          
+          showNotification('Adding support...', 'info');
+          
+          // Call the addSupport function
+          const tx = await proposalContract.addSupport(amount);
+          
+          showNotification('Transaction submitted, waiting for confirmation...', 'info');
+          
+          // Wait for transaction confirmation
+          await tx.wait();
+          
+          showNotification('Support added successfully!', 'success');
+          
+          // Clear the input field
+          inputField.value = '';
+          
+          // Reload the proposals
+          loadProposals();
+          
+        } catch (error) {
+          console.error('Error adding support:', error);
+          showNotification('Failed to add support: ' + (error.message || error), 'error');
+        }
+      };
+      
+      // Define Proposal ABIs
+      const baseProposalAbi = [
+        "function description() view returns (string)",
+        "function proposer() view returns (address)",
+        "function createdAt() view returns (uint256)",
+        "function supportTotal() view returns (uint256)",
+        "function electionTriggered() view returns (bool)",
+        "function executed() view returns (bool)"
+      ];
+      
+      const treasuryProposalAbi = baseProposalAbi.concat([
+        "function recipient() view returns (address)",
+        "function amount() view returns (uint256)",
+        "function token() view returns (address)",
+        "function tokenId() view returns (uint256)"
+      ]);
+      
+      const mintProposalAbi = baseProposalAbi.concat([
+        "function recipient() view returns (address)",
+        "function amount() view returns (uint256)"
+      ]);
+      
+      const tokenPriceProposalAbi = baseProposalAbi.concat([
+        "function newPrice() view returns (uint256)"
+      ]);
+      
+      // Load active proposals
+      const loadProposals = async () => {
+        try {
+          if (!factoryContractRef.current || !signerRef.current) {
+            return;
+          }
+          
+          // Get proposal count
+          const count = await factoryContractRef.current.proposalCount();
+          
+          const proposalsList = [];
+          
+          // Loop through all proposals
+          for (let i = count.toNumber() - 1; i >= 0; i--) {
+            const proposalAddress = await factoryContractRef.current.getProposal(i);
+            
+            // First create a base proposal contract to check common properties
+            const baseContract = new ethers.Contract(
+              proposalAddress, 
+              baseProposalAbi, 
+              signerRef.current
+            );
+            
+            // Get common proposal details
+            const description = await baseContract.description();
+            const proposer = await baseContract.proposer();
+            const createdAt = await baseContract.createdAt();
+            const supportTotal = await baseContract.supportTotal();
+            const electionTriggered = await baseContract.electionTriggered();
+            const executed = await baseContract.executed();
+            
+            // Skip executed proposals
+            if (executed) continue;
+            
+            // Skip proposals in election stage
+            if (electionTriggered) continue;
+            
+            // Determine proposal type and get additional details
+            let proposalType = 'resolution';
+            let details = {};
+            
+            try {
+              // Try to determine if it's a treasury proposal
+              const treasuryContract = new ethers.Contract(
+                proposalAddress, 
+                treasuryProposalAbi, 
+                signerRef.current
+              );
+              
+              const recipient = await treasuryContract.recipient();
+              
+              if (recipient) {
+                proposalType = 'treasury';
+                const amount = await treasuryContract.amount();
+                const token = await treasuryContract.token();
+                const tokenId = await treasuryContract.tokenId();
+                
+                details = {
+                  recipient,
+                  amount: amount.toString(),
+                  token,
+                  tokenId: tokenId.toString()
+                };
+                
+                // Skip to next proposal since we've identified the type
+                proposalsList.push({
+                  address: proposalAddress,
+                  description,
+                  proposer,
+                  createdAt: createdAt.toString(),
+                  supportTotal: supportTotal.toString(),
+                  type: proposalType,
+                  details
+                });
+                
+                continue;
+              }
+            } catch (error) {
+              // Not a treasury proposal, continue checking other types
+            }
+            
+            try {
+              // Try to determine if it's a mint proposal
+              const mintContract = new ethers.Contract(
+                proposalAddress, 
+                mintProposalAbi, 
+                signerRef.current
+              );
+              
+              const recipient = await mintContract.recipient();
+              
+              if (recipient) {
+                proposalType = 'mint';
+                const amount = await mintContract.amount();
+                
+                details = {
+                  recipient,
+                  amount: amount.toString()
+                };
+                
+                // Skip to next proposal since we've identified the type
+                proposalsList.push({
+                  address: proposalAddress,
+                  description,
+                  proposer,
+                  createdAt: createdAt.toString(),
+                  supportTotal: supportTotal.toString(),
+                  type: proposalType,
+                  details
+                });
+                
+                continue;
+              }
+            } catch (error) {
+              // Not a mint proposal, continue checking other types
+            }
+            
+            try {
+              // Try to determine if it's a token price proposal
+              const priceContract = new ethers.Contract(
+                proposalAddress, 
+                tokenPriceProposalAbi, 
+                signerRef.current
+              );
+              
+              const newPrice = await priceContract.newPrice();
+              
+              // Check if newPrice call was successful
+              if (newPrice !== undefined) {
+                proposalType = 'price';
+                
+                details = {
+                  newPrice: newPrice.toString()
+                };
+                
+                // Skip to next proposal since we've identified the type
+                proposalsList.push({
+                  address: proposalAddress,
+                  description,
+                  proposer,
+                  createdAt: createdAt.toString(),
+                  supportTotal: supportTotal.toString(),
+                  type: proposalType,
+                  details
+                });
+                
+                continue;
+              }
+            } catch (error) {
+              // Not a token price proposal, it must be a resolution proposal
+            }
+            
+            // If we reach here, it's a standard resolution proposal
+            proposalsList.push({
+              address: proposalAddress,
+              description,
+              proposer,
+              createdAt: createdAt.toString(),
+              supportTotal: supportTotal.toString(),
+              type: 'resolution',
+              details: {}
+            });
+          }
+          
+          setProposals(proposalsList);
+          
+        } catch (error) {
+          console.error('Error loading proposals:', error);
+        }
+      };
+      
+      // Define DAO contract ABI
+      const daoAbi = [
+        "function name() view returns (string)",
+        "function tokenPrice() view returns (uint256)",
+        "function balanceOf(address account, uint256 id) view returns (uint256)",
+        "function totalSupply(uint256 tokenId) view returns (uint256)",
+        "function purchaseTokens() payable"
+      ];
+      
+      // Helper functions to update form data
+      const updateTreasuryData = (field, value) => {
+        const newData = Object.assign({}, treasuryData);
+        newData[field] = value;
+        setTreasuryData(newData);
+      };
+      
+      const updateMintData = (field, value) => {
+        const newData = Object.assign({}, mintData);
+        newData[field] = value;
+        setMintData(newData);
+      };
+      
+      const updatePriceData = (field, value) => {
+        const newData = Object.assign({}, priceData);
+        newData[field] = value;
+        setPriceData(newData);
+      };
+      
+      // Define Factory contract ABI
+      const factoryAbi = [
+        "function proposalCount() view returns (uint256)",
+        "function getProposal(uint256 index) view returns (address)",
+        "function createResolutionProposal(string description) returns (address)",
+        "function createTreasuryProposal(string description, address recipient, uint256 amount, address token, uint256 tokenId) returns (address)",
+        "function createMintProposal(string description, address recipient, uint256 amount) returns (address)",
+        "function createTokenPriceProposal(string description, uint256 newPrice) returns (address)"
+      ];
+        
+      // Connect wallet
+      const connectWallet = async () => {
+        try {
+          // Check if MetaMask is installed
+          if (typeof window.ethereum === 'undefined') {
+            showNotification('Please install MetaMask to use this dApp', 'error');
+            return;
+          }
+          
+          // Request account access
+          const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+          const currentAccount = accounts[0];
+          setWalletAddress(currentAccount);
+          
+          // Initialize ethers provider and signer
+          const provider = new ethers.providers.Web3Provider(window.ethereum);
+          const signer = provider.getSigner();
+          
+          // Save references
+          providerRef.current = provider;
+          signerRef.current = signer;
+          
+          // Initialize contracts
+          const daoContract = new ethers.Contract(DAO_ADDRESS, daoAbi, signer);
+          daoContractRef.current = daoContract;
+          
+          const factoryContract = new ethers.Contract(FACTORY_ADDRESS, factoryAbi, signer);
+          factoryContractRef.current = factoryContract;
+          
+          try {
+            // Try to load actual data from the contract
+            const daoName = await daoContract.name();
+            const tokenPrice = await daoContract.tokenPrice();
+            const tokenBalance = await daoContract.balanceOf(currentAccount, 0);
+            const tokenSupply = await daoContract.totalSupply(0);
+            
+            setDaoInfo({
+              name: daoName,
+              tokenBalance: tokenBalance.toString(),
+              tokenSupply: tokenSupply.toString(),
+              tokenPrice: ethers.utils.formatEther(tokenPrice)
+            });
+          } catch (error) {
+            console.error("Error loading contract data:", error);
+            // Fallback to mock data if contract interaction fails
+            setDaoInfo({
+              name: 'Market DAO',
+              tokenBalance: '100',
+              tokenSupply: '1000',
+              tokenPrice: '0.1'
+            });
+          }
+          
+          setIsConnected(true);
+          showNotification('Wallet connected successfully!', 'success');
+          
+          // Load proposals
+          loadProposals();
+        } catch (error) {
+          console.error('Error connecting wallet:', error);
+          showNotification('Failed to connect wallet', 'error');
+        }
+      };
+      
+      // Render the appropriate content based on active tab
+      const renderContent = () => {
+        if (!isConnected) {
+          return (
+            <div className="card">
+              <h2>Welcome to Market DAO</h2>
+              <p>Please connect your wallet to interact with the DAO</p>
+              <button onClick={connectWallet}>Connect Wallet</button>
+            </div>
+          );
+        }
+        
+        switch (activeTab) {
+          case 'dashboard':
+            return (
+              <>
+                <div className="card">
+                  <h2>DAO Information</h2>
+                  <div className="stats-grid">
+                    <div className="stat-card">
+                      <div className="stat-value">{daoInfo.name}</div>
+                      <div className="stat-label">DAO Name</div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-value">{daoInfo.tokenBalance}</div>
+                      <div className="stat-label">Your Token Balance</div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-value">{daoInfo.tokenSupply}</div>
+                      <div className="stat-label">Total Supply</div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-value">{daoInfo.tokenPrice} ETH</div>
+                      <div className="stat-label">Token Price</div>
+                    </div>
+                  </div>
+                  
+                  <h3>Purchase Tokens</h3>
+                  {Number(daoInfo.tokenPrice) === 0 ? (
+                    <div style={{ color: '#666' }}>
+                      <p>Direct token purchases are currently disabled (token price is set to 0).</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                        <div style={{ flex: 1 }}>
+                          <label htmlFor="purchase-amount">Amount</label>
+                          <input 
+                            type="number" 
+                            id="purchase-amount" 
+                            min="1" 
+                            value={purchaseAmount}
+                            onChange={(e) => setPurchaseAmount(e.target.value)}
+                            placeholder="Number of tokens"
+                          />
+                        </div>
+                        <div>
+                          <button onClick={purchaseTokens}>Purchase</button>
+                        </div>
+                      </div>
+                      <div style={{ marginTop: '10px' }}>
+                        <p>Cost: {Number(purchaseAmount) * Number(daoInfo.tokenPrice)} ETH</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+                
+                <div className="card">
+                  <h2>Create Proposal</h2>
+                  
+                  <div style={{ marginBottom: '20px' }}>
+                    <label>Proposal Type</label>
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                      <div 
+                        style={{ 
+                          padding: '10px',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          backgroundColor: proposalType === 'resolution' ? '#f0f7ff' : 'white',
+                          borderColor: proposalType === 'resolution' ? '#0066cc' : '#ddd'
+                        }}
+                        onClick={() => setProposalType('resolution')}
+                      >
+                        Resolution
+                      </div>
+                      <div 
+                        style={{ 
+                          padding: '10px',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          backgroundColor: proposalType === 'treasury' ? '#f0f7ff' : 'white',
+                          borderColor: proposalType === 'treasury' ? '#0066cc' : '#ddd'
+                        }}
+                        onClick={() => setProposalType('treasury')}
+                      >
+                        Treasury
+                      </div>
+                      <div 
+                        style={{ 
+                          padding: '10px',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          backgroundColor: proposalType === 'mint' ? '#f0f7ff' : 'white',
+                          borderColor: proposalType === 'mint' ? '#0066cc' : '#ddd'
+                        }}
+                        onClick={() => setProposalType('mint')}
+                      >
+                        Mint Tokens
+                      </div>
+                      <div 
+                        style={{ 
+                          padding: '10px',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          backgroundColor: proposalType === 'price' ? '#f0f7ff' : 'white',
+                          borderColor: proposalType === 'price' ? '#0066cc' : '#ddd'
+                        }}
+                        onClick={() => setProposalType('price')}
+                      >
+                        Token Price
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {proposalType === 'resolution' && (
+                    <>
+                      <label htmlFor="proposal-description">Description</label>
+                      <textarea 
+                        id="proposal-description" 
+                        rows="4" 
+                        value={proposalDescription}
+                        onChange={(e) => setProposalDescription(e.target.value)}
+                        placeholder="Enter proposal description"
+                      ></textarea>
+                      <button onClick={createResolutionProposal} style={{ marginTop: '10px' }}>Create Resolution Proposal</button>
+                    </>
+                  )}
+                  
+                  {proposalType === 'treasury' && (
+                    <>
+                      <label htmlFor="treasury-description">Description</label>
+                      <textarea 
+                        id="treasury-description" 
+                        rows="4" 
+                        value={treasuryData.description}
+                        onChange={(e) => updateTreasuryData('description', e.target.value)}
+                        placeholder="Enter a description for this treasury transfer"
+                      ></textarea>
+                      
+                      <label htmlFor="treasury-recipient">Recipient Address</label>
+                      <input 
+                        type="text" 
+                        id="treasury-recipient" 
+                        value={treasuryData.recipient}
+                        onChange={(e) => updateTreasuryData('recipient', e.target.value)}
+                        placeholder="0x..."
+                      />
+                      
+                      <label htmlFor="treasury-amount">Amount</label>
+                      <input 
+                        type="number" 
+                        id="treasury-amount" 
+                        min="0" 
+                        step="any" 
+                        value={treasuryData.amount}
+                        onChange={(e) => updateTreasuryData('amount', e.target.value)}
+                        placeholder="Amount to transfer"
+                      />
+                      
+                      <label htmlFor="treasury-token-type">Token Type</label>
+                      <select 
+                        id="treasury-token-type"
+                        value={treasuryData.tokenType}
+                        onChange={(e) => updateTreasuryData('tokenType', e.target.value)}
+                      >
+                        <option value="eth">ETH</option>
+                        <option value="erc20">ERC20</option>
+                        <option value="erc721">ERC721</option>
+                        <option value="erc1155">ERC1155</option>
+                      </select>
+                      
+                      {treasuryData.tokenType !== 'eth' && (
+                        <div style={{ marginTop: '10px' }}>
+                          <label htmlFor="treasury-token-address">Token Address</label>
+                          <input 
+                            type="text" 
+                            id="treasury-token-address" 
+                            value={treasuryData.tokenAddress}
+                            onChange={(e) => updateTreasuryData('tokenAddress', e.target.value)}
+                            placeholder="0x..."
+                          />
+                        </div>
+                      )}
+                      
+                      {(treasuryData.tokenType === 'erc721' || treasuryData.tokenType === 'erc1155') && (
+                        <div style={{ marginTop: '10px' }}>
+                          <label htmlFor="treasury-token-id">Token ID</label>
+                          <input 
+                            type="number" 
+                            id="treasury-token-id" 
+                            min="0" 
+                            step="1" 
+                            value={treasuryData.tokenId}
+                            onChange={(e) => updateTreasuryData('tokenId', e.target.value)}
+                            placeholder="Token ID"
+                          />
+                        </div>
+                      )}
+                      
+                      <button onClick={createTreasuryProposal} style={{ marginTop: '20px' }}>Create Treasury Proposal</button>
+                    </>
+                  )}
+                  
+                  {proposalType === 'mint' && (
+                    <>
+                      <label htmlFor="mint-description">Description</label>
+                      <textarea 
+                        id="mint-description" 
+                        rows="4" 
+                        value={mintData.description}
+                        onChange={(e) => updateMintData('description', e.target.value)}
+                        placeholder="Enter a description for minting new tokens"
+                      ></textarea>
+                      
+                      <label htmlFor="mint-recipient">Recipient Address</label>
+                      <input 
+                        type="text" 
+                        id="mint-recipient" 
+                        value={mintData.recipient}
+                        onChange={(e) => updateMintData('recipient', e.target.value)}
+                        placeholder="0x..."
+                      />
+                      
+                      <label htmlFor="mint-amount">Amount</label>
+                      <input 
+                        type="number" 
+                        id="mint-amount" 
+                        min="1" 
+                        step="1" 
+                        value={mintData.amount}
+                        onChange={(e) => updateMintData('amount', e.target.value)}
+                        placeholder="Number of tokens to mint"
+                      />
+                      
+                      <button onClick={createMintProposal} style={{ marginTop: '10px' }}>Create Mint Proposal</button>
+                    </>
+                  )}
+                  
+                  {proposalType === 'price' && (
+                    <>
+                      <label htmlFor="price-description">Description</label>
+                      <textarea 
+                        id="price-description" 
+                        rows="4" 
+                        value={priceData.description}
+                        onChange={(e) => updatePriceData('description', e.target.value)}
+                        placeholder="Enter a description for changing the token price"
+                      ></textarea>
+                      
+                      <label htmlFor="new-token-price">New Token Price (in ETH)</label>
+                      <input 
+                        type="number" 
+                        id="new-token-price" 
+                        min="0" 
+                        step="any" 
+                        value={priceData.newPrice}
+                        onChange={(e) => updatePriceData('newPrice', e.target.value)}
+                        placeholder="Enter new token price (0 to disable direct sales)"
+                      />
+                      
+                      <button onClick={createTokenPriceProposal} style={{ marginTop: '10px' }}>Create Token Price Proposal</button>
+                    </>
+                  )}
+                </div>
+              </>
+            );
+            
+          case 'proposals':
+            return (
+              <div className="card">
+                <h2>Active Proposals</h2>
+                {proposals.length === 0 ? (
+                  <p>No active proposals found.</p>
+                ) : (
+                  proposals.map(proposal => (
+                    <div key={proposal.address} style={{ 
+                      border: '1px solid #ddd', 
+                      borderLeft: `4px solid ${
+                        proposal.type === 'treasury' ? '#4caf50' : 
+                        proposal.type === 'mint' ? '#ff9800' :
+                        proposal.type === 'price' ? '#2196f3' : '#9c27b0'
+                      }`,
+                      borderRadius: '4px', 
+                      padding: '15px', 
+                      marginBottom: '15px' 
+                    }}>
+                      <div style={{ 
+                        display: 'inline-block', 
+                        padding: '2px 6px', 
+                        background: 
+                          proposal.type === 'treasury' ? '#e8f5e9' : 
+                          proposal.type === 'mint' ? '#fff3e0' :
+                          proposal.type === 'price' ? '#e3f2fd' : '#f3e5f5',
+                        color: 
+                          proposal.type === 'treasury' ? '#2e7d32' : 
+                          proposal.type === 'mint' ? '#e65100' :
+                          proposal.type === 'price' ? '#0d47a1' : '#4a148c',
+                        borderRadius: '4px',
+                        marginBottom: '6px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        textTransform: 'uppercase'
+                      }}>
+                        {proposal.type}
+                      </div>
+                      
+                      <h3>{proposal.description}</h3>
+                      
+                      <div style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
+                        Proposer: {proposal.proposer.substring(0, 6)}...{proposal.proposer.substring(38)}
+                      </div>
+                      
+                      {/* Proposal type specific details */}
+                      {proposal.type === 'treasury' && (
+                        <div style={{ background: '#f5f5f5', padding: '10px', borderRadius: '4px', marginBottom: '10px' }}>
+                          <div><strong>Recipient:</strong> {proposal.details.recipient.substring(0, 6)}...{proposal.details.recipient.substring(38)}</div>
+                          <div><strong>Amount:</strong> {proposal.details.token === ethers.constants.AddressZero 
+                            ? ethers.utils.formatEther(proposal.details.amount) + ' ETH'
+                            : proposal.details.amount + ' tokens'
+                          }</div>
+                          {proposal.details.token !== ethers.constants.AddressZero && (
+                            <div><strong>Token:</strong> {proposal.details.token.substring(0, 6)}...{proposal.details.token.substring(38)}</div>
+                          )}
+                          {proposal.details.tokenId !== '0' && (
+                            <div><strong>Token ID:</strong> {proposal.details.tokenId}</div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {proposal.type === 'mint' && (
+                        <div style={{ background: '#f5f5f5', padding: '10px', borderRadius: '4px', marginBottom: '10px' }}>
+                          <div><strong>Recipient:</strong> {proposal.details.recipient.substring(0, 6)}...{proposal.details.recipient.substring(38)}</div>
+                          <div><strong>Amount:</strong> {proposal.details.amount} tokens</div>
+                        </div>
+                      )}
+                      
+                      {proposal.type === 'price' && (
+                        <div style={{ background: '#f5f5f5', padding: '10px', borderRadius: '4px', marginBottom: '10px' }}>
+                          <div><strong>New Price:</strong> {ethers.utils.formatEther(proposal.details.newPrice)} ETH</div>
+                        </div>
+                      )}
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <div>Created at block: {proposal.createdAt}</div>
+                        <div>Current support: {proposal.supportTotal}</div>
+                      </div>
+                      
+                      <div style={{ marginTop: '15px' }}>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                          <input 
+                            type="number" 
+                            placeholder="Support amount" 
+                            style={{ flex: 1 }}
+                            id={`support-amount-${proposal.address}`}
+                          />
+                          <button onClick={() => addSupport(proposal.address)}>
+                            Add Support
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            );
+            
+          case 'elections':
+            return (
+              <div className="card">
+                <h2>Active Elections</h2>
+                <p>No active elections found.</p>
+              </div>
+            );
+            
+          case 'history':
+            return (
+              <div className="card">
+                <h2>Proposal History</h2>
+                <p>No proposal history found.</p>
+              </div>
+            );
+            
+          default:
+            return null;
+        }
+      };
+      
+      return (
+        <>
+          <h1>Market DAO</h1>
+          
+          {isConnected && (
+            <div className="navbar">
+              <div 
+                className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+                onClick={() => setActiveTab('dashboard')}
+              >
+                Dashboard
+              </div>
+              <div 
+                className={`nav-item ${activeTab === 'proposals' ? 'active' : ''}`}
+                onClick={() => setActiveTab('proposals')}
+              >
+                Proposals
+              </div>
+              <div 
+                className={`nav-item ${activeTab === 'elections' ? 'active' : ''}`}
+                onClick={() => setActiveTab('elections')}
+              >
+                Elections
+              </div>
+              <div 
+                className={`nav-item ${activeTab === 'history' ? 'active' : ''}`}
+                onClick={() => setActiveTab('history')}
+              >
+                History
+              </div>
+            </div>
+          )}
+          
+          {renderContent()}
+          
+          {notification.show && (
+            <div 
+              style={{
+                position: 'fixed',
+                bottom: '20px',
+                right: '20px',
+                padding: '12px 16px',
+                backgroundColor: notification.type === 'error' ? '#f44336' :
+                                 notification.type === 'success' ? '#4caf50' : '#2196f3',
+                color: 'white',
+                borderRadius: '4px',
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+              }}
+            >
+              {notification.message}
+            </div>
+          )}
+        </>
+      );
+    }
+    
+    // Render the App
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
