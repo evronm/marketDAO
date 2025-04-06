@@ -473,7 +473,7 @@
           }
           
           // Create proposal contract instance with the addSupport function
-          const fullProposalAbi = proposalAbi.concat(["function addSupport(uint256 amount)"]);
+          const fullProposalAbi = baseProposalAbi.concat(["function addSupport(uint256 amount)"]);
           const proposalContract = new ethers.Contract(
             proposalAddress,
             fullProposalAbi,
