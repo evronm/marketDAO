@@ -516,7 +516,11 @@
         "function createdAt() view returns (uint256)",
         "function supportTotal() view returns (uint256)",
         "function electionTriggered() view returns (bool)",
-        "function executed() view returns (bool)"
+        "function executed() view returns (bool)",
+        "function electionStart() view returns (uint256)",
+        "function votingTokenId() view returns (uint256)",
+        "function yesVoteAddress() view returns (address)",
+        "function noVoteAddress() view returns (address)"
       ];
       
       const treasuryProposalAbi = baseProposalAbi.concat([
@@ -569,6 +573,16 @@
             // Skip executed proposals and non-election proposals
             if (executed || !electionTriggered) continue;
             
+            // Get election details
+            const votingTokenId = await baseContract.votingTokenId();
+            const yesVoteAddress = await baseContract.yesVoteAddress();
+            const noVoteAddress = await baseContract.noVoteAddress();
+            
+            // Get vote counts
+            const yesVotes = await daoContractRef.current.balanceOf(yesVoteAddress, votingTokenId);
+            const noVotes = await daoContractRef.current.balanceOf(noVoteAddress, votingTokenId);
+            const totalVotes = await daoContractRef.current.totalSupply(votingTokenId);
+            
             // Determine proposal type and get additional details
             let proposalType = 'resolution';
             let details = {};
@@ -603,7 +617,13 @@
                   createdAt: createdAt.toString(),
                   supportTotal: supportTotal.toString(),
                   type: proposalType,
-                  details
+                  details,
+                  votes: {
+                    yes: yesVotes.toString(),
+                    no: noVotes.toString(),
+                    total: totalVotes.toString()
+                  },
+                  votingTokenId: votingTokenId.toString()
                 });
                 
                 continue;
@@ -638,7 +658,13 @@
                   createdAt: createdAt.toString(),
                   supportTotal: supportTotal.toString(),
                   type: proposalType,
-                  details
+                  details,
+                  votes: {
+                    yes: yesVotes.toString(),
+                    no: noVotes.toString(),
+                    total: totalVotes.toString()
+                  },
+                  votingTokenId: votingTokenId.toString()
                 });
                 
                 continue;
@@ -672,7 +698,13 @@
                   createdAt: createdAt.toString(),
                   supportTotal: supportTotal.toString(),
                   type: proposalType,
-                  details
+                  details,
+                  votes: {
+                    yes: yesVotes.toString(),
+                    no: noVotes.toString(),
+                    total: totalVotes.toString()
+                  },
+                  votingTokenId: votingTokenId.toString()
                 });
                 
                 continue;
@@ -689,7 +721,13 @@
               createdAt: createdAt.toString(),
               supportTotal: supportTotal.toString(),
               type: 'resolution',
-              details: {}
+              details: {},
+              votes: {
+                yes: yesVotes.toString(),
+                no: noVotes.toString(),
+                total: totalVotes.toString()
+              },
+              votingTokenId: votingTokenId.toString()
             });
           }
           
@@ -871,13 +909,103 @@
         }
       };
       
+      // Vote on a proposal
+      const voteOnProposal = async (proposalAddress, isYesVote) => {
+        try {
+          if (!signerRef.current) {
+            showNotification('Please connect your wallet first', 'error');
+            return;
+          }
+          
+          // Create contract instance
+          const proposalContract = new ethers.Contract(
+            proposalAddress,
+            baseProposalAbi,
+            signerRef.current
+          );
+          
+          // Get the voting addresses
+          const yesVoteAddress = await proposalContract.yesVoteAddress();
+          const noVoteAddress = await proposalContract.noVoteAddress();
+          const votingTokenId = await proposalContract.votingTokenId();
+          
+          // Determine vote destination
+          const voteDestination = isYesVote ? yesVoteAddress : noVoteAddress;
+          
+          // Check if user has voting tokens
+          const votingBalance = await daoContractRef.current.balanceOf(walletAddress, votingTokenId);
+          
+          if (votingBalance.eq(0)) {
+            showNotification('You have no voting tokens for this proposal', 'error');
+            return;
+          }
+          
+          // Get the vote amount from the input field
+          const inputField = document.getElementById(`vote-amount-${proposalAddress}`);
+          if (!inputField) {
+            showNotification('Input field not found', 'error');
+            return;
+          }
+          
+          const amount = parseInt(inputField.value);
+          if (isNaN(amount) || amount <= 0) {
+            showNotification('Please enter a valid amount', 'error');
+            return;
+          }
+          
+          if (amount > votingBalance.toNumber()) {
+            showNotification(`You only have ${votingBalance.toString()} voting tokens`, 'error');
+            return;
+          }
+          
+          showNotification(`Sending ${isYesVote ? 'YES' : 'NO'} vote...`, 'info');
+          
+          // Send voting tokens to the appropriate address
+          const tx = await daoContractRef.current.safeTransferFrom(
+            walletAddress,
+            voteDestination,
+            votingTokenId,
+            amount,
+            "0x" // No data
+          );
+          
+          showNotification('Transaction submitted, waiting for confirmation...', 'info');
+          
+          // Wait for transaction confirmation
+          await tx.wait();
+          
+          showNotification(`Vote ${isYesVote ? 'YES' : 'NO'} cast successfully!`, 'success');
+          
+          // Clear the input field
+          inputField.value = '';
+          
+          // Check if early termination is possible
+          try {
+            const earlyTerminationTx = await proposalContract.checkEarlyTermination();
+            await earlyTerminationTx.wait();
+          } catch (error) {
+            // Early termination might not be applicable, so we just ignore errors
+            console.log("Early termination check failed or not applicable:", error.message);
+          }
+          
+          // Reload the proposals and elections
+          loadProposals();
+          loadElectionProposals();
+          
+        } catch (error) {
+          console.error('Error voting:', error);
+          showNotification('Failed to vote: ' + (error.message || error), 'error');
+        }
+      };
+      
       // Define DAO contract ABI
       const daoAbi = [
         "function name() view returns (string)",
         "function tokenPrice() view returns (uint256)",
         "function balanceOf(address account, uint256 id) view returns (uint256)",
         "function totalSupply(uint256 tokenId) view returns (uint256)",
-        "function purchaseTokens() payable"
+        "function purchaseTokens() payable",
+        "function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes data)"
       ];
       
       // Helper functions to update form data
@@ -1429,14 +1557,90 @@
                         </div>
                       )}
                       
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                         <div>Created at block: {proposal.createdAt}</div>
-                        <div>Current support: {proposal.supportTotal}</div>
+                        <div>Support threshold: {proposal.supportTotal}</div>
                       </div>
                       
-                      <div style={{ marginTop: '15px', display: 'flex', gap: '10px' }}>
-                        <button style={{ flex: 1, backgroundColor: '#4CAF50' }}>Vote Yes</button>
-                        <button style={{ flex: 1, backgroundColor: '#F44336' }}>Vote No</button>
+                      {/* Vote Progress Bar */}
+                      <div style={{ marginBottom: '15px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                          <div><strong>Yes:</strong> {proposal.votes.yes} ({
+                            proposal.votes.total > 0 
+                              ? Math.round((parseInt(proposal.votes.yes) / parseInt(proposal.votes.total)) * 100) 
+                              : 0
+                          }%)</div>
+                          <div><strong>No:</strong> {proposal.votes.no} ({
+                            proposal.votes.total > 0 
+                              ? Math.round((parseInt(proposal.votes.no) / parseInt(proposal.votes.total)) * 100) 
+                              : 0
+                          }%)</div>
+                        </div>
+                        <div style={{ 
+                          width: '100%', 
+                          height: '20px', 
+                          border: '1px solid #ddd', 
+                          borderRadius: '10px',
+                          overflow: 'hidden',
+                          position: 'relative'
+                        }}>
+                          {/* Yes votes */}
+                          <div style={{ 
+                            position: 'absolute',
+                            left: '0',
+                            top: '0',
+                            bottom: '0',
+                            width: `${proposal.votes.total > 0 ? (parseInt(proposal.votes.yes) / parseInt(proposal.votes.total)) * 100 : 0}%`,
+                            backgroundColor: '#4CAF50'
+                          }}></div>
+                          {/* No votes */}
+                          <div style={{ 
+                            position: 'absolute',
+                            right: '0',
+                            top: '0',
+                            bottom: '0',
+                            width: `${proposal.votes.total > 0 ? (parseInt(proposal.votes.no) / parseInt(proposal.votes.total)) * 100 : 0}%`,
+                            backgroundColor: '#F44336'
+                          }}></div>
+                          {/* Remaining votes (haven't voted) */}
+                          <div style={{ 
+                            position: 'absolute',
+                            left: `${proposal.votes.total > 0 ? (parseInt(proposal.votes.yes) / parseInt(proposal.votes.total)) * 100 : 0}%`,
+                            right: `${proposal.votes.total > 0 ? (parseInt(proposal.votes.no) / parseInt(proposal.votes.total)) * 100 : 0}%`,
+                            top: '0',
+                            bottom: '0',
+                            backgroundColor: '#f5f5f5'
+                          }}></div>
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#666', marginTop: '5px', textAlign: 'center' }}>
+                          Voting token ID: {proposal.votingTokenId}
+                        </div>
+                      </div>
+                      
+                      <div style={{ marginTop: '15px' }}>
+                        <div style={{ marginBottom: '10px' }}>
+                          <label htmlFor={`vote-amount-${proposal.address}`} style={{ display: 'block', marginBottom: '5px' }}>Vote Amount:</label>
+                          <input 
+                            type="number" 
+                            id={`vote-amount-${proposal.address}`}
+                            placeholder="Number of voting tokens" 
+                            style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                          <button 
+                            style={{ flex: 1, backgroundColor: '#4CAF50' }}
+                            onClick={() => voteOnProposal(proposal.address, true)}
+                          >
+                            Vote Yes
+                          </button>
+                          <button 
+                            style={{ flex: 1, backgroundColor: '#F44336' }}
+                            onClick={() => voteOnProposal(proposal.address, false)}
+                          >
+                            Vote No
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))
