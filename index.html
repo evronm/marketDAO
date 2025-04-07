@@ -139,6 +139,7 @@
         tokenPrice: '0'
       });
       const [electionProposals, setElectionProposals] = React.useState([]);
+      const [historyProposals, setHistoryProposals] = React.useState([]);
       const [notification, setNotification] = React.useState({
         show: false,
         message: '',
@@ -250,9 +251,10 @@
           // Clear the description field
           setProposalDescription('');
           
-          // Reload the proposals list and elections
+          // Reload the proposals list, elections, and history
           loadProposals();
           loadElectionProposals();
+          loadHistoryProposals();
           
         } catch (error) {
           console.error('Error creating resolution proposal:', error);
@@ -336,9 +338,10 @@
             tokenId: ''
           });
           
-          // Reload the proposals list and elections
+          // Reload the proposals list, elections, and history
           loadProposals();
           loadElectionProposals();
+          loadHistoryProposals();
           
         } catch (error) {
           console.error('Error creating treasury proposal:', error);
@@ -393,9 +396,10 @@
             amount: ''
           });
           
-          // Reload the proposals list and elections
+          // Reload the proposals list, elections, and history
           loadProposals();
           loadElectionProposals();
+          loadHistoryProposals();
           
         } catch (error) {
           console.error('Error creating mint proposal:', error);
@@ -446,9 +450,10 @@
             newPrice: ''
           });
           
-          // Reload the proposals list and elections
+          // Reload the proposals list, elections, and history
           loadProposals();
           loadElectionProposals();
+          loadHistoryProposals();
           
         } catch (error) {
           console.error('Error creating token price proposal:', error);
@@ -500,8 +505,27 @@
           // Clear the input field
           inputField.value = '';
           
-          // Reload the proposals
+          // Check if the proposal now triggers an election
+          try {
+            const electionTriggered = await proposalContract.electionTriggered();
+            if (electionTriggered) {
+              showNotification('This proposal has triggered an election!', 'success');
+            }
+          } catch (error) {
+            console.warn('Error checking election triggered status:', error);
+          }
+          
+          // Reload the proposals, elections, and history immediately
           loadProposals();
+          loadElectionProposals();
+          loadHistoryProposals();
+          
+          // Also reload after a short delay to catch blockchain updates
+          setTimeout(() => {
+            loadProposals();
+            loadElectionProposals();
+            loadHistoryProposals();
+          }, 3000);
           
         } catch (error) {
           console.error('Error adding support:', error);
@@ -607,12 +631,14 @@
                 electionStatus = "Not Started";
               } else if (currentBlock >= parseInt(electionEnd.toString())) {
                 electionStatus = "Ended";
+                // Skip ended elections - they'll go to history instead
+                continue;
               } else {
                 isActive = true;
                 electionStatus = "Active";
               }
               
-              // Don't skip inactive elections - show them all but mark their status
+              // Don't skip inactive elections that haven't started yet
             } catch (error) {
               console.warn(`Error checking election status for ${proposalAddress}:`, error);
               electionStatus = "Error";
@@ -790,6 +816,263 @@
           
         } catch (error) {
           console.error('Error loading election proposals:', error);
+        }
+      };
+      
+      // Load history proposals (executed or ended elections)
+      const loadHistoryProposals = async () => {
+        try {
+          if (!factoryContractRef.current || !signerRef.current) {
+            return;
+          }
+          
+          // Get proposal count
+          const count = await factoryContractRef.current.proposalCount();
+          
+          const historyList = [];
+          
+          // Loop through all proposals
+          for (let i = count.toNumber() - 1; i >= 0; i--) {
+            const proposalAddress = await factoryContractRef.current.getProposal(i);
+            
+            // Create a base proposal contract to check common properties
+            const baseContract = new ethers.Contract(
+              proposalAddress, 
+              baseProposalAbi, 
+              signerRef.current
+            );
+            
+            // Get common proposal details
+            const description = await baseContract.description();
+            const proposer = await baseContract.proposer();
+            const createdAt = await baseContract.createdAt();
+            const supportTotal = await baseContract.supportTotal();
+            const electionTriggered = await baseContract.electionTriggered();
+            const executed = await baseContract.executed();
+            
+            // For history we want:
+            // 1. Executed proposals
+            // 2. Elections that have ended (not executed but past voting period)
+            let isHistorical = executed;
+            let result = executed ? 'EXECUTED' : '';
+            
+            // Check if it's an ended election
+            if (!executed && electionTriggered) {
+              try {
+                const electionStart = await baseContract.electionStart();
+                const currentBlock = await providerRef.current.getBlockNumber();
+                
+                // Get DAO contract to check election duration
+                const dao = await baseContract.dao();
+                const daoContract = new ethers.Contract(
+                  dao,
+                  ["function electionDuration() view returns (uint256)"],
+                  signerRef.current
+                );
+                const electionDuration = await daoContract.electionDuration();
+                const electionEnd = electionStart.add(electionDuration);
+                
+                // If current block is past election end, it's historical
+                if (currentBlock >= parseInt(electionEnd.toString())) {
+                  isHistorical = true;
+                  
+                  // Get election details for result determination
+                  const votingTokenId = await baseContract.votingTokenId();
+                  const yesVoteAddress = await baseContract.yesVoteAddress();
+                  const noVoteAddress = await baseContract.noVoteAddress();
+                  
+                  // Get vote counts
+                  const yesVotes = await daoContractRef.current.balanceOf(yesVoteAddress, votingTokenId);
+                  const noVotes = await daoContractRef.current.balanceOf(noVoteAddress, votingTokenId);
+                  
+                  // Determine outcome
+                  if (yesVotes.gt(noVotes)) {
+                    result = 'APPROVED';
+                  } else {
+                    result = 'REJECTED';
+                  }
+                }
+              } catch (error) {
+                console.warn(`Error checking if election is historical for ${proposalAddress}:`, error);
+                // If we can't determine, assume it's not historical
+                isHistorical = false;
+              }
+            }
+            
+            // Skip non-historical proposals
+            if (!isHistorical) continue;
+            
+            // Determine proposal type and get additional details
+            let proposalType = 'resolution';
+            let details = {};
+            let votes = { yes: '0', no: '0', total: '0' };
+            let votingTokenId = '0';
+            
+            // If it was an election, get the voting info
+            if (electionTriggered) {
+              try {
+                votingTokenId = await baseContract.votingTokenId();
+                const yesVoteAddress = await baseContract.yesVoteAddress();
+                const noVoteAddress = await baseContract.noVoteAddress();
+                
+                const yesVotes = await daoContractRef.current.balanceOf(yesVoteAddress, votingTokenId);
+                const noVotes = await daoContractRef.current.balanceOf(noVoteAddress, votingTokenId);
+                const totalVotes = await daoContractRef.current.totalSupply(votingTokenId);
+                
+                votes = {
+                  yes: yesVotes.toString(),
+                  no: noVotes.toString(),
+                  total: totalVotes.toString()
+                };
+              } catch (error) {
+                console.warn(`Error getting vote details for ${proposalAddress}:`, error);
+              }
+            }
+            
+            try {
+              // Try to determine if it's a treasury proposal
+              const treasuryContract = new ethers.Contract(
+                proposalAddress, 
+                treasuryProposalAbi, 
+                signerRef.current
+              );
+              
+              const recipient = await treasuryContract.recipient();
+              
+              if (recipient) {
+                proposalType = 'treasury';
+                const amount = await treasuryContract.amount();
+                const token = await treasuryContract.token();
+                const tokenId = await treasuryContract.tokenId();
+                
+                details = {
+                  recipient,
+                  amount: amount.toString(),
+                  token,
+                  tokenId: tokenId.toString()
+                };
+                
+                historyList.push({
+                  address: proposalAddress,
+                  description,
+                  proposer,
+                  createdAt: createdAt.toString(),
+                  supportTotal: supportTotal.toString(),
+                  type: proposalType,
+                  details,
+                  executed,
+                  electionTriggered,
+                  result,
+                  votes,
+                  votingTokenId
+                });
+                
+                continue;
+              }
+            } catch (error) {
+              // Not a treasury proposal, continue checking other types
+            }
+            
+            try {
+              // Try to determine if it's a mint proposal
+              const mintContract = new ethers.Contract(
+                proposalAddress, 
+                mintProposalAbi, 
+                signerRef.current
+              );
+              
+              const recipient = await mintContract.recipient();
+              
+              if (recipient) {
+                proposalType = 'mint';
+                const amount = await mintContract.amount();
+                
+                details = {
+                  recipient,
+                  amount: amount.toString()
+                };
+                
+                historyList.push({
+                  address: proposalAddress,
+                  description,
+                  proposer,
+                  createdAt: createdAt.toString(),
+                  supportTotal: supportTotal.toString(),
+                  type: proposalType,
+                  details,
+                  executed,
+                  electionTriggered,
+                  result,
+                  votes,
+                  votingTokenId
+                });
+                
+                continue;
+              }
+            } catch (error) {
+              // Not a mint proposal, continue checking other types
+            }
+            
+            try {
+              // Try to determine if it's a token price proposal
+              const priceContract = new ethers.Contract(
+                proposalAddress, 
+                tokenPriceProposalAbi, 
+                signerRef.current
+              );
+              
+              const newPrice = await priceContract.newPrice();
+              
+              // Check if newPrice call was successful
+              if (newPrice !== undefined) {
+                proposalType = 'price';
+                
+                details = {
+                  newPrice: newPrice.toString()
+                };
+                
+                historyList.push({
+                  address: proposalAddress,
+                  description,
+                  proposer,
+                  createdAt: createdAt.toString(),
+                  supportTotal: supportTotal.toString(),
+                  type: proposalType,
+                  details,
+                  executed,
+                  electionTriggered,
+                  result,
+                  votes,
+                  votingTokenId
+                });
+                
+                continue;
+              }
+            } catch (error) {
+              // Not a token price proposal, it must be a resolution proposal
+            }
+            
+            // If we reach here, it's a standard resolution proposal
+            historyList.push({
+              address: proposalAddress,
+              description,
+              proposer,
+              createdAt: createdAt.toString(),
+              supportTotal: supportTotal.toString(),
+              type: 'resolution',
+              details: {},
+              executed,
+              electionTriggered,
+              result,
+              votes,
+              votingTokenId
+            });
+          }
+          
+          setHistoryProposals(historyList);
+          
+        } catch (error) {
+          console.error('Error loading history proposals:', error);
         }
       };
       
@@ -1103,9 +1386,10 @@
             console.log("Early termination check failed or not applicable:", error.message);
           }
           
-          // Reload the proposals and elections
+          // Reload the proposals, elections, and history
           loadProposals();
           loadElectionProposals();
+          loadHistoryProposals();
           
         } catch (error) {
           console.error('Error voting:', error);
@@ -1208,9 +1492,10 @@
           setIsConnected(true);
           showNotification('Wallet connected successfully!', 'success');
           
-          // Load proposals and elections
+          // Load proposals, elections, and history
           loadProposals();
           loadElectionProposals();
+          loadHistoryProposals();
         } catch (error) {
           console.error('Error connecting wallet:', error);
           showNotification('Failed to connect wallet', 'error');
@@ -1801,7 +2086,87 @@
             return (
               <div className="card">
                 <h2>Proposal History</h2>
-                <p>No proposal history found.</p>
+                {historyProposals.length === 0 ? (
+                  <p>No proposal history found.</p>
+                ) : (
+                  historyProposals.map(proposal => (
+                    <div key={proposal.address} style={{ 
+                      border: '1px solid #ddd', 
+                      borderLeft: `4px solid ${
+                        proposal.type === 'treasury' ? '#4caf50' : 
+                        proposal.type === 'mint' ? '#ff9800' :
+                        proposal.type === 'price' ? '#2196f3' : '#9c27b0'
+                      }`,
+                      borderRadius: '4px', 
+                      padding: '15px', 
+                      marginBottom: '15px' 
+                    }}>
+                      <div style={{ 
+                        display: 'inline-block', 
+                        padding: '2px 6px', 
+                        background: 
+                          proposal.type === 'treasury' ? '#e8f5e9' : 
+                          proposal.type === 'mint' ? '#fff3e0' :
+                          proposal.type === 'price' ? '#e3f2fd' : '#f3e5f5',
+                        color: 
+                          proposal.type === 'treasury' ? '#2e7d32' : 
+                          proposal.type === 'mint' ? '#e65100' :
+                          proposal.type === 'price' ? '#0d47a1' : '#4a148c',
+                        borderRadius: '4px',
+                        marginBottom: '6px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        textTransform: 'uppercase'
+                      }}>
+                        {proposal.type} {proposal.result}
+                      </div>
+                      
+                      <h3>{proposal.description}</h3>
+                      
+                      <div style={{ fontSize: '14px', color: '#666', marginBottom: '10px' }}>
+                        Proposer: {proposal.proposer.substring(0, 6)}...{proposal.proposer.substring(38)}
+                      </div>
+                      
+                      {/* Proposal type specific details */}
+                      {proposal.type === 'treasury' && (
+                        <div style={{ background: '#f5f5f5', padding: '10px', borderRadius: '4px', marginBottom: '10px' }}>
+                          <div><strong>Recipient:</strong> {proposal.details.recipient.substring(0, 6)}...{proposal.details.recipient.substring(38)}</div>
+                          <div><strong>Amount:</strong> {proposal.details.token === ethers.constants.AddressZero 
+                            ? ethers.utils.formatEther(proposal.details.amount) + ' ETH'
+                            : proposal.details.amount + ' tokens'
+                          }</div>
+                          {proposal.details.token !== ethers.constants.AddressZero && (
+                            <div><strong>Token:</strong> {proposal.details.token.substring(0, 6)}...{proposal.details.token.substring(38)}</div>
+                          )}
+                          {proposal.details.tokenId !== '0' && (
+                            <div><strong>Token ID:</strong> {proposal.details.tokenId}</div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {proposal.type === 'mint' && (
+                        <div style={{ background: '#f5f5f5', padding: '10px', borderRadius: '4px', marginBottom: '10px' }}>
+                          <div><strong>Recipient:</strong> {proposal.details.recipient.substring(0, 6)}...{proposal.details.recipient.substring(38)}</div>
+                          <div><strong>Amount:</strong> {proposal.details.amount} tokens</div>
+                        </div>
+                      )}
+                      
+                      {proposal.type === 'price' && (
+                        <div style={{ background: '#f5f5f5', padding: '10px', borderRadius: '4px', marginBottom: '10px' }}>
+                          <div><strong>New Price:</strong> {ethers.utils.formatEther(proposal.details.newPrice)} ETH</div>
+                        </div>
+                      )}
+                      
+                      <div style={{ 
+                        fontWeight: 'bold', 
+                        marginTop: '10px', 
+                        color: proposal.result === 'APPROVED' ? '#4caf50' : '#f44336' 
+                      }}>
+                        {proposal.result}: {proposal.votes.yes} Yes / {proposal.votes.no} No
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             );
             
