@@ -520,7 +520,10 @@
         "function electionStart() view returns (uint256)",
         "function votingTokenId() view returns (uint256)",
         "function yesVoteAddress() view returns (address)",
-        "function noVoteAddress() view returns (address)"
+        "function noVoteAddress() view returns (address)",
+        "function isElectionActive() view returns (bool)",
+        "function checkEarlyTermination()",
+        "function dao() view returns (address)"
       ];
       
       const treasuryProposalAbi = baseProposalAbi.concat([
@@ -573,6 +576,50 @@
             // Skip executed proposals and non-election proposals
             if (executed || !electionTriggered) continue;
             
+            // Manually calculate if the election is active to be safe
+            let isActive = false;
+            let electionStatus = "Unknown";
+            
+            try {
+              const electionStart = await baseContract.electionStart();
+              const currentBlock = await providerRef.current.getBlockNumber();
+              
+              // Get DAO contract to check election duration
+              const dao = await baseContract.dao();
+              const daoContract = new ethers.Contract(
+                dao,
+                ["function electionDuration() view returns (uint256)"],
+                signerRef.current
+              );
+              const electionDuration = await daoContract.electionDuration();
+              const electionEnd = electionStart.add(electionDuration);
+              
+              console.log(`Election ${proposalAddress} details:`, {
+                electionStart: electionStart.toString(),
+                currentBlock: currentBlock,
+                electionDuration: electionDuration.toString(),
+                electionEnd: electionEnd.toString(),
+                hasStarted: currentBlock >= parseInt(electionStart.toString()),
+                hasEnded: currentBlock >= parseInt(electionEnd.toString())
+              });
+              
+              if (currentBlock < parseInt(electionStart.toString())) {
+                electionStatus = "Not Started";
+              } else if (currentBlock >= parseInt(electionEnd.toString())) {
+                electionStatus = "Ended";
+              } else {
+                isActive = true;
+                electionStatus = "Active";
+              }
+              
+              // Don't skip inactive elections - show them all but mark their status
+            } catch (error) {
+              console.warn(`Error checking election status for ${proposalAddress}:`, error);
+              electionStatus = "Error";
+              isActive = false; // Set to false explicitly when there's an error
+              // If we can't determine the status, include it anyway
+            }
+            
             // Get election details
             const votingTokenId = await baseContract.votingTokenId();
             const yesVoteAddress = await baseContract.yesVoteAddress();
@@ -623,7 +670,9 @@
                     no: noVotes.toString(),
                     total: totalVotes.toString()
                   },
-                  votingTokenId: votingTokenId.toString()
+                  votingTokenId: votingTokenId.toString(),
+                  electionStatus,
+                  isActive
                 });
                 
                 continue;
@@ -664,7 +713,9 @@
                     no: noVotes.toString(),
                     total: totalVotes.toString()
                   },
-                  votingTokenId: votingTokenId.toString()
+                  votingTokenId: votingTokenId.toString(),
+                  electionStatus,
+                  isActive
                 });
                 
                 continue;
@@ -704,7 +755,9 @@
                     no: noVotes.toString(),
                     total: totalVotes.toString()
                   },
-                  votingTokenId: votingTokenId.toString()
+                  votingTokenId: votingTokenId.toString(),
+                  electionStatus,
+                  isActive
                 });
                 
                 continue;
@@ -727,7 +780,9 @@
                 no: noVotes.toString(),
                 total: totalVotes.toString()
               },
-              votingTokenId: votingTokenId.toString()
+              votingTokenId: votingTokenId.toString(),
+              electionStatus,
+              isActive
             });
           }
           
@@ -923,6 +978,66 @@
             baseProposalAbi,
             signerRef.current
           );
+          
+          // Detailed check of election state to help debugging
+          try {
+            // Get detailed election data first
+            const electionTriggered = await proposalContract.electionTriggered();
+            const executed = await proposalContract.executed();
+            const electionStart = await proposalContract.electionStart();
+            const currentBlock = await providerRef.current.getBlockNumber();
+            
+            // Get DAO contract to check election duration
+            const dao = await proposalContract.dao();
+            const daoContract = new ethers.Contract(
+              dao,
+              ["function electionDuration() view returns (uint256)"],
+              signerRef.current
+            );
+            const electionDuration = await daoContract.electionDuration();
+            const electionEnd = electionStart.add(electionDuration);
+            
+            console.log("Election details:", {
+              proposalAddress,
+              electionTriggered: electionTriggered,
+              executed: executed,
+              electionStart: electionStart.toString(),
+              currentBlock: currentBlock,
+              electionDuration: electionDuration.toString(),
+              electionEnd: electionEnd.toString()
+            });
+            
+            if (!electionTriggered) {
+              showNotification('This proposal has not triggered an election yet', 'error');
+              return;
+            }
+            
+            if (executed) {
+              showNotification('This proposal has already been executed', 'error');
+              return;
+            }
+            
+            if (currentBlock < parseInt(electionStart.toString())) {
+              showNotification('Voting has not started yet', 'error');
+              return;
+            }
+            
+            if (currentBlock >= parseInt(electionEnd.toString())) {
+              showNotification('This election has ended and is no longer accepting votes', 'error');
+              return;
+            }
+            
+            // The fallback - use the contract's isElectionActive function
+            const isActive = await proposalContract.isElectionActive();
+            if (!isActive) {
+              showNotification('This election is not active (according to contract)', 'error');
+              return;
+            }
+          } catch (error) {
+            console.error('Error checking election status:', error);
+            showNotification('Could not verify election status: ' + error.message, 'error');
+            return;
+          }
           
           // Get the voting addresses
           const yesVoteAddress = await proposalContract.yesVoteAddress();
@@ -1629,17 +1744,51 @@
                         </div>
                         <div style={{ display: 'flex', gap: '10px' }}>
                           <button 
-                            style={{ flex: 1, backgroundColor: '#4CAF50' }}
+                            style={{ 
+                              flex: 1, 
+                              backgroundColor: proposal.isActive ? '#4CAF50' : '#cccccc',
+                              cursor: proposal.isActive ? 'pointer' : 'not-allowed'
+                            }}
                             onClick={() => voteOnProposal(proposal.address, true)}
+                            title={proposal.isActive ? "Vote in favor of this proposal" : "Voting not available"}
+                            disabled={!proposal.isActive}
                           >
                             Vote Yes
                           </button>
                           <button 
-                            style={{ flex: 1, backgroundColor: '#F44336' }}
+                            style={{ 
+                              flex: 1, 
+                              backgroundColor: proposal.isActive ? '#F44336' : '#cccccc',
+                              cursor: proposal.isActive ? 'pointer' : 'not-allowed'
+                            }}
                             onClick={() => voteOnProposal(proposal.address, false)}
+                            title={proposal.isActive ? "Vote against this proposal" : "Voting not available"}
+                            disabled={!proposal.isActive}
                           >
                             Vote No
                           </button>
+                        </div>
+                        
+                        {/* Election status message */}
+                        <div style={{ 
+                          fontSize: '12px', 
+                          marginTop: '10px', 
+                          textAlign: 'center',
+                          fontStyle: 'italic',
+                          color: proposal.isActive ? '#4CAF50' : 
+                                 (proposal.electionStatus === "Not Started" ? '#2196F3' : '#F44336'),
+                          fontWeight: 'bold',
+                          padding: '5px',
+                          border: '1px solid',
+                          borderRadius: '4px',
+                          borderColor: proposal.isActive ? '#4CAF50' : 
+                                       (proposal.electionStatus === "Not Started" ? '#2196F3' : '#F44336')
+                        }}>
+                          {proposal.isActive ? 
+                            'Election ACTIVE - Cast your votes before the voting period ends.' :
+                            (proposal.electionStatus === "Not Started" ? 
+                              'Election has not started yet. Voting will be enabled soon.' :
+                              'Election has ENDED. No more votes can be cast.')}
                         </div>
                       </div>
                     </div>
