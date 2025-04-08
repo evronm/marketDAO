@@ -136,7 +136,8 @@
         name: 'Loading...',
         tokenBalance: '0',
         tokenSupply: '0',
-        tokenPrice: '0'
+        tokenPrice: '0',
+        quorumPercentage: '0'
       });
       const [electionProposals, setElectionProposals] = React.useState([]);
       const [historyProposals, setHistoryProposals] = React.useState([]);
@@ -885,8 +886,15 @@
                   const yesVotes = await daoContractRef.current.balanceOf(yesVoteAddress, votingTokenId);
                   const noVotes = await daoContractRef.current.balanceOf(noVoteAddress, votingTokenId);
                   
-                  // Determine outcome
-                  if (yesVotes.gt(noVotes)) {
+                  // Get quorum requirement
+                  const totalVotes = await daoContractRef.current.totalSupply(votingTokenId);
+                  const quorumPercentage = await daoContractRef.current.quorumPercentage();
+                  const quorum = totalVotes.mul(quorumPercentage).div(100);
+                  
+                  // Check if quorum was met first
+                  if (yesVotes.add(noVotes).lt(quorum)) {
+                    result = 'REJECTED (Quorum not met)';
+                  } else if (yesVotes.gt(noVotes)) {
                     result = 'APPROVED';
                   } else {
                     result = 'REJECTED';
@@ -1404,7 +1412,8 @@
         "function balanceOf(address account, uint256 id) view returns (uint256)",
         "function totalSupply(uint256 tokenId) view returns (uint256)",
         "function purchaseTokens() payable",
-        "function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes data)"
+        "function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes data)",
+        "function quorumPercentage() view returns (uint256)"
       ];
       
       // Helper functions to update form data
@@ -1471,12 +1480,14 @@
             const tokenPrice = await daoContract.tokenPrice();
             const tokenBalance = await daoContract.balanceOf(currentAccount, 0);
             const tokenSupply = await daoContract.totalSupply(0);
+            const quorumPercentage = await daoContract.quorumPercentage();
             
             setDaoInfo({
               name: daoName,
               tokenBalance: tokenBalance.toString(),
               tokenSupply: tokenSupply.toString(),
-              tokenPrice: ethers.utils.formatEther(tokenPrice)
+              tokenPrice: ethers.utils.formatEther(tokenPrice),
+              quorumPercentage: quorumPercentage.toString()
             });
           } catch (error) {
             console.error("Error loading contract data:", error);
@@ -1485,7 +1496,8 @@
               name: 'Market DAO',
               tokenBalance: '100',
               tokenSupply: '1000',
-              tokenPrice: '0.1'
+              tokenPrice: '0.1',
+              quorumPercentage: '25'
             });
           }
           
@@ -1536,6 +1548,10 @@
                     <div className="stat-card">
                       <div className="stat-value">{daoInfo.tokenPrice} ETH</div>
                       <div className="stat-label">Token Price</div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-value">{daoInfo.quorumPercentage}%</div>
+                      <div className="stat-label">Quorum Requirement</div>
                     </div>
                   </div>
                   
@@ -1976,6 +1992,11 @@
                               : 0
                           }%)</div>
                         </div>
+                        <div style={{ fontSize: '12px', marginBottom: '5px', textAlign: 'center' }}>
+                          <strong>Total Votes:</strong> {parseInt(proposal.votes.yes) + parseInt(proposal.votes.no)} of {proposal.votes.total} 
+                          ({Math.round(((parseInt(proposal.votes.yes) + parseInt(proposal.votes.no)) / parseInt(proposal.votes.total)) * 100)}% turnout)
+                          <div><strong>Quorum Requirement:</strong> {daoInfo.quorumPercentage}% participation needed for valid result</div>
+                        </div>
                         <div style={{ 
                           width: '100%', 
                           height: '20px', 
@@ -2160,9 +2181,15 @@
                       <div style={{ 
                         fontWeight: 'bold', 
                         marginTop: '10px', 
-                        color: proposal.result === 'APPROVED' ? '#4caf50' : '#f44336' 
+                        color: proposal.result === 'APPROVED' ? '#4caf50' : 
+                              proposal.result.includes('Quorum') ? '#ff9800' : '#f44336'
                       }}>
                         {proposal.result}: {proposal.votes.yes} Yes / {proposal.votes.no} No
+                      </div>
+                      <div style={{ fontSize: '12px', marginTop: '5px' }}>
+                        <div><strong>Total Votes:</strong> {parseInt(proposal.votes.yes) + parseInt(proposal.votes.no)} of {proposal.votes.total}</div>
+                        <div><strong>Turnout:</strong> {Math.round(((parseInt(proposal.votes.yes) + parseInt(proposal.votes.no)) / parseInt(proposal.votes.total)) * 100)}% 
+                        (Quorum: {daoInfo.quorumPercentage}% required)</div>
                       </div>
                     </div>
                   ))
