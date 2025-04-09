@@ -660,6 +660,9 @@
             const noVotes = await daoContractRef.current.balanceOf(noVoteAddress, votingTokenId);
             const totalVotes = await daoContractRef.current.totalSupply(votingTokenId);
             
+            // Get user's available voting tokens
+            const userVotingBalance = await daoContractRef.current.balanceOf(walletAddress, votingTokenId);
+            
             // Determine proposal type and get additional details
             let proposalType = 'resolution';
             let details = {};
@@ -698,7 +701,8 @@
                   votes: {
                     yes: yesVotes.toString(),
                     no: noVotes.toString(),
-                    total: totalVotes.toString()
+                    total: totalVotes.toString(),
+                    available: userVotingBalance.toString()
                   },
                   votingTokenId: votingTokenId.toString(),
                   electionStatus,
@@ -741,7 +745,8 @@
                   votes: {
                     yes: yesVotes.toString(),
                     no: noVotes.toString(),
-                    total: totalVotes.toString()
+                    total: totalVotes.toString(),
+                    available: userVotingBalance.toString()
                   },
                   votingTokenId: votingTokenId.toString(),
                   electionStatus,
@@ -783,7 +788,8 @@
                   votes: {
                     yes: yesVotes.toString(),
                     no: noVotes.toString(),
-                    total: totalVotes.toString()
+                    total: totalVotes.toString(),
+                    available: userVotingBalance.toString()
                   },
                   votingTokenId: votingTokenId.toString(),
                   electionStatus,
@@ -808,7 +814,8 @@
               votes: {
                 yes: yesVotes.toString(),
                 no: noVotes.toString(),
-                total: totalVotes.toString()
+                total: totalVotes.toString(),
+                available: userVotingBalance.toString()
               },
               votingTokenId: votingTokenId.toString(),
               electionStatus,
@@ -2051,12 +2058,17 @@
                       
                       <div style={{ marginTop: '15px' }}>
                         <div style={{ marginBottom: '10px' }}>
-                          <label htmlFor={`vote-amount-${proposal.address}`} style={{ display: 'block', marginBottom: '5px' }}>Vote Amount:</label>
+                          <label htmlFor={`vote-amount-${proposal.address}`} style={{ display: 'block', marginBottom: '5px' }}>
+                            Vote Amount: <span style={{ fontWeight: 'normal', color: '#666' }}>
+                              (You have {proposal.votes.available} tokens available)
+                            </span>
+                          </label>
                           <input 
                             type="number" 
                             id={`vote-amount-${proposal.address}`}
                             placeholder="Number of voting tokens" 
                             style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
+                            max={proposal.votes.available}
                           />
                         </div>
                         <div style={{ display: 'flex', gap: '10px' }}>
