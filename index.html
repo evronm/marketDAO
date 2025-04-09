@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Market DAO</title>
   <!-- React and ReactDOM from CDN -->
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
@@ -18,6 +18,7 @@
       max-width: 1000px;
       margin: 0 auto;
       padding: 20px;
+      font-size: 16px;
     }
     @keyframes spin {
       0% { transform: rotate(0deg); }
@@ -70,6 +71,7 @@
     }
     .navbar {
       display: flex;
+      flex-wrap: wrap;
       margin-bottom: 20px;
       border-bottom: 1px solid #ddd;
       padding-bottom: 10px;
@@ -78,6 +80,7 @@
       padding: 8px 16px;
       cursor: pointer;
       margin-right: 8px;
+      margin-bottom: 8px;
     }
     .nav-item.active {
       font-weight: bold;
@@ -94,6 +97,40 @@
       display: block;
       margin-bottom: 8px;
       font-weight: bold;
+    }
+    
+    /* Mobile responsiveness */
+    @media (max-width: 767px) {
+      body {
+        padding: 10px;
+      }
+      
+      .card {
+        padding: 15px;
+      }
+      
+      .stat-card {
+        width: 130px;
+        padding: 12px;
+      }
+      
+      .navbar {
+        justify-content: center;
+      }
+      
+      .nav-item {
+        padding: 8px 12px;
+        margin-right: 4px;
+      }
+      
+      h1 {
+        font-size: 24px;
+        text-align: center;
+      }
+      
+      h2 {
+        font-size: 20px;
+      }
     }
   </style>
 </head>
@@ -1601,8 +1638,18 @@
                     </div>
                   ) : (
                     <>
-                      <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                        <div style={{ flex: 1 }}>
+                      <div style={{ 
+                        display: 'flex', 
+                        gap: '16px', 
+                        alignItems: 'center',
+                        flexDirection: window.innerWidth <= 767 ? 'column' : 'row',
+                        maxWidth: '400px',
+                        margin: '0 auto'
+                      }}>
+                        <div style={{ 
+                          width: window.innerWidth <= 767 ? '100%' : '150px',
+                          flexGrow: window.innerWidth <= 767 ? 1 : 0
+                        }}>
                           <label htmlFor="purchase-amount">Amount</label>
                           <input 
                             type="number" 
@@ -1610,11 +1657,20 @@
                             min="1" 
                             value={purchaseAmount}
                             onChange={(e) => setPurchaseAmount(e.target.value)}
-                            placeholder="Number of tokens"
+                            placeholder="Tokens to buy"
+                            style={{ width: '100%' }}
                           />
                         </div>
-                        <div style={{ marginTop: '16px' }}>
-                          <button onClick={purchaseTokens}>Purchase</button>
+                        <div style={{ 
+                          marginTop: window.innerWidth <= 767 ? '0' : '16px', 
+                          width: window.innerWidth <= 767 ? '100%' : 'auto' 
+                        }}>
+                          <button 
+                            onClick={purchaseTokens}
+                            style={{ width: window.innerWidth <= 767 ? '100%' : 'auto' }}
+                          >
+                            Purchase
+                          </button>
                         </div>
                       </div>
                       <div style={{ marginTop: '10px' }}>
@@ -1628,8 +1684,8 @@
                   <h2>Create Proposal</h2>
                   
                   <div style={{ marginBottom: '20px' }}>
-                    <label>Proposal Type</label>
-                    <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                    <label style={{ textAlign: 'center', display: 'block' }}>Proposal Type</label>
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
                       <div 
                         style={{ 
                           padding: '10px',
@@ -1637,7 +1693,10 @@
                           borderRadius: '4px',
                           cursor: 'pointer',
                           backgroundColor: proposalType === 'resolution' ? '#f0f7ff' : 'white',
-                          borderColor: proposalType === 'resolution' ? '#0066cc' : '#ddd'
+                          borderColor: proposalType === 'resolution' ? '#0066cc' : '#ddd',
+                          minWidth: window.innerWidth <= 767 ? '40%' : 'auto',
+                          textAlign: 'center',
+                          margin: '4px'
                         }}
                         onClick={() => setProposalType('resolution')}
                       >
@@ -1650,7 +1709,10 @@
                           borderRadius: '4px',
                           cursor: 'pointer',
                           backgroundColor: proposalType === 'treasury' ? '#f0f7ff' : 'white',
-                          borderColor: proposalType === 'treasury' ? '#0066cc' : '#ddd'
+                          borderColor: proposalType === 'treasury' ? '#0066cc' : '#ddd',
+                          minWidth: window.innerWidth <= 767 ? '40%' : 'auto',
+                          textAlign: 'center',
+                          margin: '4px'
                         }}
                         onClick={() => setProposalType('treasury')}
                       >
@@ -1663,7 +1725,10 @@
                           borderRadius: '4px',
                           cursor: 'pointer',
                           backgroundColor: proposalType === 'mint' ? '#f0f7ff' : 'white',
-                          borderColor: proposalType === 'mint' ? '#0066cc' : '#ddd'
+                          borderColor: proposalType === 'mint' ? '#0066cc' : '#ddd',
+                          minWidth: window.innerWidth <= 767 ? '40%' : 'auto',
+                          textAlign: 'center',
+                          margin: '4px'
                         }}
                         onClick={() => setProposalType('mint')}
                       >
@@ -1676,7 +1741,10 @@
                           borderRadius: '4px',
                           cursor: 'pointer',
                           backgroundColor: proposalType === 'price' ? '#f0f7ff' : 'white',
-                          borderColor: proposalType === 'price' ? '#0066cc' : '#ddd'
+                          borderColor: proposalType === 'price' ? '#0066cc' : '#ddd',
+                          minWidth: window.innerWidth <= 767 ? '40%' : 'auto',
+                          textAlign: 'center',
+                          margin: '4px'
                         }}
                         onClick={() => setProposalType('price')}
                       >
@@ -1919,14 +1987,27 @@
                       </div>
                       
                       <div style={{ marginTop: '15px' }}>
-                        <div style={{ display: 'flex', gap: '10px' }}>
+                        <div style={{ 
+                          display: 'flex', 
+                          gap: '10px', 
+                          justifyContent: 'center',
+                          flexDirection: window.innerWidth <= 767 ? 'column' : 'row', 
+                          maxWidth: '400px',
+                          margin: '0 auto'
+                        }}>
                           <input 
                             type="number" 
-                            placeholder="Support amount" 
-                            style={{ flex: 1 }}
+                            placeholder="Support tokens" 
+                            style={{ 
+                              width: window.innerWidth <= 767 ? '100%' : '150px',
+                              marginBottom: window.innerWidth <= 767 ? '8px' : '16px'
+                            }}
                             id={`support-amount-${proposal.address}`}
                           />
-                          <button onClick={() => addSupport(proposal.address)}>
+                          <button 
+                            onClick={() => addSupport(proposal.address)}
+                            style={{ width: window.innerWidth <= 767 ? '100%' : 'auto' }}
+                          >
                             Add Support
                           </button>
                         </div>
@@ -2079,25 +2160,43 @@
                       
                       <div style={{ marginTop: '15px' }}>
                         <div style={{ marginBottom: '10px' }}>
-                          <label htmlFor={`vote-amount-${proposal.address}`} style={{ display: 'block', marginBottom: '5px' }}>
+                          <label htmlFor={`vote-amount-${proposal.address}`} style={{ display: 'block', marginBottom: '5px', textAlign: 'center' }}>
                             Vote Amount: <span style={{ fontWeight: 'normal', color: '#666' }}>
                               (You have {proposal.votes.available} tokens available)
                             </span>
                           </label>
-                          <input 
-                            type="number" 
-                            id={`vote-amount-${proposal.address}`}
-                            placeholder="Number of voting tokens" 
-                            style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-                            max={proposal.votes.available}
-                          />
+                          <div style={{ 
+                            display: 'flex', 
+                            justifyContent: 'center',
+                            maxWidth: '400px',
+                            margin: '0 auto'
+                          }}>
+                            <input 
+                              type="number" 
+                              id={`vote-amount-${proposal.address}`}
+                              placeholder="Tokens to vote" 
+                              style={{ 
+                                width: window.innerWidth <= 767 ? '100%' : '200px', 
+                                padding: '8px', 
+                                boxSizing: 'border-box'
+                              }}
+                              max={proposal.votes.available}
+                            />
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '10px' }}>
+                        <div style={{ 
+                          display: 'flex', 
+                          gap: '10px', 
+                          maxWidth: '400px',
+                          margin: '0 auto',
+                          flexDirection: window.innerWidth <= 767 ? 'column' : 'row'
+                        }}>
                           <button 
                             style={{ 
                               flex: 1, 
                               backgroundColor: proposal.isActive ? '#4CAF50' : '#cccccc',
-                              cursor: proposal.isActive ? 'pointer' : 'not-allowed'
+                              cursor: proposal.isActive ? 'pointer' : 'not-allowed',
+                              width: '100%'
                             }}
                             onClick={() => voteOnProposal(proposal.address, true)}
                             title={proposal.isActive ? "Vote in favor of this proposal" : "Voting not available"}
@@ -2109,7 +2208,8 @@
                             style={{ 
                               flex: 1, 
                               backgroundColor: proposal.isActive ? '#F44336' : '#cccccc',
-                              cursor: proposal.isActive ? 'pointer' : 'not-allowed'
+                              cursor: proposal.isActive ? 'pointer' : 'not-allowed',
+                              width: '100%'
                             }}
                             onClick={() => voteOnProposal(proposal.address, false)}
                             title={proposal.isActive ? "Vote against this proposal" : "Voting not available"}
