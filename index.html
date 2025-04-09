@@ -137,7 +137,8 @@
         tokenBalance: '0',
         tokenSupply: '0',
         tokenPrice: '0',
-        quorumPercentage: '0'
+        quorumPercentage: '0',
+        supportThreshold: '0'
       });
       const [electionProposals, setElectionProposals] = React.useState([]);
       const [historyProposals, setHistoryProposals] = React.useState([]);
@@ -209,12 +210,14 @@
           
           showNotification(`Successfully purchased ${amount} tokens!`, 'success');
           
-          // Update user's token balance
+          // Update user's token balance and total supply
           const newBalance = await daoContractRef.current.balanceOf(walletAddress, 0);
+          const newSupply = await daoContractRef.current.totalSupply(0);
           
           // Create copy of current state without using spread operator
           const updatedDaoInfo = Object.assign({}, daoInfo);
           updatedDaoInfo.tokenBalance = newBalance.toString();
+          updatedDaoInfo.tokenSupply = newSupply.toString();
           setDaoInfo(updatedDaoInfo);
           
         } catch (error) {
@@ -1413,7 +1416,8 @@
         "function totalSupply(uint256 tokenId) view returns (uint256)",
         "function purchaseTokens() payable",
         "function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes data)",
-        "function quorumPercentage() view returns (uint256)"
+        "function quorumPercentage() view returns (uint256)",
+        "function supportThreshold() view returns (uint256)"
       ];
       
       // Helper functions to update form data
@@ -1481,13 +1485,15 @@
             const tokenBalance = await daoContract.balanceOf(currentAccount, 0);
             const tokenSupply = await daoContract.totalSupply(0);
             const quorumPercentage = await daoContract.quorumPercentage();
+            const supportThreshold = await daoContract.supportThreshold();
             
             setDaoInfo({
               name: daoName,
               tokenBalance: tokenBalance.toString(),
               tokenSupply: tokenSupply.toString(),
               tokenPrice: ethers.utils.formatEther(tokenPrice),
-              quorumPercentage: quorumPercentage.toString()
+              quorumPercentage: quorumPercentage.toString(),
+              supportThreshold: supportThreshold.toString()
             });
           } catch (error) {
             console.error("Error loading contract data:", error);
@@ -1497,7 +1503,8 @@
               tokenBalance: '100',
               tokenSupply: '1000',
               tokenPrice: '0.1',
-              quorumPercentage: '25'
+              quorumPercentage: '25',
+              supportThreshold: '15'
             });
           }
           
@@ -1552,6 +1559,10 @@
                     <div className="stat-card">
                       <div className="stat-value">{daoInfo.quorumPercentage}%</div>
                       <div className="stat-label">Quorum Requirement</div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-value">{daoInfo.supportThreshold}%</div>
+                      <div className="stat-label">Support Threshold</div>
                     </div>
                   </div>
                   
