@@ -19,6 +19,10 @@
       margin: 0 auto;
       padding: 20px;
     }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
     .card {
       border: 1px solid #ddd;
       border-radius: 8px;
@@ -147,6 +151,7 @@
         message: '',
         type: ''
       });
+      const [isLoading, setIsLoading] = React.useState(false);
       
       // Store references to ethers.js objects
       const providerRef = React.useRef(null);
@@ -198,6 +203,7 @@
           // Calculate total cost
           const totalCost = tokenPrice.mul(amount);
           
+          setIsLoading(true);
           showNotification('Submitting transaction...', 'info');
           
           // Execute purchase
@@ -208,6 +214,7 @@
           // Wait for transaction confirmation
           const receipt = await tx.wait();
           
+          setIsLoading(false);
           showNotification(`Successfully purchased ${amount} tokens!`, 'success');
           
           // Update user's token balance and total supply
@@ -240,6 +247,7 @@
             return;
           }
           
+          setIsLoading(true);
           showNotification('Creating resolution proposal...', 'info');
           
           // Call the factory contract to create the proposal
@@ -250,6 +258,7 @@
           // Wait for transaction confirmation
           const receipt = await tx.wait();
           
+          setIsLoading(false);
           showNotification('Resolution proposal created successfully!', 'success');
           
           // Clear the description field
@@ -314,6 +323,7 @@
           // Convert amount to appropriate format
           const amount = ethers.utils.parseEther(treasuryData.amount);
           
+          setIsLoading(true);
           showNotification('Creating treasury proposal...', 'info');
           
           // Call the factory contract to create the proposal
@@ -330,6 +340,7 @@
           // Wait for transaction confirmation
           const receipt = await tx.wait();
           
+          setIsLoading(false);
           showNotification('Treasury proposal created successfully!', 'success');
           
           // Clear the form
@@ -377,6 +388,7 @@
             return;
           }
           
+          setIsLoading(true);
           showNotification('Creating mint proposal...', 'info');
           
           // Call the factory contract to create the proposal
@@ -391,6 +403,7 @@
           // Wait for transaction confirmation
           const receipt = await tx.wait();
           
+          setIsLoading(false);
           showNotification('Mint proposal created successfully!', 'success');
           
           // Clear the form
@@ -433,6 +446,7 @@
           // Convert new price to wei
           const newPrice = ethers.utils.parseEther(priceData.newPrice);
           
+          setIsLoading(true);
           showNotification('Creating token price proposal...', 'info');
           
           // Call the factory contract to create the proposal
@@ -446,6 +460,7 @@
           // Wait for transaction confirmation
           const receipt = await tx.wait();
           
+          setIsLoading(false);
           showNotification('Token price proposal created successfully!', 'success');
           
           // Clear the form
@@ -494,6 +509,7 @@
             signerRef.current
           );
           
+          setIsLoading(true);
           showNotification('Adding support...', 'info');
           
           // Call the addSupport function
@@ -504,6 +520,7 @@
           // Wait for transaction confirmation
           await tx.wait();
           
+          setIsLoading(false);
           showNotification('Support added successfully!', 'success');
           
           // Clear the input field
@@ -1374,6 +1391,7 @@
             return;
           }
           
+          setIsLoading(true);
           showNotification(`Sending ${isYesVote ? 'YES' : 'NO'} vote...`, 'info');
           
           // Send voting tokens to the appropriate address
@@ -1390,6 +1408,7 @@
           // Wait for transaction confirmation
           await tx.wait();
           
+          setIsLoading(false);
           showNotification(`Vote ${isYesVote ? 'YES' : 'NO'} cast successfully!`, 'success');
           
           // Clear the input field
@@ -2260,6 +2279,48 @@
           
           {renderContent()}
           
+          {/* Loading overlay */}
+          {isLoading && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 1000
+            }}>
+              <div style={{
+                backgroundColor: 'white',
+                padding: '20px',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center'
+              }}>
+                <div style={{
+                  width: '50px',
+                  height: '50px',
+                  border: '5px solid #f3f3f3',
+                  borderTop: '5px solid #3498db',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                  marginBottom: '10px'
+                }}></div>
+                <div style={{ marginTop: '10px', fontWeight: 'bold' }}>
+                  Processing Blockchain Transaction...
+                </div>
+                <div style={{ marginTop: '5px', fontSize: '14px', color: '#666' }}>
+                  Please wait for confirmation
+                </div>
+              </div>
+            </div>
+          )}
+          
           {notification.show && (
             <div 
               style={{
@@ -2271,7 +2332,8 @@
                                  notification.type === 'success' ? '#4caf50' : '#2196f3',
                 color: 'white',
                 borderRadius: '4px',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+                zIndex: 1001
               }}
             >
               {notification.message}
