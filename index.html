@@ -47,8 +47,9 @@
       cursor: not-allowed;
     }
     .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
       gap: 16px;
       margin-bottom: 20px;
     }
@@ -57,6 +58,7 @@
       padding: 16px;
       border-radius: 4px;
       text-align: center;
+      width: 150px;
     }
     .stat-value {
       font-size: 24px;
@@ -1564,7 +1566,7 @@
             return (
               <>
                 <div className="card">
-                  <h2>DAO Information</h2>
+                  <h2 style={{ textAlign: 'center' }}>DAO Information</h2>
                   <div className="stats-grid">
                     <div className="stat-card">
                       <div className="stat-value">{daoInfo.name}</div>
@@ -1611,7 +1613,7 @@
                             placeholder="Number of tokens"
                           />
                         </div>
-                        <div>
+                        <div style={{ marginTop: '16px' }}>
                           <button onClick={purchaseTokens}>Purchase</button>
                         </div>
                       </div>
