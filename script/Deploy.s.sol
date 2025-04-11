@@ -12,7 +12,7 @@ contract DeployConfig {
     uint256 constant MAX_PROPOSAL_AGE = 100;       // blocks until proposal expires
     uint256 constant ELECTION_DURATION = 50;       // blocks for voting period
     bool constant ALLOW_MINTING = true;            // can mint new governance tokens
-    uint256 constant TOKEN_PRICE = 0;       // blocks for voting period
+    uint256 constant TOKEN_PRICE = 1e14;       // blocks for voting period
 }
 
 contract DeployScript is Script, DeployConfig {
@@ -24,11 +24,11 @@ contract DeployScript is Script, DeployConfig {
     }
 
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        vm.startBroadcast(deployerPrivateKey);
+        // Use foundry's account system instead of env variable
+        vm.startBroadcast();
 
         address[] memory initialHolders = new address[](1);
-        initialHolders[0] = vm.addr(deployerPrivateKey);
+        initialHolders[0] = msg.sender;
         
         uint256[] memory initialAmounts = new uint256[](1);
         initialAmounts[0] = 100;
