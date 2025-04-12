@@ -21,5 +21,5 @@
 - **Security**: No hardcoded secrets, validate all inputs, follow CEI pattern
 - **Tests**: Name tests with "test" prefix, group related tests in the same contract
 
+- The entire front end is in index.html in the base directory
 - For CDN, use jsdeliver
-- Do not use tailwind, but feel free to use semantic frameworks like Bulma or Foundation
