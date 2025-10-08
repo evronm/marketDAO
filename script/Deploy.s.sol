@@ -41,6 +41,7 @@ contract DeployScript is Script, DeployConfig {
             ELECTION_DURATION,
             ALLOW_MINTING,
             TOKEN_PRICE,
+            0, // No vesting period
             getTreasuryConfig(),
             initialHolders,
             initialAmounts

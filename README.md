@@ -13,6 +13,7 @@ Unlike traditional DAOs where voting power is static, MarketDAO introduces trada
 
 - **ERC1155-based governance tokens** for proposal creation and voting rights
 - **Saleable voting rights** through transferable voting tokens
+- **Token vesting mechanism** to prevent governance attacks from new token purchases
 - **Proposal lifecycle** with support thresholds and voting periods
 - **Multiple proposal types**:
   - Resolution proposals (text-only governance decisions)
@@ -29,6 +30,18 @@ Unlike traditional DAOs where voting power is static, MarketDAO introduces trada
 - Each election creates unique voting tokens distributed to governance token holders
 - Voting is done by transferring voting tokens to YES/NO addresses
 - Treasury functions support multiple asset types (ETH, ERC20, ERC721, ERC1155)
+
+### Token Vesting System
+
+To prevent governance attacks where an actor purchases enough tokens to immediately control the DAO, purchased tokens are subject to a vesting period:
+
+- **Vested tokens**: Available for governance (creating/supporting proposals, receiving voting tokens)
+- **Unvested tokens**: Locked for governance but transferable
+- **Vesting schedule**: Each token purchase creates a separate vesting entry
+- **Multiple purchases**: Each purchase has its own unlock block, allowing gradual vesting
+- **Frontend display**: Dashboard shows total, vested, and unvested balances separately
+
+Initial token holders (from constructor) are not subject to vesting restrictions.
 
 ## Installation & Development
 
@@ -64,6 +77,7 @@ When creating a new DAO, you can configure:
 - Treasury configuration (ETH, ERC20, ERC721, ERC1155)
 - Governance token minting permissions
 - Initial token price (0 = direct sales disabled)
+- **Vesting period** (in blocks, 0 = no vesting)
 - Initial token distribution (addresses and amounts)
 
 ## Current Deployment

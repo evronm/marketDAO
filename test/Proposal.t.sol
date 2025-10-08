@@ -37,6 +37,7 @@ contract ProposalTest is Test {
             50,  // election duration
             true, // allow minting
             0, //token sales off
+            0, // No vesting
             treasuryConfig,
             initialHolders,
             initialAmounts

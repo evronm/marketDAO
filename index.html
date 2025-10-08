@@ -116,11 +116,14 @@
       const [daoInfo, setDaoInfo] = React.useState({
         name: 'Loading...',
         tokenBalance: '0',
+        vestedBalance: '0',
+        unvestedBalance: '0',
         tokenSupply: '0',
         tokenPrice: '0',
         quorumPercentage: '0',
         supportThreshold: '0',
-        treasuryBalance: '0'
+        treasuryBalance: '0',
+        vestingPeriod: '0'
       });
       const [electionProposals, setElectionProposals] = React.useState([]);
       const [historyProposals, setHistoryProposals] = React.useState([]);
@@ -697,13 +700,16 @@
           setIsLoading(false);
           showNotification(`Successfully purchased ${amount} tokens!`, 'success');
           
-          // Update user's token balance and total supply
+          // Update user's token balance, vested balance, and total supply
           const newBalance = await daoContractRef.current.balanceOf(walletAddress, 0);
+          const newVestedBalance = await daoContractRef.current.vestedBalance(walletAddress);
           const newSupply = await daoContractRef.current.totalSupply(0);
-          
+
           // Create copy of current state without using spread operator
           const updatedDaoInfo = Object.assign({}, daoInfo);
           updatedDaoInfo.tokenBalance = newBalance.toString();
+          updatedDaoInfo.vestedBalance = newVestedBalance.toString();
+          updatedDaoInfo.unvestedBalance = newBalance.sub(newVestedBalance).toString();
           updatedDaoInfo.tokenSupply = newSupply.toString();
           setDaoInfo(updatedDaoInfo);
           
@@ -1139,7 +1145,9 @@
         "function purchaseTokens() payable",
         "function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes data)",
         "function quorumPercentage() view returns (uint256)",
-        "function supportThreshold() view returns (uint256)"
+        "function supportThreshold() view returns (uint256)",
+        "function vestedBalance(address holder) view returns (uint256)",
+        "function vestingPeriod() view returns (uint256)"
       ];
       
       // Helper functions to update form data
@@ -1228,58 +1236,77 @@
               await new Promise(resolve => setTimeout(resolve, 1000));
               
               // Try individual reads with better error handling instead of Promise.all
-              let daoName, tokenPrice, tokenBalance, tokenSupply, quorumPercentage, supportThreshold;
-              
+              let daoName, tokenPrice, tokenBalance, vestedBal, tokenSupply, quorumPercentage, supportThreshold, vestingPer;
+
               try {
                 daoName = await daoContract.name();
               } catch (e) {
                 console.warn("Error getting DAO name:", e);
                 daoName = "Market DAO";
               }
-              
+
               try {
                 tokenPrice = await daoContract.tokenPrice();
               } catch (e) {
                 console.warn("Error getting token price:", e);
                 tokenPrice = ethers.utils.parseEther("0.1");
               }
-              
+
               try {
                 tokenBalance = await daoContract.balanceOf(currentAccount, 0);
               } catch (e) {
                 console.warn("Error getting token balance:", e);
                 tokenBalance = ethers.BigNumber.from(100);
               }
-              
+
+              try {
+                vestedBal = await daoContract.vestedBalance(currentAccount);
+              } catch (e) {
+                console.warn("Error getting vested balance:", e);
+                vestedBal = ethers.BigNumber.from(100);
+              }
+
               try {
                 tokenSupply = await daoContract.totalSupply(0);
               } catch (e) {
                 console.warn("Error getting token supply:", e);
                 tokenSupply = ethers.BigNumber.from(1000);
               }
-              
+
               try {
                 quorumPercentage = await daoContract.quorumPercentage();
               } catch (e) {
                 console.warn("Error getting quorum percentage:", e);
                 quorumPercentage = ethers.BigNumber.from(25);
               }
-              
+
               try {
                 supportThreshold = await daoContract.supportThreshold();
               } catch (e) {
                 console.warn("Error getting support threshold:", e);
                 supportThreshold = ethers.BigNumber.from(15);
               }
-              
+
+              try {
+                vestingPer = await daoContract.vestingPeriod();
+              } catch (e) {
+                console.warn("Error getting vesting period:", e);
+                vestingPer = ethers.BigNumber.from(0);
+              }
+
+              const unvestedBal = tokenBalance.sub(vestedBal);
+
               setDaoInfo({
                 name: daoName,
                 tokenBalance: tokenBalance.toString(),
+                vestedBalance: vestedBal.toString(),
+                unvestedBalance: unvestedBal.toString(),
                 tokenSupply: tokenSupply.toString(),
                 tokenPrice: ethers.utils.formatEther(tokenPrice),
                 quorumPercentage: quorumPercentage.toString(),
                 supportThreshold: supportThreshold.toString(),
-                treasuryBalance: treasuryBalance
+                treasuryBalance: treasuryBalance,
+                vestingPeriod: vestingPer.toString()
               });
               
               // Try loading proposals with better error handling
@@ -1296,11 +1323,14 @@
               setDaoInfo({
                 name: 'Market DAO',
                 tokenBalance: '100',
+                vestedBalance: '100',
+                unvestedBalance: '0',
                 tokenSupply: '1000',
                 tokenPrice: '0.1',
                 quorumPercentage: '25',
                 supportThreshold: '15',
-                treasuryBalance: treasuryBalance
+                treasuryBalance: treasuryBalance,
+                vestingPeriod: '0'
               });
               
               showNotification('Connected, but there was an error loading some contract data', 'warning');
@@ -1311,11 +1341,14 @@
             setDaoInfo({
               name: 'Market DAO',
               tokenBalance: '100',
+              vestedBalance: '100',
+              unvestedBalance: '0',
               tokenSupply: '1000',
               tokenPrice: '0.1',
               quorumPercentage: '25',
               supportThreshold: '15',
-              treasuryBalance: '0'
+              treasuryBalance: '0',
+              vestingPeriod: '0'
             });
             setIsConnected(true);
             showNotification('Connected, but there was an error loading data', 'warning');
@@ -1492,9 +1525,9 @@
                           <div className="bg-light rounded p-2" style={{height: '100%'}}>
                             <div className="text-center">
                               <div className="fw-bold">{daoInfo.tokenBalance}</div>
-                              <div className="text-muted small">Your Balance</div>
+                              <div className="text-muted small">Total Balance</div>
                               <div className="small">
-                                <a 
+                                <a
                                   href={`https://testnet.rarible.com/token/polygon/${DAO_ADDRESS}:0`}
                                   target="_blank"
                                   rel="noopener noreferrer"
@@ -1503,6 +1536,28 @@
                                 >
                                   Buy/Sell
                                 </a>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col">
+                          <div className="bg-success bg-opacity-10 rounded p-2" style={{height: '100%'}}>
+                            <div className="text-center">
+                              <div className="fw-bold text-success">{daoInfo.vestedBalance}</div>
+                              <div className="text-muted small">Vested (Available)</div>
+                              <div className="text-success" style={{fontSize: '0.65rem'}}>
+                                Can vote & support
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col">
+                          <div className="bg-warning bg-opacity-10 rounded p-2" style={{height: '100%'}}>
+                            <div className="text-center">
+                              <div className="fw-bold text-warning">{daoInfo.unvestedBalance}</div>
+                              <div className="text-muted small">Unvested (Locked)</div>
+                              <div className="text-warning" style={{fontSize: '0.65rem'}}>
+                                {daoInfo.vestingPeriod !== '0' ? `${daoInfo.vestingPeriod} blocks` : 'No vesting'}
                               </div>
                             </div>
                           </div>

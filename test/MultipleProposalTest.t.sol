@@ -35,6 +35,7 @@ contract MultipleProposalTest is Test {
             50,  // election duration
             true, // allow minting
             0.1 ether, // token price
+            0, // No vesting
             treasuryConfig,
             initialHolders,
             initialAmounts

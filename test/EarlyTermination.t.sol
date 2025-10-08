@@ -47,6 +47,7 @@ contract EarlyTerminationTest is Test {
             100, // Election duration
             true, // Allow minting
             0, // Token price
+            0, // No vesting
             treasuryConfig,
             initialHolders,
             initialAmounts

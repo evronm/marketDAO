@@ -31,6 +31,7 @@ contract MarketDAOTokenSaleTest is Test {
             50,
             true,
             TOKEN_PRICE,
+            0, // No vesting for these tests
             treasuryConfig,
             initialHolders,
             initialAmounts
@@ -109,6 +110,7 @@ contract MarketDAOTokenSaleTest is Test {
             50,
             true,
             0, // disable direct sales
+            0, // No vesting
             treasuryConfig,
             initialHolders,
             initialAmounts

@@ -31,6 +31,7 @@ contract MarketDAOTest is Test {
             50,  // 50 blocks election duration
             true, // allow minting
             0, //token sales off
+            0, // No vesting
             treasuryConfig,
             initialHolders,
             initialAmounts
@@ -97,6 +98,7 @@ contract MarketDAOTest is Test {
             50,
             true,
             0, //token sales off
+            0, // No vesting
             treasuryConfig,
             initialHolders,
             initialAmounts

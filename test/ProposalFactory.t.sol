@@ -26,6 +26,7 @@ contract ProposalFactoryTest is Test {
             50,
             true,
             0, //token sales off
+            0, // No vesting
             treasuryConfig,
             initialHolders,
             initialAmounts

@@ -61,18 +61,19 @@ abstract contract Proposal {
     }
     
     function addSupport(uint256 amount) external onlyBeforeElection {
+        uint256 availableBalance = dao.vestedBalance(msg.sender);
         require(
-            dao.balanceOf(msg.sender, 0) >= amount,
-            "Insufficient governance tokens"
+            availableBalance >= amount,
+            "Insufficient vested governance tokens"
         );
         require(
-            support[msg.sender] + amount <= dao.balanceOf(msg.sender, 0),
-            "Cannot support more than governance tokens held"
+            support[msg.sender] + amount <= availableBalance,
+            "Cannot support more than vested governance tokens held"
         );
-        
+
         support[msg.sender] += amount;
         supportTotal += amount;
-        
+
         if (canTriggerElection()) {
             _triggerElection();
         }
@@ -112,12 +113,12 @@ abstract contract Proposal {
         dao.registerVoteAddress(yesVoteAddress);
         dao.registerVoteAddress(noVoteAddress);
         
-        // Mint voting tokens to all governance token holders
+        // Mint voting tokens to all governance token holders based on vested balance
         address[] memory holders = dao.getGovernanceTokenHolders();
         for(uint i = 0; i < holders.length; i++) {
-            uint256 balance = dao.balanceOf(holders[i], 0);
-            if(balance > 0) {
-                dao.mintVotingTokens(holders[i], votingTokenId, balance);
+            uint256 vestedBal = dao.vestedBalance(holders[i]);
+            if(vestedBal > 0) {
+                dao.mintVotingTokens(holders[i], votingTokenId, vestedBal);
             }
         }
     }

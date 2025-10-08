@@ -37,6 +37,7 @@ contract TokenPriceProposalTest is Test {
             50,  // election duration
             true, // allow minting
             INITIAL_TOKEN_PRICE, // token price
+            0, // No vesting
             treasuryConfig,
             initialHolders,
             initialAmounts

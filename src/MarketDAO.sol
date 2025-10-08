@@ -20,6 +20,16 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     uint256 private constant GOVERNANCE_TOKEN_ID = 0;
     uint256 private nextVotingTokenId = 1;
     mapping(address => bool) public activeProposals;
+
+    // Vesting configuration
+    uint256 public vestingPeriod;  // vesting period in blocks
+
+    struct VestingSchedule {
+        uint256 amount;
+        uint256 unlockBlock;
+    }
+
+    mapping(address => VestingSchedule[]) private vestingSchedules;
     
     // Vote address tracking
     mapping(address => bool) public isVoteAddress;
@@ -45,6 +55,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         uint256 _electionDuration,
         bool _allowMinting,
         uint256 _tokenPrice,
+        uint256 _vestingPeriod,
         string[] memory _treasuryConfig,
         address[] memory _initialHolders,
         uint256[] memory _initialAmounts
@@ -60,6 +71,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         electionDuration = _electionDuration;
         allowMinting = _allowMinting;
         tokenPrice = _tokenPrice;
+        vestingPeriod = _vestingPeriod;
         
         // Set up treasury configuration
         hasTreasury = _treasuryConfig.length > 0;
@@ -81,16 +93,36 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         }
     }
     
+    // Calculate the amount of tokens available for governance (unlocked)
+    function vestedBalance(address holder) public view returns (uint256) {
+        uint256 locked = 0;
+        VestingSchedule[] storage schedules = vestingSchedules[holder];
+        for (uint256 i = 0; i < schedules.length; i++) {
+            if (block.number < schedules[i].unlockBlock) {
+                locked += schedules[i].amount;
+            }
+        }
+        return balanceOf(holder, GOVERNANCE_TOKEN_ID) - locked;
+    }
+
     // Direct token purchase function
     function purchaseTokens() external payable nonReentrant {
         require(tokenPrice > 0, "Direct token sales disabled");
         require(msg.value > 0, "Payment required");
         require(msg.value % tokenPrice == 0, "Payment must be multiple of token price");
-        
+
         uint256 tokenAmount = msg.value / tokenPrice;
         _mint(msg.sender, GOVERNANCE_TOKEN_ID, tokenAmount, "");
         tokenSupply[GOVERNANCE_TOKEN_ID] += tokenAmount;
         _addGovernanceTokenHolder(msg.sender);
+
+        // Add vesting schedule if vesting period is set
+        if (vestingPeriod > 0) {
+            vestingSchedules[msg.sender].push(VestingSchedule({
+                amount: tokenAmount,
+                unlockBlock: block.number + vestingPeriod
+            }));
+        }
     }
     
     // Treasury functions
