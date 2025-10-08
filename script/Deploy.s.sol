@@ -12,14 +12,16 @@ contract DeployConfig {
     uint256 constant MAX_PROPOSAL_AGE = 100;       // blocks until proposal expires
     uint256 constant ELECTION_DURATION = 50;       // blocks for voting period
     bool constant ALLOW_MINTING = true;            // can mint new governance tokens
-    uint256 constant TOKEN_PRICE = 1e14;       // blocks for voting period
+    uint256 constant TOKEN_PRICE = 1e14;           // initial token price
+    uint256 constant VESTING_PERIOD = 100;         // initial vesting period is 2 election cycles
 }
 
 contract DeployScript is Script, DeployConfig {
     function getTreasuryConfig() internal pure returns (string[] memory) {
-        string[] memory config = new string[](2);
+        string[] memory config = new string[](3);
         config[0] = "ETH";
         config[1] = "ERC20";
+        config[2] = "ERC1155";
         return config;
     }
 
@@ -41,7 +43,7 @@ contract DeployScript is Script, DeployConfig {
             ELECTION_DURATION,
             ALLOW_MINTING,
             TOKEN_PRICE,
-            0, // No vesting period
+            VESTING_PERIOD, 
             getTreasuryConfig(),
             initialHolders,
             initialAmounts
