@@ -13,6 +13,7 @@ Unlike traditional DAOs where voting power is static, MarketDAO introduces trada
 
 - **ERC1155-based governance tokens** for proposal creation and voting rights
 - **Saleable voting rights** through transferable voting tokens
+- **Lazy token distribution** for gas-efficient voting token claiming
 - **Token vesting mechanism** to prevent governance attacks from new token purchases
 - **Proposal lifecycle** with support thresholds and voting periods
 - **Multiple proposal types**:
@@ -27,9 +28,19 @@ Unlike traditional DAOs where voting power is static, MarketDAO introduces trada
 
 - The DAO inherits from OpenZeppelin's ERC1155 implementation
 - Token ID 0 is reserved for governance tokens
-- Each election creates unique voting tokens distributed to governance token holders
+- Each election creates unique voting tokens that can be claimed by governance token holders
 - Voting is done by transferring voting tokens to YES/NO addresses
 - Treasury functions support multiple asset types (ETH, ERC20, ERC721, ERC1155)
+
+### Lazy Token Distribution
+
+To minimize gas costs when elections are triggered, voting tokens use a "lazy minting" approach:
+
+- **On-demand claiming**: Voting tokens are not automatically distributed when an election starts
+- **Gas efficiency**: The proposer who triggers the election doesn't pay gas fees to mint tokens for all holders
+- **User-initiated**: Each governance token holder claims their voting tokens when they're ready to participate
+- **One-time claim**: Each address can claim once per election, receiving voting tokens equal to their vested governance token balance
+- **Flexible participation**: Holders can claim and vote at any point during the election period
 
 ### Token Vesting System
 
@@ -90,10 +101,11 @@ When creating a new DAO, you can configure:
 
 1. **Create a Proposal**: Governance token holders can submit proposals
 2. **Support Phase**: Proposals need to reach support threshold to trigger an election
-3. **Election**: When triggered, voting tokens are distributed 1:1 to governance token holders
-4. **Trading Period**: During elections, voting tokens can be freely bought and sold
-5. **Voting**: Cast votes by sending voting tokens to YES/NO addresses
-6. **Execution**: Successful proposals are executed automatically
+3. **Election Triggered**: When the threshold is reached, an election period begins
+4. **Claim Voting Tokens**: Governance token holders claim their voting tokens (1:1 with vested governance tokens)
+5. **Trading Period**: During elections, voting tokens can be freely bought and sold
+6. **Voting**: Cast votes by sending voting tokens to YES/NO addresses
+7. **Execution**: Successful proposals are executed automatically
 
 ## Future Possibilities
 
