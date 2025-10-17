@@ -117,22 +117,27 @@ contract MultipleProposalTest is Test {
         treasuryProposal.addSupport(40); // Need 40 for 20% of 200 total tokens
         
         assertTrue(treasuryProposal.electionTriggered());
-        
+
         // The actual tokenId used for voting is 1, not the one returned by treasuryProposal.votingTokenId()
         uint256 actualVotingTokenId = 1;
-        
+
+        // Claim voting tokens
+        treasuryProposal.claimVotingTokens();
+
         // Vote yes with all tokens - using the correct voting token ID
         dao.safeTransferFrom(proposer, treasuryProposal.yesVoteAddress(), actualVotingTokenId, 100, "");
         vm.stopPrank();
-        
+
         // Let voter1 and voter2 vote as well to meet quorum
         vm.startPrank(voter1);
         dao.setApprovalForAll(address(treasuryProposal), true);
+        treasuryProposal.claimVotingTokens();
         dao.safeTransferFrom(voter1, treasuryProposal.yesVoteAddress(), actualVotingTokenId, 50, "");
         vm.stopPrank();
-        
+
         vm.startPrank(voter2);
         dao.setApprovalForAll(address(treasuryProposal), true);
+        treasuryProposal.claimVotingTokens();
         dao.safeTransferFrom(voter2, treasuryProposal.yesVoteAddress(), actualVotingTokenId, 50, "");
         vm.stopPrank();
         

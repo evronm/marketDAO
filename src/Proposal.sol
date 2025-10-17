@@ -19,6 +19,9 @@ abstract contract Proposal {
     address public yesVoteAddress;
     address public noVoteAddress;
     bool public executed;
+
+    // Lazy minting for voting tokens
+    mapping(address => bool) public hasClaimed;
     
     modifier onlyBeforeElection() {
         require(!electionTriggered, "Election already triggered");
@@ -95,7 +98,7 @@ abstract contract Proposal {
         electionTriggered = true;
         electionStart = block.number;
         votingTokenId = dao.getNextVotingTokenId();
-        
+
         // Generate deterministic vote addresses
         bytes32 salt = keccak256(abi.encodePacked(
             votingTokenId,
@@ -108,19 +111,29 @@ abstract contract Proposal {
         noVoteAddress = address(uint160(uint256(keccak256(
             abi.encodePacked(salt, "no")
         ))));
-        
+
         // Register vote addresses with the DAO
         dao.registerVoteAddress(yesVoteAddress);
         dao.registerVoteAddress(noVoteAddress);
-        
-        // Mint voting tokens to all governance token holders based on vested balance
-        address[] memory holders = dao.getGovernanceTokenHolders();
-        for(uint i = 0; i < holders.length; i++) {
-            uint256 vestedBal = dao.vestedBalance(holders[i]);
-            if(vestedBal > 0) {
-                dao.mintVotingTokens(holders[i], votingTokenId, vestedBal);
-            }
-        }
+
+        // No upfront minting - users claim voting tokens lazily
+    }
+
+    function claimVotingTokens() external onlyDuringElection {
+        require(!hasClaimed[msg.sender], "Already claimed voting tokens");
+
+        uint256 vestedBal = dao.vestedBalance(msg.sender);
+        require(vestedBal > 0, "No vested governance tokens to claim");
+
+        hasClaimed[msg.sender] = true;
+        dao.mintVotingTokens(msg.sender, votingTokenId, vestedBal);
+    }
+
+    function getClaimableAmount(address holder) external view returns (uint256) {
+        if (!electionTriggered) return 0;
+        if (hasClaimed[holder]) return 0;
+        if (block.number >= electionStart + dao.electionDuration()) return 0;
+        return dao.vestedBalance(holder);
     }
     
     function checkEarlyTermination() external virtual {
@@ -128,18 +141,25 @@ abstract contract Proposal {
         require(!executed, "Already executed");
         require(block.number >= electionStart, "Election not started");
         require(block.number < electionStart + dao.electionDuration(), "Election ended");
-        
-        uint256 totalVotes = dao.totalSupply(votingTokenId);
-        uint256 halfVotes = totalVotes / 2;
-        
+
+        // Calculate total possible votes based on vested governance tokens
+        // NOT based on voting token totalSupply (which only reflects claimed tokens)
+        address[] memory holders = dao.getGovernanceTokenHolders();
+        uint256 totalPossibleVotes = 0;
+        for(uint i = 0; i < holders.length; i++) {
+            totalPossibleVotes += dao.vestedBalance(holders[i]);
+        }
+
+        uint256 halfVotes = totalPossibleVotes / 2;
+
         uint256 yesVotes = dao.balanceOf(yesVoteAddress, votingTokenId);
         uint256 noVotes = dao.balanceOf(noVoteAddress, votingTokenId);
-        
+
         // For early termination, we need a strict majority (> 50%)
         // For odd total votes, halfVotes + 1 is a majority
         // For even total votes, halfVotes + 1 is a majority
         uint256 majorityThreshold = halfVotes + 1;
-        
+
         if(yesVotes >= majorityThreshold) {
             _execute();
         } else if(noVotes >= majorityThreshold) {
@@ -153,15 +173,22 @@ abstract contract Proposal {
             block.number >= electionStart + dao.electionDuration(),
             "Election still ongoing"
         );
-        
-        uint256 totalVotes = dao.totalSupply(votingTokenId);
-        uint256 quorum = (totalVotes * dao.quorumPercentage()) / 100;
+
+        // Calculate total possible votes based on vested governance tokens
+        // NOT based on voting token totalSupply (which only reflects claimed tokens)
+        address[] memory holders = dao.getGovernanceTokenHolders();
+        uint256 totalPossibleVotes = 0;
+        for(uint i = 0; i < holders.length; i++) {
+            totalPossibleVotes += dao.vestedBalance(holders[i]);
+        }
+
+        uint256 quorum = (totalPossibleVotes * dao.quorumPercentage()) / 100;
         uint256 yesVotes = dao.balanceOf(yesVoteAddress, votingTokenId);
         uint256 noVotes = dao.balanceOf(noVoteAddress, votingTokenId);
-        
+
         require(yesVotes + noVotes >= quorum, "Quorum not met");
         require(yesVotes > noVotes, "Proposal not passed");
-        
+
         _execute();
     }
     

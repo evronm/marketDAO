@@ -48,21 +48,32 @@ contract ProposalTest is Test {
         vm.startPrank(proposer);
         ResolutionProposal proposal = new ResolutionProposal(dao, "Test Resolution");
         dao.setApprovalForAll(address(proposal), true);
-        
+
         console.log("Adding support to proposal");
         proposal.addSupport(40); // 20% of 200 total tokens needed
         assertTrue(proposal.electionTriggered());
-        
+
         uint256 votingTokenId = proposal.votingTokenId();
+
+        // Claim voting tokens
+        proposal.claimVotingTokens();
         assertEq(dao.balanceOf(proposer, votingTokenId), 100);
+        vm.stopPrank();
+
+        vm.prank(voter1);
+        proposal.claimVotingTokens();
         assertEq(dao.balanceOf(voter1, votingTokenId), 50);
+
+        vm.prank(voter2);
+        proposal.claimVotingTokens();
         assertEq(dao.balanceOf(voter2, votingTokenId), 50);
-        
+
+        vm.startPrank(proposer);
         console.log("Transferring votes (Yes)");
         dao.safeTransferFrom(proposer, proposal.yesVoteAddress(), votingTokenId, 100, "");
-        
+
         vm.stopPrank();
-        
+
         vm.startPrank(voter1);
         dao.setApprovalForAll(address(proposal), true);
         dao.safeTransferFrom(voter1, proposal.yesVoteAddress(), votingTokenId, 50, "");
@@ -85,7 +96,7 @@ contract ProposalTest is Test {
 
     function testTreasuryProposal() public {
         vm.deal(address(dao), 100 ether);
-        
+
         vm.startPrank(proposer);
         TreasuryProposal proposal = new TreasuryProposal(
             dao,
@@ -96,16 +107,20 @@ contract ProposalTest is Test {
             0
         );
         dao.setApprovalForAll(address(proposal), true);
-        
+
         proposal.addSupport(40);
         assertTrue(proposal.electionTriggered());
-        
+
         uint256 votingTokenId = proposal.votingTokenId();
+
+        // Claim voting tokens
+        proposal.claimVotingTokens();
         dao.safeTransferFrom(proposer, proposal.yesVoteAddress(), votingTokenId, 100, "");
         vm.stopPrank();
-        
+
         vm.startPrank(voter1);
         dao.setApprovalForAll(address(proposal), true);
+        proposal.claimVotingTokens();
         dao.safeTransferFrom(voter1, proposal.yesVoteAddress(), votingTokenId, 50, "");
         vm.stopPrank();
         
@@ -125,16 +140,20 @@ contract ProposalTest is Test {
             100
         );
         dao.setApprovalForAll(address(proposal), true);
-        
+
         proposal.addSupport(40);
         assertTrue(proposal.electionTriggered());
-        
+
         uint256 votingTokenId = proposal.votingTokenId();
+
+        // Claim voting tokens
+        proposal.claimVotingTokens();
         dao.safeTransferFrom(proposer, proposal.yesVoteAddress(), votingTokenId, 100, "");
         vm.stopPrank();
-        
+
         vm.startPrank(voter1);
         dao.setApprovalForAll(address(proposal), true);
+        proposal.claimVotingTokens();
         dao.safeTransferFrom(voter1, proposal.yesVoteAddress(), votingTokenId, 50, "");
         vm.stopPrank();
         

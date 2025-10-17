@@ -214,14 +214,25 @@ contract VestingTest is Test {
         proposal.addSupport(32); // Just enough to trigger election
         assertTrue(proposal.electionTriggered(), "Election should be triggered");
 
-        // Check voting token distribution
-        // Alice should get 100 voting tokens
-        // Bob should get 50 voting tokens
-        // Attacker should get 0 voting tokens (all tokens still vesting)
+        // Check voting token distribution with lazy minting
+        // Alice should be able to claim 100 voting tokens
+        // Bob should be able to claim 50 voting tokens
+        // Attacker should be able to claim 0 voting tokens (all tokens still vesting)
         uint256 votingTokenId = proposal.votingTokenId();
 
+        // Claim voting tokens
+        vm.prank(alice);
+        proposal.claimVotingTokens();
         assertEq(dao.balanceOf(alice, votingTokenId), 100);
+
+        vm.prank(bob);
+        proposal.claimVotingTokens();
         assertEq(dao.balanceOf(bob, votingTokenId), 50);
+
+        // Attacker should not be able to claim (0 vested balance)
+        vm.prank(attacker);
+        vm.expectRevert("No vested governance tokens to claim");
+        proposal.claimVotingTokens();
         assertEq(dao.balanceOf(attacker, votingTokenId), 0);
 
         // Wait for vesting to complete
@@ -242,9 +253,11 @@ contract VestingTest is Test {
         vm.prank(alice);
         proposal2.addSupport(32); // Triggers election
 
-        // Now attacker should get voting tokens based on vested balance
+        // Now attacker should be able to claim voting tokens based on vested balance
         uint256 votingTokenId2 = proposal2.votingTokenId();
 
+        vm.prank(attacker);
+        proposal2.claimVotingTokens();
         assertEq(dao.balanceOf(attacker, votingTokenId2), 10);
     }
 

@@ -54,7 +54,7 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
   <script type="text/babel">
-    // Constants with actual addresses from the Polygon Amoy testnet deployment
+    // Constants with actual addresses from the local deployment
     const DAO_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
     const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512';
     
@@ -159,7 +159,9 @@
         "function noVoteAddress() view returns (address)",
         "function isElectionActive() view returns (bool)",
         "function checkEarlyTermination()",
-        "function dao() view returns (address)"
+        "function dao() view returns (address)",
+        "function getClaimableAmount(address holder) view returns (uint256)",
+        "function hasClaimed(address holder) view returns (bool)"
       ];
       
       const treasuryProposalAbi = baseProposalAbi.concat([
@@ -296,20 +298,24 @@
             ]);
             
             proposalData.votingTokenId = votingTokenId.toString();
-            
-            // Get vote counts
-            const [yesVotes, noVotes, totalVotes, userVotingBalance] = await Promise.all([
+
+            // Get vote counts and claimable amounts
+            const [yesVotes, noVotes, totalVotes, userVotingBalance, claimableAmount, hasClaimed] = await Promise.all([
               daoContractRef.current.balanceOf(yesVoteAddress, votingTokenId),
               daoContractRef.current.balanceOf(noVoteAddress, votingTokenId),
               daoContractRef.current.totalSupply(votingTokenId),
-              daoContractRef.current.balanceOf(walletAddress, votingTokenId)
+              daoContractRef.current.balanceOf(walletAddress, votingTokenId),
+              baseContract.getClaimableAmount(walletAddress),
+              baseContract.hasClaimed(walletAddress)
             ]);
-            
+
             proposalData.votes = {
               yes: yesVotes.toString(),
               no: noVotes.toString(),
               total: totalVotes.toString(),
-              available: userVotingBalance.toString()
+              available: userVotingBalance.toString(),
+              claimable: claimableAmount.toString(),
+              hasClaimed: hasClaimed
             };
             
             // Check if election is active
@@ -1030,6 +1036,47 @@
         }
       };
       
+      // Claim voting tokens for a proposal
+      const claimVotingTokens = async (proposalAddress) => {
+        try {
+          if (!signerRef.current) {
+            showNotification('Please connect your wallet first', 'danger');
+            return;
+          }
+
+          // Create contract instance with claim function
+          const fullProposalAbi = baseProposalAbi.concat(["function claimVotingTokens()"]);
+          const proposalContract = new ethers.Contract(
+            proposalAddress,
+            fullProposalAbi,
+            signerRef.current
+          );
+
+          setIsLoading(true);
+          showNotification('Claiming voting tokens...', 'info');
+
+          // Call the claimVotingTokens function
+          const tx = await proposalContract.claimVotingTokens();
+
+          showNotification('Transaction submitted, waiting for confirmation...', 'info');
+
+          // Wait for transaction confirmation
+          await tx.wait();
+
+          setIsLoading(false);
+          showNotification('Voting tokens claimed successfully!', 'success');
+
+          // Clear cache for this proposal and reload
+          delete proposalCacheRef.current[proposalAddress];
+          await loadAllProposals();
+
+        } catch (error) {
+          console.error('Error claiming voting tokens:', error);
+          setIsLoading(false);
+          showNotification('Failed to claim voting tokens: ' + (error.message || error), 'danger');
+        }
+      };
+
       // Vote on a proposal
       const voteOnProposal = async (proposalAddress, isYesVote) => {
         try {
@@ -1037,7 +1084,7 @@
             showNotification('Please connect your wallet first', 'danger');
             return;
           }
-          
+
           // Use cache to avoid making multiple RPC calls
           const proposal = proposalCacheRef.current[proposalAddress];
           if (!proposal) {
@@ -1045,57 +1092,57 @@
             await loadAllProposals();
             return;
           }
-          
+
           // Create contract instance
           const proposalContract = new ethers.Contract(
             proposalAddress,
             baseProposalAbi,
             signerRef.current
           );
-          
+
           // Check if the election is still active (using cached data to avoid RPC calls)
           if (!proposal.isActive) {
             showNotification(`This election is ${proposal.electionStatus.toLowerCase()}`, 'danger');
             return;
           }
-          
+
           // Get the voting addresses from cache
           const yesVoteAddress = await proposalContract.yesVoteAddress();
           const noVoteAddress = await proposalContract.noVoteAddress();
           const votingTokenId = proposal.votingTokenId;
-          
+
           // Determine vote destination
           const voteDestination = isYesVote ? yesVoteAddress : noVoteAddress;
-          
+
           // Check if user has voting tokens (using cached data)
           const votingBalance = parseInt(proposal.votes.available);
-          
+
           if (votingBalance === 0) {
-            showNotification('You have no voting tokens for this proposal', 'danger');
+            showNotification('You have no voting tokens for this proposal. Please claim them first!', 'danger');
             return;
           }
-          
+
           // Get the vote amount from the input field
           const inputField = document.getElementById(`vote-amount-${proposalAddress}`);
           if (!inputField) {
             showNotification('Input field not found', 'danger');
             return;
           }
-          
+
           const amount = parseInt(inputField.value);
           if (isNaN(amount) || amount <= 0) {
             showNotification('Please enter a valid amount', 'danger');
             return;
           }
-          
+
           if (amount > votingBalance) {
             showNotification(`You only have ${votingBalance} voting tokens`, 'danger');
             return;
           }
-          
+
           setIsLoading(true);
           showNotification(`Sending ${isYesVote ? 'YES' : 'NO'} vote...`, 'info');
-          
+
           // Send voting tokens to the appropriate address
           const tx = await daoContractRef.current.safeTransferFrom(
             walletAddress,
@@ -1104,18 +1151,18 @@
             amount,
             "0x" // No data
           );
-          
+
           showNotification('Transaction submitted, waiting for confirmation...', 'info');
-          
+
           // Wait for transaction confirmation
           await tx.wait();
-          
+
           setIsLoading(false);
           showNotification(`Vote ${isYesVote ? 'YES' : 'NO'} cast successfully!`, 'success');
-          
+
           // Clear the input field
           inputField.value = '';
-          
+
           // Check if early termination is possible
           try {
             const earlyTerminationTx = await proposalContract.checkEarlyTermination();
@@ -1124,11 +1171,11 @@
             // Early termination might not be applicable, so we just ignore errors
             console.log("Early termination check failed or not applicable:", error.message);
           }
-          
+
           // Clear cache for this proposal and reload
           delete proposalCacheRef.current[proposalAddress];
           await loadAllProposals();
-          
+
         } catch (error) {
           console.error('Error voting:', error);
           setIsLoading(false);
@@ -2100,7 +2147,24 @@
                                 </div>
                               </div>
                             </div>
-                            
+
+                            {/* Claim Voting Tokens Section */}
+                            {proposal.votes && !proposal.votes.hasClaimed && parseInt(proposal.votes.claimable) > 0 && (
+                              <div className="mb-3">
+                                <div className="alert alert-info text-center">
+                                  <strong>Claim your voting tokens first!</strong>
+                                  <div className="my-2">You can claim {proposal.votes.claimable} voting tokens based on your vested governance tokens.</div>
+                                  <button
+                                    className="btn btn-primary"
+                                    onClick={() => claimVotingTokens(proposal.address)}
+                                    disabled={!proposal.isActive}
+                                  >
+                                    Claim {proposal.votes.claimable} Voting Tokens
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
                             <div className="mb-3">
                               <label htmlFor={`vote-amount-${proposal.address}`} className="form-label text-center d-block">
                                 Vote Amount: <span className="text-muted fw-normal">
@@ -2109,20 +2173,20 @@
                               </label>
                               <div className="row g-3 justify-content-center">
                                 <div className="col-12 col-md-6">
-                                  <input 
-                                    type="number" 
+                                  <input
+                                    type="number"
                                     className="form-control"
                                     id={`vote-amount-${proposal.address}`}
-                                    placeholder="Tokens to vote" 
+                                    placeholder="Tokens to vote"
                                     max={proposal.votes.available}
                                   />
                                 </div>
                               </div>
                             </div>
-                            
+
                             <div className="row g-3">
                               <div className="col">
-                                <button 
+                                <button
                                   className={`btn btn-success w-100 ${!proposal.isActive ? 'disabled' : ''}`}
                                   onClick={() => voteOnProposal(proposal.address, true)}
                                   title={proposal.isActive ? "Vote in favor of this proposal" : "Voting not available"}
@@ -2132,7 +2196,7 @@
                                 </button>
                               </div>
                               <div className="col">
-                                <button 
+                                <button
                                   className={`btn btn-danger w-100 ${!proposal.isActive ? 'disabled' : ''}`}
                                   onClick={() => voteOnProposal(proposal.address, false)}
                                   title={proposal.isActive ? "Vote against this proposal" : "Voting not available"}

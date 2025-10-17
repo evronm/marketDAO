@@ -83,6 +83,14 @@ contract EarlyTerminationTest is Test {
         console.log("Total votes:", totalVotes);
         console.log("Half votes needed:", totalVotes / 2);
         
+        // Claim voting tokens
+        proposal.claimVotingTokens();
+        vm.stopPrank();
+        vm.startPrank(bob);
+        proposal.claimVotingTokens();
+        vm.stopPrank();
+        vm.startPrank(alice);
+
         // Check initial balances
         uint256 aliceBalance = dao.balanceOf(alice, votingTokenId);
         uint256 bobBalance = dao.balanceOf(bob, votingTokenId);
@@ -91,7 +99,7 @@ contract EarlyTerminationTest is Test {
         assertEq(aliceBalance, 100);
         assertEq(bobBalance, 50);
         assertEq(dao.balanceOf(yesVoteAddress, votingTokenId), 0);
-        
+
         // We need more than half of total votes (200) to trigger early termination
         // First, Bob will transfer all 50 tokens to Yes
         vm.stopPrank();
@@ -136,14 +144,22 @@ contract EarlyTerminationTest is Test {
         // Get the voting token ID and the No vote address
         uint256 votingTokenId = proposal.votingTokenId();
         address noVoteAddress = proposal.noVoteAddress();
-        
+
+        // Claim voting tokens
+        proposal.claimVotingTokens();
+        vm.stopPrank();
+        vm.startPrank(bob);
+        proposal.claimVotingTokens();
+        vm.stopPrank();
+        vm.startPrank(alice);
+
         // Check initial balances
         uint256 aliceBalance = dao.balanceOf(alice, votingTokenId);
         uint256 bobBalance = dao.balanceOf(bob, votingTokenId);
         assertEq(aliceBalance, 100);
         assertEq(bobBalance, 50);
         assertEq(dao.balanceOf(noVoteAddress, votingTokenId), 0);
-        
+
         // We need more than half of total votes (200) to trigger early termination
         // First, Bob will transfer all 50 tokens to No
         vm.stopPrank();
@@ -182,14 +198,22 @@ contract EarlyTerminationTest is Test {
         // Get the voting token ID and the Yes vote address
         uint256 votingTokenId = proposal.votingTokenId();
         address yesVoteAddress = proposal.yesVoteAddress();
-        
+
+        // Claim voting tokens
+        proposal.claimVotingTokens();
+        vm.stopPrank();
+        vm.startPrank(bob);
+        proposal.claimVotingTokens();
+        vm.stopPrank();
+        vm.startPrank(alice);
+
         // Check initial balances
         uint256 aliceBalance = dao.balanceOf(alice, votingTokenId);
         uint256 bobBalance = dao.balanceOf(bob, votingTokenId);
         assertEq(aliceBalance, 100);
         assertEq(bobBalance, 50);
         assertEq(dao.balanceOf(yesVoteAddress, votingTokenId), 0);
-        
+
         // We need more than half of total votes (200) to trigger early termination
         // First, Bob will transfer all 50 tokens to Yes
         vm.stopPrank();
