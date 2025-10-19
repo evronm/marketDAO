@@ -200,7 +200,8 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
 
     function transferETH(address payable recipient, uint256 amount) external nonReentrant {
         require(activeProposals[msg.sender], "Only active proposal can transfer");
-        recipient.transfer(amount);
+        (bool success, ) = recipient.call{value: amount}("");
+        require(success, "ETH transfer failed");
     }
 
     function transferERC20(address token, address recipient, uint256 amount) external nonReentrant {
