@@ -40,6 +40,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
 
     // Proposal factory for access control
     address public factory;
+    address private immutable deployer;
 
     // Treasury configuration
     bool public hasTreasury;
@@ -69,7 +70,8 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         require(_supportThreshold <= 10000, "Support threshold must be <= 10000");
         require(_quorumPercentage <= 10000, "Quorum must be <= 10000");
         require(_initialHolders.length == _initialAmounts.length, "Arrays length mismatch");
-        
+
+        deployer = msg.sender;
         name = _name;
         supportThreshold = _supportThreshold;
         quorumPercentage = _quorumPercentage;
@@ -412,6 +414,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     }
 
     function setFactory(address _factory) external {
+        require(msg.sender == deployer, "Only deployer can set factory");
         require(factory == address(0), "Factory already set");
         require(_factory != address(0), "Invalid factory address");
         factory = _factory;

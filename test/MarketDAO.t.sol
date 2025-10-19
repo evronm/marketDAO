@@ -89,7 +89,7 @@ contract MarketDAOTest is Test {
         address[] memory initialHolders = new address[](0);
         uint256[] memory initialAmounts = new uint256[](0);
         string[] memory treasuryConfig = new string[](0);
-        
+
         MarketDAO noTreasuryDao = new MarketDAO(
             "No Treasury",
             2000,  // 20% (basis points)
@@ -103,7 +103,29 @@ contract MarketDAOTest is Test {
             initialHolders,
             initialAmounts
         );
-        
+
         payable(address(noTreasuryDao)).transfer(1 ether);
+    }
+
+    function testDeployerCanSetFactory() public {
+        // The test contract is the deployer since it deployed in setUp
+        address mockFactory = address(0x999);
+        dao.setFactory(mockFactory);
+        assertEq(dao.factory(), mockFactory);
+    }
+
+    function testFailNonDeployerCannotSetFactory() public {
+        address mockFactory = address(0x999);
+        // Try to set factory from alice's account (not deployer)
+        vm.prank(alice);
+        dao.setFactory(mockFactory);
+    }
+
+    function testFailCannotSetFactoryTwice() public {
+        address mockFactory1 = address(0x999);
+        address mockFactory2 = address(0x888);
+
+        dao.setFactory(mockFactory1);
+        dao.setFactory(mockFactory2); // Should fail
     }
 }
