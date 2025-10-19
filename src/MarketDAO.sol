@@ -3,12 +3,14 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./Proposal.sol";
 
 contract MarketDAO is ERC1155, ReentrancyGuard {
+    using SafeERC20 for IERC20;
     string public name;
     uint256 public supportThreshold;        // basis points (10000 = 100%) needed to trigger election
     uint256 public quorumPercentage;        // basis points (10000 = 100%) needed for valid election
@@ -197,6 +199,21 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     function transferETH(address payable recipient, uint256 amount) external nonReentrant {
         require(activeProposals[msg.sender], "Only active proposal can transfer");
         recipient.transfer(amount);
+    }
+
+    function transferERC20(address token, address recipient, uint256 amount) external nonReentrant {
+        require(activeProposals[msg.sender], "Only active proposal can transfer");
+        IERC20(token).safeTransfer(recipient, amount);
+    }
+
+    function transferERC721(address token, address recipient, uint256 tokenId) external nonReentrant {
+        require(activeProposals[msg.sender], "Only active proposal can transfer");
+        IERC721(token).safeTransferFrom(address(this), recipient, tokenId);
+    }
+
+    function transferERC1155(address token, address recipient, uint256 tokenId, uint256 amount) external nonReentrant {
+        require(activeProposals[msg.sender], "Only active proposal can transfer");
+        IERC1155(token).safeTransferFrom(address(this), recipient, tokenId, amount, "");
     }
     
     // Override ERC1155 transfer functions to handle voting tokens

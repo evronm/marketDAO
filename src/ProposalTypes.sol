@@ -2,10 +2,6 @@
 pragma solidity ^0.8.20;
 
 import "./Proposal.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 
 contract ResolutionProposal is Proposal {
     constructor(
@@ -25,8 +21,6 @@ contract ResolutionProposal is Proposal {
 }
 
 contract TreasuryProposal is Proposal {
-    using SafeERC20 for IERC20;
-    
     address public recipient;
     uint256 public amount;
     address public token;
@@ -52,22 +46,21 @@ contract TreasuryProposal is Proposal {
 
     function _execute() internal override {
         super._execute();
-        
+
         if(token == address(0)) {
             require(dao.acceptsETH(), "ETH not accepted");
             dao.transferETH(payable(recipient), amount);
         } else {
             if(tokenId == 0) {
                 require(dao.acceptsERC20(), "ERC20 not accepted");
-                // Use safeTransfer instead of transfer
-                IERC20(token).safeTransfer(recipient, amount);
+                dao.transferERC20(token, recipient, amount);
             } else {
                 if(amount == 1) {
                     require(dao.acceptsERC721(), "ERC721 not accepted");
-                    IERC721(token).safeTransferFrom(address(dao), recipient, tokenId);
+                    dao.transferERC721(token, recipient, tokenId);
                 } else {
                     require(dao.acceptsERC1155(), "ERC1155 not accepted");
-                    IERC1155(token).safeTransferFrom(address(dao), recipient, tokenId, amount, "");
+                    dao.transferERC1155(token, recipient, tokenId, amount);
                 }
             }
         }

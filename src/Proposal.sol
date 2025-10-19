@@ -122,14 +122,12 @@ abstract contract Proposal {
         dao.registerVoteAddress(yesVoteAddress);
         dao.registerVoteAddress(noVoteAddress);
 
-        // Snapshot total possible votes at election start (gas optimization)
-        // This prevents DoS from unbounded array growth
-        address[] memory holders = dao.getGovernanceTokenHolders();
-        uint256 total = 0;
-        for(uint i = 0; i < holders.length; i++) {
-            total += dao.vestedBalance(holders[i]);
-        }
-        snapshotTotalVotes = total;
+        // Snapshot total possible votes at election start
+        // Uses total supply for O(1) calculation (unlimited scalability)
+        // Note: This includes unvested tokens in the quorum calculation,
+        // but voting tokens can only be claimed for vested balance,
+        // so this makes quorum slightly more conservative
+        snapshotTotalVotes = dao.totalSupply(0);
 
         // No upfront minting - users claim voting tokens lazily
     }
