@@ -16,6 +16,7 @@ contract ProposalFactory {
         string memory description
     ) external returns (ResolutionProposal) {
         ResolutionProposal proposal = new ResolutionProposal(dao, description);
+        dao.setActiveProposal(address(proposal));
         proposals[proposalCount++] = address(proposal);
         return proposal;
     }
@@ -35,6 +36,7 @@ contract ProposalFactory {
             token,
             tokenId
         );
+        dao.setActiveProposal(address(proposal));
         proposals[proposalCount++] = address(proposal);
         return proposal;
     }
@@ -50,11 +52,12 @@ contract ProposalFactory {
             recipient,
             amount
         );
+        dao.setActiveProposal(address(proposal));
         proposals[proposalCount++] = address(proposal);
         return proposal;
     }
 
-    
+
     function createTokenPriceProposal(
         string memory description,
         uint256 newPrice
@@ -64,6 +67,7 @@ contract ProposalFactory {
             description,
             newPrice
         );
+        dao.setActiveProposal(address(proposal));
         proposals[proposalCount++] = address(proposal);
         return proposal;
     }

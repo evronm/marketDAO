@@ -31,8 +31,8 @@ contract TokenPriceProposalTest is Test {
         
         dao = new MarketDAO(
             "Test DAO",
-            20,  // 20% support threshold
-            51,  // 51% quorum
+            2000,  // 20% support threshold (basis points)
+            5100,  // 51% quorum (basis points)
             100, // max proposal age
             50,  // election duration
             true, // allow minting
@@ -44,6 +44,7 @@ contract TokenPriceProposalTest is Test {
         );
 
         factory = new ProposalFactory(dao);
+        dao.setFactory(address(factory));
     }
 
     function testTokenPriceProposal() public {

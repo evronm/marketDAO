@@ -5,9 +5,11 @@ import "forge-std/Test.sol";
 import "../src/MarketDAO.sol";
 import "../src/Proposal.sol";
 import "../src/ProposalTypes.sol";
+import "../src/ProposalFactory.sol";
 
 contract ProposalTest is Test {
     MarketDAO dao;
+    ProposalFactory factory;
     address proposer = address(0x1);
     address voter1 = address(0x2);
     address voter2 = address(0x3);
@@ -31,8 +33,8 @@ contract ProposalTest is Test {
         
         dao = new MarketDAO(
             "Test DAO",
-            20,  // 20% support threshold
-            51,  // 51% quorum
+            2000,  // 20% support threshold (basis points)
+            5100,  // 51% quorum (basis points)
             100, // max proposal age
             50,  // election duration
             true, // allow minting
@@ -42,11 +44,14 @@ contract ProposalTest is Test {
             initialHolders,
             initialAmounts
         );
+
+        factory = new ProposalFactory(dao);
+        dao.setFactory(address(factory));
     }
 
     function testResolutionProposal() public {
         vm.startPrank(proposer);
-        ResolutionProposal proposal = new ResolutionProposal(dao, "Test Resolution");
+        ResolutionProposal proposal = factory.createResolutionProposal("Test Resolution");
         dao.setApprovalForAll(address(proposal), true);
 
         console.log("Adding support to proposal");
@@ -98,8 +103,7 @@ contract ProposalTest is Test {
         vm.deal(address(dao), 100 ether);
 
         vm.startPrank(proposer);
-        TreasuryProposal proposal = new TreasuryProposal(
-            dao,
+        TreasuryProposal proposal = factory.createTreasuryProposal(
             "Send ETH",
             voter1,
             1 ether,
@@ -133,8 +137,7 @@ contract ProposalTest is Test {
 
     function testMintProposal() public {
         vm.startPrank(proposer);
-        MintProposal proposal = new MintProposal(
-            dao,
+        MintProposal proposal = factory.createMintProposal(
             "Mint tokens",
             voter1,
             100
@@ -166,14 +169,14 @@ contract ProposalTest is Test {
 
     function testFailInsufficientSupport() public {
         vm.prank(voter1);  // Only has 50 tokens
-        ResolutionProposal proposal = new ResolutionProposal(dao, "Test Resolution");
+        ResolutionProposal proposal = factory.createResolutionProposal("Test Resolution");
         proposal.addSupport(39);  // Not enough for 20% threshold
         assertTrue(!proposal.electionTriggered());
     }
 
     function testRemoveSupport() public {
         vm.startPrank(proposer);
-        ResolutionProposal proposal = new ResolutionProposal(dao, "Test Resolution");
+        ResolutionProposal proposal = factory.createResolutionProposal("Test Resolution");
         
         proposal.addSupport(40);
         assertTrue(proposal.electionTriggered());

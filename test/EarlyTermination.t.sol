@@ -41,8 +41,8 @@ contract EarlyTerminationTest is Test {
         // Create DAO with a 30% support threshold and 60% quorum
         dao = new MarketDAO(
             "Test DAO",
-            30, // Support threshold 30%
-            60, // Quorum 60%
+            3000, // Support threshold 30% (basis points)
+            6000, // Quorum 60% (basis points)
             100, // Max proposal age
             100, // Election duration
             true, // Allow minting
@@ -54,7 +54,8 @@ contract EarlyTerminationTest is Test {
         );
         
         factory = new ProposalFactory(dao);
-        
+        dao.setFactory(address(factory));
+
         vm.stopPrank();
     }
     

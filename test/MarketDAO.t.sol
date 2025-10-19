@@ -25,8 +25,8 @@ contract MarketDAOTest is Test {
         
         dao = new MarketDAO(
             "Test DAO",
-            20, // 20% support threshold
-            51, // 51% quorum
+            2000, // 20% support threshold (basis points)
+            5100, // 51% quorum (basis points)
             100, // 100 blocks max proposal age
             50,  // 50 blocks election duration
             true, // allow minting
@@ -40,8 +40,8 @@ contract MarketDAOTest is Test {
     
     function testInitialState() public {
         assertEq(dao.name(), "Test DAO");
-        assertEq(dao.supportThreshold(), 20);
-        assertEq(dao.quorumPercentage(), 51);
+        assertEq(dao.supportThreshold(), 2000);  // 20% in basis points
+        assertEq(dao.quorumPercentage(), 5100);  // 51% in basis points
         assertEq(dao.maxProposalAge(), 100);
         assertEq(dao.electionDuration(), 50);
         assertTrue(dao.allowMinting());
@@ -92,8 +92,8 @@ contract MarketDAOTest is Test {
         
         MarketDAO noTreasuryDao = new MarketDAO(
             "No Treasury",
-            20,
-            51,
+            2000,  // 20% (basis points)
+            5100,  // 51% (basis points)
             100,
             50,
             true,

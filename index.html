@@ -79,7 +79,23 @@
         return value;
       }
     };
-    
+
+    // Helper to convert basis points (10000 = 100%) to percentage string
+    const basisPointsToPercent = (basisPoints) => {
+      try {
+        let value = basisPoints;
+        if (typeof basisPoints === 'object' && basisPoints._isBigNumber) {
+          value = basisPoints.toNumber();
+        } else if (typeof basisPoints === 'string') {
+          value = parseInt(basisPoints);
+        }
+        return (value / 100).toFixed(2);
+      } catch (error) {
+        console.error('Error converting basis points:', error, basisPoints);
+        return '0';
+      }
+    };
+
     // Main App Component
     function App() {
       const [activeTab, setActiveTab] = React.useState('dashboard');
@@ -343,7 +359,7 @@
                   
                   // Determine result
                   const quorumPercentage = await daoContractRef.current.quorumPercentage();
-                  const quorum = totalVotes.mul(quorumPercentage).div(100);
+                  const quorum = totalVotes.mul(quorumPercentage).div(10000);
                   
                   // Check if quorum was met
                   if (yesVotes.add(noVotes).lt(quorum)) {
@@ -1324,14 +1340,14 @@
                 quorumPercentage = await daoContract.quorumPercentage();
               } catch (e) {
                 console.warn("Error getting quorum percentage:", e);
-                quorumPercentage = ethers.BigNumber.from(25);
+                quorumPercentage = ethers.BigNumber.from(2500);  // 25% in basis points
               }
 
               try {
                 supportThreshold = await daoContract.supportThreshold();
               } catch (e) {
                 console.warn("Error getting support threshold:", e);
-                supportThreshold = ethers.BigNumber.from(15);
+                supportThreshold = ethers.BigNumber.from(1500);  // 15% in basis points
               }
 
               try {
@@ -1374,12 +1390,12 @@
                 unvestedBalance: '0',
                 tokenSupply: '1000',
                 tokenPrice: '0.1',
-                quorumPercentage: '25',
-                supportThreshold: '15',
+                quorumPercentage: '2500',  // 25% in basis points
+                supportThreshold: '1500',  // 15% in basis points
                 treasuryBalance: treasuryBalance,
                 vestingPeriod: '0'
               });
-              
+
               showNotification('Connected, but there was an error loading some contract data', 'warning');
             }
           } catch (error) {
@@ -1392,8 +1408,8 @@
               unvestedBalance: '0',
               tokenSupply: '1000',
               tokenPrice: '0.1',
-              quorumPercentage: '25',
-              supportThreshold: '15',
+              quorumPercentage: '2500',  // 25% in basis points
+              supportThreshold: '1500',  // 15% in basis points
               treasuryBalance: '0',
               vestingPeriod: '0'
             });
@@ -1439,8 +1455,8 @@
             return (
               <div className="small">
                 <div><strong>Total Votes:</strong> {totalCast} of {safeValue(proposal.votes.total)}</div>
-                <div><strong>Turnout:</strong> {isNaN(turnoutPercent) ? 0 : turnoutPercent}% 
-                (Quorum: {safeValue(daoInfo.quorumPercentage)}% required)</div>
+                <div><strong>Turnout:</strong> {isNaN(turnoutPercent) ? 0 : turnoutPercent}%
+                (Quorum: {basisPointsToPercent(safeValue(daoInfo.quorumPercentage))}% required)</div>
                 {safeValue(proposal.votingTokenId) !== '0' && (
                   <div className="mt-2 text-center">
                     <strong>Voting token ID:</strong> {safeValue(proposal.votingTokenId)}
@@ -1636,7 +1652,7 @@
                         <div className="col">
                           <div className="bg-light rounded p-2" style={{height: '100%'}}>
                             <div className="text-center">
-                              <div className="fw-bold">{daoInfo.quorumPercentage}%</div>
+                              <div className="fw-bold">{basisPointsToPercent(daoInfo.quorumPercentage)}%</div>
                               <div className="text-muted small">Quorum Requirement</div>
                             </div>
                           </div>
@@ -1644,7 +1660,7 @@
                         <div className="col">
                           <div className="bg-light rounded p-2" style={{height: '100%'}}>
                             <div className="text-center">
-                              <div className="fw-bold">{daoInfo.supportThreshold}%</div>
+                              <div className="fw-bold">{basisPointsToPercent(daoInfo.supportThreshold)}%</div>
                               <div className="text-muted small">Support Threshold</div>
                             </div>
                           </div>
@@ -2111,9 +2127,9 @@
                                 <div><strong>No:</strong> {proposal.votes.no} ({noPercent}%)</div>
                               </div>
                               <div className="text-center mb-2 small">
-                                <strong>Total Votes:</strong> {parseInt(proposal.votes.yes) + parseInt(proposal.votes.no)} of {proposal.votes.total} 
+                                <strong>Total Votes:</strong> {parseInt(proposal.votes.yes) + parseInt(proposal.votes.no)} of {proposal.votes.total}
                                 ({turnoutPercent}% turnout)
-                                <div><strong>Quorum Requirement:</strong> {daoInfo.quorumPercentage}% participation needed for valid result</div>
+                                <div><strong>Quorum Requirement:</strong> {basisPointsToPercent(daoInfo.quorumPercentage)}% participation needed for valid result</div>
                               </div>
                               <div className="progress mb-2" style={{height: "20px"}}>
                                 <div 

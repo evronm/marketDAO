@@ -25,8 +25,8 @@ contract MarketDAOTokenSaleTest is Test {
         
         dao = new MarketDAO(
             "Test DAO",
-            20,
-            51,
+            2000,  // 20% (basis points)
+            5100,  // 51% (basis points)
             100,
             50,
             true,
@@ -104,8 +104,8 @@ contract MarketDAOTokenSaleTest is Test {
         
         MarketDAO disabledSalesDao = new MarketDAO(
             "No Sales DAO",
-            20,
-            51,
+            2000,  // 20% (basis points)
+            5100,  // 51% (basis points)
             100,
             50,
             true,

@@ -20,6 +20,9 @@ abstract contract Proposal {
     address public noVoteAddress;
     bool public executed;
 
+    // Snapshot of total possible votes at election start (for gas efficiency)
+    uint256 public snapshotTotalVotes;
+
     // Lazy minting for voting tokens
     mapping(address => bool) public hasClaimed;
     
@@ -60,10 +63,13 @@ abstract contract Proposal {
         proposer = msg.sender;
         description = _description;
         createdAt = block.number;
-        dao.setActiveProposal(address(this));
+        // Note: Factory will call dao.setActiveProposal(address(this)) after construction
     }
     
     function addSupport(uint256 amount) external onlyBeforeElection {
+        // Clean up expired vesting schedules for gas optimization
+        dao.cleanupVestingSchedules(msg.sender);
+
         uint256 availableBalance = dao.vestedBalance(msg.sender);
         require(
             availableBalance >= amount,
@@ -90,7 +96,7 @@ abstract contract Proposal {
     }
     
     function canTriggerElection() public view returns (bool) {
-        uint256 threshold = (dao.totalSupply(0) * dao.supportThreshold()) / 100;
+        uint256 threshold = (dao.totalSupply(0) * dao.supportThreshold()) / 10000;
         return supportTotal >= threshold;
     }
     
@@ -116,11 +122,23 @@ abstract contract Proposal {
         dao.registerVoteAddress(yesVoteAddress);
         dao.registerVoteAddress(noVoteAddress);
 
+        // Snapshot total possible votes at election start (gas optimization)
+        // This prevents DoS from unbounded array growth
+        address[] memory holders = dao.getGovernanceTokenHolders();
+        uint256 total = 0;
+        for(uint i = 0; i < holders.length; i++) {
+            total += dao.vestedBalance(holders[i]);
+        }
+        snapshotTotalVotes = total;
+
         // No upfront minting - users claim voting tokens lazily
     }
 
     function claimVotingTokens() external onlyDuringElection {
         require(!hasClaimed[msg.sender], "Already claimed voting tokens");
+
+        // Clean up expired vesting schedules for gas optimization
+        dao.cleanupVestingSchedules(msg.sender);
 
         uint256 vestedBal = dao.vestedBalance(msg.sender);
         require(vestedBal > 0, "No vested governance tokens to claim");
@@ -142,13 +160,8 @@ abstract contract Proposal {
         require(block.number >= electionStart, "Election not started");
         require(block.number < electionStart + dao.electionDuration(), "Election ended");
 
-        // Calculate total possible votes based on vested governance tokens
-        // NOT based on voting token totalSupply (which only reflects claimed tokens)
-        address[] memory holders = dao.getGovernanceTokenHolders();
-        uint256 totalPossibleVotes = 0;
-        for(uint i = 0; i < holders.length; i++) {
-            totalPossibleVotes += dao.vestedBalance(holders[i]);
-        }
+        // Use snapshot taken at election start (gas optimization)
+        uint256 totalPossibleVotes = snapshotTotalVotes;
 
         uint256 halfVotes = totalPossibleVotes / 2;
 
@@ -174,15 +187,10 @@ abstract contract Proposal {
             "Election still ongoing"
         );
 
-        // Calculate total possible votes based on vested governance tokens
-        // NOT based on voting token totalSupply (which only reflects claimed tokens)
-        address[] memory holders = dao.getGovernanceTokenHolders();
-        uint256 totalPossibleVotes = 0;
-        for(uint i = 0; i < holders.length; i++) {
-            totalPossibleVotes += dao.vestedBalance(holders[i]);
-        }
+        // Use snapshot taken at election start (gas optimization)
+        uint256 totalPossibleVotes = snapshotTotalVotes;
 
-        uint256 quorum = (totalPossibleVotes * dao.quorumPercentage()) / 100;
+        uint256 quorum = (totalPossibleVotes * dao.quorumPercentage()) / 10000;
         uint256 yesVotes = dao.balanceOf(yesVoteAddress, votingTokenId);
         uint256 noVotes = dao.balanceOf(noVoteAddress, votingTokenId);
 

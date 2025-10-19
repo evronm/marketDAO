@@ -20,8 +20,8 @@ contract ProposalFactoryTest is Test {
         
         dao = new MarketDAO(
             "Test DAO",
-            20,
-            51,
+            2000,  // 20% (basis points)
+            5100,  // 51% (basis points)
             100,
             50,
             true,
@@ -31,8 +31,9 @@ contract ProposalFactoryTest is Test {
             initialHolders,
             initialAmounts
         );
-        
+
         factory = new ProposalFactory(dao);
+        dao.setFactory(address(factory));
     }
     
     function testCreateResolutionProposal() public {

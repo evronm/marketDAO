@@ -28,8 +28,8 @@ contract VestingTest is Test {
 
         dao = new MarketDAO(
             "Test DAO",
-            20,
-            51,
+            2000,  // 20% (basis points)
+            5100,  // 51% (basis points)
             100,
             50,
             true,
@@ -41,6 +41,7 @@ contract VestingTest is Test {
         );
 
         factory = new ProposalFactory(dao);
+        dao.setFactory(address(factory));
     }
 
     function testSinglePurchaseWithVesting() public {
@@ -279,8 +280,8 @@ contract VestingTest is Test {
 
         MarketDAO noVestingDao = new MarketDAO(
             "No Vesting DAO",
-            20,
-            51,
+            2000,  // 20% (basis points)
+            5100,  // 51% (basis points)
             100,
             50,
             true,

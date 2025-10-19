@@ -64,7 +64,7 @@ contract TreasuryProposal is Proposal {
             } else {
                 if(amount == 1) {
                     require(dao.acceptsERC721(), "ERC721 not accepted");
-                    IERC721(token).transferFrom(address(dao), recipient, tokenId);
+                    IERC721(token).safeTransferFrom(address(dao), recipient, tokenId);
                 } else {
                     require(dao.acceptsERC1155(), "ERC1155 not accepted");
                     IERC1155(token).safeTransferFrom(address(dao), recipient, tokenId, amount, "");

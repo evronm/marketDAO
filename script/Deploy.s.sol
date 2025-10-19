@@ -7,8 +7,8 @@ import "../src/ProposalFactory.sol";
 
 contract DeployConfig {
     string constant DAO_NAME = "Market DAO";
-    uint256 constant SUPPORT_THRESHOLD = 20;       // 20% of tokens needed for proposal
-    uint256 constant QUORUM = 51;                  // 51% needed for valid vote
+    uint256 constant SUPPORT_THRESHOLD = 2000;     // 20% (basis points: 2000/10000)
+    uint256 constant QUORUM = 5100;                // 51% (basis points: 5100/10000)
     uint256 constant MAX_PROPOSAL_AGE = 100;       // blocks until proposal expires
     uint256 constant ELECTION_DURATION = 50;       // blocks for voting period
     bool constant ALLOW_MINTING = true;            // can mint new governance tokens
@@ -43,13 +43,16 @@ contract DeployScript is Script, DeployConfig {
             ELECTION_DURATION,
             ALLOW_MINTING,
             TOKEN_PRICE,
-            VESTING_PERIOD, 
+            VESTING_PERIOD,
             getTreasuryConfig(),
             initialHolders,
             initialAmounts
         );
 
         ProposalFactory factory = new ProposalFactory(dao);
+
+        // Register the factory with the DAO to enable proposal creation
+        dao.setFactory(address(factory));
 
         vm.stopBroadcast();
     }

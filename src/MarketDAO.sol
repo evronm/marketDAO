@@ -10,8 +10,8 @@ import "./Proposal.sol";
 
 contract MarketDAO is ERC1155, ReentrancyGuard {
     string public name;
-    uint256 public supportThreshold;        // percentage needed to trigger election
-    uint256 public quorumPercentage;        // percentage needed for valid election
+    uint256 public supportThreshold;        // basis points (10000 = 100%) needed to trigger election
+    uint256 public quorumPercentage;        // basis points (10000 = 100%) needed for valid election
     uint256 public maxProposalAge;          // max age of proposal without election
     uint256 public electionDuration;        // length of election in blocks
     bool public allowMinting;               // whether new governance tokens can be minted
@@ -19,6 +19,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     
     uint256 private constant GOVERNANCE_TOKEN_ID = 0;
     uint256 private nextVotingTokenId = 1;
+    uint256 private constant MAX_VESTING_SCHEDULES = 10;
     mapping(address => bool) public activeProposals;
 
     // Vesting configuration
@@ -34,7 +35,10 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     // Vote address tracking
     mapping(address => bool) public isVoteAddress;
     mapping(address => address) public voteAddressToProposal;
-    
+
+    // Proposal factory for access control
+    address public factory;
+
     // Treasury configuration
     bool public hasTreasury;
     bool public acceptsETH;
@@ -60,8 +64,8 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         address[] memory _initialHolders,
         uint256[] memory _initialAmounts
     ) ERC1155("") {  // URI will be set later if needed
-        require(_supportThreshold <= 100, "Support threshold must be <= 100");
-        require(_quorumPercentage <= 100, "Quorum must be <= 100");
+        require(_supportThreshold <= 10000, "Support threshold must be <= 10000");
+        require(_quorumPercentage <= 10000, "Quorum must be <= 10000");
         require(_initialHolders.length == _initialAmounts.length, "Arrays length mismatch");
         
         name = _name;
@@ -105,6 +109,43 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         return balanceOf(holder, GOVERNANCE_TOKEN_ID) - locked;
     }
 
+    // Remove expired vesting schedules for gas optimization
+    function _cleanupExpiredSchedules(address holder) internal {
+        VestingSchedule[] storage schedules = vestingSchedules[holder];
+        uint256 writeIndex = 0;
+
+        // Copy only non-expired schedules
+        for (uint256 readIndex = 0; readIndex < schedules.length; readIndex++) {
+            if (block.number < schedules[readIndex].unlockBlock) {
+                // Still locked, keep it
+                if (writeIndex != readIndex) {
+                    schedules[writeIndex] = schedules[readIndex];
+                }
+                writeIndex++;
+            }
+            // Expired schedules are skipped (deleted)
+        }
+
+        // Trim array to new size
+        while (schedules.length > writeIndex) {
+            schedules.pop();
+        }
+    }
+
+    // Public function for users to manually cleanup their schedules
+    function cleanupMyVestingSchedules() external {
+        _cleanupExpiredSchedules(msg.sender);
+    }
+
+    // Cleanup function callable by active proposals or the holder themselves
+    function cleanupVestingSchedules(address holder) external {
+        require(
+            msg.sender == holder || activeProposals[msg.sender],
+            "Only holder or active proposal can cleanup"
+        );
+        _cleanupExpiredSchedules(holder);
+    }
+
     // Direct token purchase function
     function purchaseTokens() external payable nonReentrant {
         require(tokenPrice > 0, "Direct token sales disabled");
@@ -118,10 +159,33 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
 
         // Add vesting schedule if vesting period is set
         if (vestingPeriod > 0) {
-            vestingSchedules[msg.sender].push(VestingSchedule({
-                amount: tokenAmount,
-                unlockBlock: block.number + vestingPeriod
-            }));
+            // Clean up expired schedules first
+            _cleanupExpiredSchedules(msg.sender);
+
+            uint256 unlockBlock = block.number + vestingPeriod;
+            VestingSchedule[] storage schedules = vestingSchedules[msg.sender];
+
+            // Try to consolidate with existing schedule at same unlock time
+            bool merged = false;
+            for (uint256 i = 0; i < schedules.length; i++) {
+                if (schedules[i].unlockBlock == unlockBlock) {
+                    schedules[i].amount += tokenAmount;
+                    merged = true;
+                    break;
+                }
+            }
+
+            // If no match, create new schedule (with limit check)
+            if (!merged) {
+                require(
+                    schedules.length < MAX_VESTING_SCHEDULES,
+                    "Too many vesting schedules"
+                );
+                schedules.push(VestingSchedule({
+                    amount: tokenAmount,
+                    unlockBlock: unlockBlock
+                }));
+            }
         }
     }
     
@@ -330,14 +394,15 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         return governanceTokenHolders;
     }
 
+    function setFactory(address _factory) external {
+        require(factory == address(0), "Factory already set");
+        require(_factory != address(0), "Invalid factory address");
+        factory = _factory;
+    }
+
     function setActiveProposal(address proposal) external {
-        // Only allow this function to be called from a contract that's being constructed
-        // by checking if the caller's code size is 0 (it's still being created)
-        uint256 codeSize;
-        assembly {
-            codeSize := extcodesize(caller())
-        }
-        require(codeSize == 0, "Only contracts being deployed can call this");
+        require(msg.sender == factory, "Only factory can register proposals");
+        require(proposal != address(0), "Invalid proposal address");
         activeProposals[proposal] = true;
     }
 

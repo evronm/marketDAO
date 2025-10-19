@@ -29,8 +29,8 @@ contract MultipleProposalTest is Test {
         
         dao = new MarketDAO(
             "Test DAO",
-            20,  // 20% support threshold
-            20,  // 20% quorum (lower for test)
+            2000,  // 20% support threshold (basis points)
+            2000,  // 20% quorum (basis points, lower for test)
             100, // max proposal age
             50,  // election duration
             true, // allow minting
@@ -42,6 +42,7 @@ contract MultipleProposalTest is Test {
         );
 
         factory = new ProposalFactory(dao);
+        dao.setFactory(address(factory));
     }
 
     function testCreateMultipleProposals() public {
