@@ -15,6 +15,8 @@ Unlike traditional DAOs where voting power is static, MarketDAO introduces trada
 - **Saleable voting rights** through transferable voting tokens
 - **Lazy token distribution** for gas-efficient voting token claiming
 - **Token vesting mechanism** to prevent governance attacks from new token purchases
+- **Snapshot-based voting power** for unlimited scalability (no holder count limits)
+- **Automatic vesting schedule management** with cleanup and consolidation
 - **Proposal lifecycle** with support thresholds and voting periods
 - **Multiple proposal types**:
   - Resolution proposals (text-only governance decisions)
@@ -23,6 +25,7 @@ Unlike traditional DAOs where voting power is static, MarketDAO introduces trada
   - Token price updates
 - **Early election termination** when clear majority is reached
 - **Configurable parameters** for tailoring governance to specific needs
+- **Security-hardened** with factory-based proposal registration and bounded gas costs
 
 ## Implementation Details
 
@@ -48,11 +51,45 @@ To prevent governance attacks where an actor purchases enough tokens to immediat
 
 - **Vested tokens**: Available for governance (creating/supporting proposals, receiving voting tokens)
 - **Unvested tokens**: Locked for governance but transferable
-- **Vesting schedule**: Each token purchase creates a separate vesting entry
-- **Multiple purchases**: Each purchase has its own unlock block, allowing gradual vesting
+- **Automatic cleanup**: Expired vesting schedules are automatically removed during user interactions
+- **Schedule consolidation**: Multiple purchases with the same unlock time are automatically merged
+- **Schedule limit**: Maximum 10 active vesting schedules per address (prevents DoS attacks)
+- **Manual cleanup**: Users can call `cleanupMyVestingSchedules()` to remove expired schedules
 - **Frontend display**: Dashboard shows total, vested, and unvested balances separately
 
 Initial token holders (from constructor) are not subject to vesting restrictions.
+
+### Snapshot-Based Voting Power
+
+To enable unlimited scalability without gas limit concerns:
+
+- **One-time snapshot**: Total voting power is calculated once when an election is triggered
+- **O(1) execution cost**: Proposal execution and early termination use the snapshot (no loops)
+- **Unlimited holders**: DAO can scale to thousands of governance token holders
+- **Fair voting**: Voting power is frozen at election start, preventing mid-election manipulation
+- **Gas efficient**: Saves millions of gas compared to dynamic calculations
+
+## Security & Scalability
+
+MarketDAO has been audited and hardened against common vulnerabilities:
+
+### Security Features
+- ✅ **Factory-only proposal registration**: Only the official ProposalFactory can register proposals
+- ✅ **Safe token transfers**: Uses OpenZeppelin's SafeERC20 and safeTransferFrom for all token operations
+- ✅ **Basis points precision**: Thresholds use basis points (10000 = 100%) for 0.01% precision
+- ✅ **ReentrancyGuard**: Protected against reentrancy attacks on critical functions
+- ✅ **Bounded gas costs**: All operations have predictable, capped gas costs
+
+### Scalability Guarantees
+- ✅ **Unlimited governance token holders**: Snapshot mechanism enables thousands of participants
+- ✅ **Automatic vesting cleanup**: Prevents unbounded array growth in vesting schedules
+- ✅ **O(1) proposal execution**: Constant-time execution regardless of holder count
+- ✅ **Gas-efficient operations**: Optimized for low transaction costs
+
+### DoS Protection
+- ✅ **No holder count limits**: Snapshot prevents DoS from too many token holders
+- ✅ **Vesting schedule limits**: Max 10 active schedules per address with auto-cleanup
+- ✅ **Consolidation**: Automatic merging of schedules with same unlock time
 
 ## Installation & Development
 
@@ -80,16 +117,24 @@ forge fmt
 ## Configuration Parameters
 
 When creating a new DAO, you can configure:
-- Name of the DAO
-- Support threshold (% tokens needed to trigger an election)
-- Quorum percentage (% tokens needed for valid election)
-- Maximum proposal age before expiration
-- Election duration (in blocks)
-- Treasury configuration (ETH, ERC20, ERC721, ERC1155)
-- Governance token minting permissions
-- Initial token price (0 = direct sales disabled)
+- **Name** of the DAO
+- **Support threshold** (in basis points, e.g., 2000 = 20% of tokens needed to trigger an election)
+- **Quorum percentage** (in basis points, e.g., 5100 = 51% of tokens needed for valid election)
+- **Maximum proposal age** before expiration (in blocks)
+- **Election duration** (in blocks)
+- **Treasury configuration** (ETH, ERC20, ERC721, ERC1155)
+- **Governance token minting** permissions (true/false)
+- **Initial token price** (in wei, 0 = direct sales disabled)
 - **Vesting period** (in blocks, 0 = no vesting)
-- Initial token distribution (addresses and amounts)
+- **Initial token distribution** (addresses and amounts)
+
+**Note on Basis Points**: All percentage parameters use basis points for precision:
+- 10000 = 100%
+- 5100 = 51%
+- 2000 = 20%
+- 250 = 2.5%
+
+This allows for fractional percentages with 0.01% precision.
 
 ## Current Deployment
 
