@@ -52,6 +52,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     // Governance token holder tracking
     address[] private governanceTokenHolders;
     mapping(address => bool) private isGovernanceTokenHolder;
+    mapping(address => uint256) private holderIndex; // O(1) lookup for holder removal
     mapping(uint256 => uint256) private tokenSupply;
     
     constructor(
@@ -321,6 +322,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     function _addGovernanceTokenHolder(address holder) private {
         if(!isGovernanceTokenHolder[holder]) {
             isGovernanceTokenHolder[holder] = true;
+            holderIndex[holder] = governanceTokenHolders.length;
             governanceTokenHolders.push(holder);
         }
     }
@@ -328,13 +330,17 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     function _removeGovernanceTokenHolder(address holder) private {
         if(isGovernanceTokenHolder[holder]) {
             isGovernanceTokenHolder[holder] = false;
-            for(uint i = 0; i < governanceTokenHolders.length; i++) {
-                if(governanceTokenHolders[i] == holder) {
-                    governanceTokenHolders[i] = governanceTokenHolders[governanceTokenHolders.length - 1];
-                    governanceTokenHolders.pop();
-                    break;
-                }
-            }
+
+            uint256 index = holderIndex[holder];
+            address lastHolder = governanceTokenHolders[governanceTokenHolders.length - 1];
+
+            // Swap with last element
+            governanceTokenHolders[index] = lastHolder;
+            holderIndex[lastHolder] = index;
+
+            // Remove last element
+            governanceTokenHolders.pop();
+            delete holderIndex[holder];
         }
     }
     
