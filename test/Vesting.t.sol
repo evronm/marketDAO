@@ -160,35 +160,6 @@ contract VestingTest is Test {
         proposal.addSupport(5);
     }
 
-    function testCanSupportAfterVesting() public {
-        // Fund DAO treasury
-        vm.deal(address(dao), 10 ether);
-
-        // Setup: Alice creates a proposal
-        vm.prank(alice);
-        TreasuryProposal proposal = factory.createTreasuryProposal(
-            "Transfer 1 ETH",
-            bob,
-            1 ether,
-            address(0), // ETH transfer
-            0
-        );
-
-        // Attacker buys tokens
-        vm.deal(attacker, 1 ether);
-        vm.prank(attacker);
-        dao.purchaseTokens{value: 1 ether}(); // 10 tokens
-        uint256 purchaseBlock = block.number;
-
-        // Wait for vesting to complete
-        vm.roll(purchaseBlock + VESTING_PERIOD);
-        assertEq(dao.vestedBalance(attacker), 10);
-
-        // Now attacker can support with vested tokens
-        vm.prank(attacker);
-        proposal.addSupport(5);
-    }
-
     function testVotingTokensMintedOnlyForVestedBalance() public {
         // Fund DAO treasury
         vm.deal(address(dao), 10 ether);

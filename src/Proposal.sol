@@ -67,6 +67,12 @@ abstract contract Proposal {
     }
     
     function addSupport(uint256 amount) external onlyBeforeElection {
+        // Check if proposal has expired
+        require(
+            block.number < createdAt + dao.maxProposalAge(),
+            "Proposal expired"
+        );
+
         // Clean up expired vesting schedules for gas optimization
         dao.cleanupVestingSchedules(msg.sender);
 
@@ -89,8 +95,14 @@ abstract contract Proposal {
     }
     
     function removeSupport(uint256 amount) external onlyBeforeElection {
+        // Check if proposal has expired
+        require(
+            block.number < createdAt + dao.maxProposalAge(),
+            "Proposal expired"
+        );
+
         require(support[msg.sender] >= amount, "Insufficient support to remove");
-        
+
         support[msg.sender] -= amount;
         supportTotal -= amount;
     }
