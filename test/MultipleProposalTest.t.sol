@@ -46,14 +46,17 @@ contract MultipleProposalTest is Test {
     }
 
     function testCreateMultipleProposals() public {
+        // Fund the DAO treasury first
+        vm.deal(address(dao), 10 ether);
+
         vm.startPrank(proposer);
-        
+
         // Create first proposal
         ResolutionProposal proposal1 = factory.createResolutionProposal("First Resolution");
-        
+
         // Verify first proposal is registered
         assertTrue(dao.activeProposals(address(proposal1)), "First proposal not registered as active");
-        
+
         // Create second proposal - this should not revert now with our changes
         TreasuryProposal proposal2 = factory.createTreasuryProposal(
             "Second Proposal",

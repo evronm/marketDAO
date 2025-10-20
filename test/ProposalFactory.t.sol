@@ -46,6 +46,9 @@ contract ProposalFactoryTest is Test {
     }
     
     function testCreateTreasuryProposal() public {
+        // Fund the DAO treasury first
+        vm.deal(address(dao), 10 ether);
+
         vm.startPrank(proposer);
         TreasuryProposal proposal = factory.createTreasuryProposal(
             "Test Treasury",
@@ -54,7 +57,7 @@ contract ProposalFactoryTest is Test {
             address(0),
             0
         );
-        
+
         assertEq(factory.proposalCount(), 1);
         assertEq(factory.getProposal(0), address(proposal));
         assertEq(proposal.description(), "Test Treasury");

@@ -2,6 +2,9 @@
 pragma solidity ^0.8.20;
 
 import "./Proposal.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 
 contract ResolutionProposal is Proposal {
     constructor(
@@ -37,7 +40,30 @@ contract TreasuryProposal is Proposal {
         require(_recipient != address(0), "Invalid recipient");
         require(_amount > 0, "Amount must be positive");
         require(dao.hasTreasury(), "DAO has no treasury");
-        
+
+        // Validate treasury has sufficient balance
+        if(_token == address(0)) {
+            require(dao.acceptsETH(), "ETH not accepted");
+            require(address(dao).balance >= _amount, "Insufficient ETH balance");
+        } else {
+            if(_tokenId == 0) {
+                require(dao.acceptsERC20(), "ERC20 not accepted");
+                require(IERC20(_token).balanceOf(address(dao)) >= _amount, "Insufficient ERC20 balance");
+            } else {
+                if(_amount == 1) {
+                    require(dao.acceptsERC721(), "ERC721 not accepted");
+                    try IERC721(_token).ownerOf(_tokenId) returns (address owner) {
+                        require(owner == address(dao), "DAO does not own this ERC721 token");
+                    } catch {
+                        revert("Invalid ERC721 token");
+                    }
+                } else {
+                    require(dao.acceptsERC1155(), "ERC1155 not accepted");
+                    require(IERC1155(_token).balanceOf(address(dao), _tokenId) >= _amount, "Insufficient ERC1155 balance");
+                }
+            }
+        }
+
         recipient = _recipient;
         amount = _amount;
         token = _token;
