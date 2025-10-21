@@ -139,7 +139,9 @@
         quorumPercentage: '0',
         supportThreshold: '0',
         treasuryBalance: '0',
-        vestingPeriod: '0'
+        vestingPeriod: '0',
+        maxProposalAge: '0',
+        electionDuration: '0'
       });
       const [electionProposals, setElectionProposals] = React.useState([]);
       const [historyProposals, setHistoryProposals] = React.useState([]);
@@ -174,6 +176,7 @@
         "function yesVoteAddress() view returns (address)",
         "function noVoteAddress() view returns (address)",
         "function isElectionActive() view returns (bool)",
+        "function canTriggerElection() view returns (bool)",
         "function checkEarlyTermination()",
         "function dao() view returns (address)",
         "function getClaimableAmount(address holder) view returns (uint256)",
@@ -269,13 +272,14 @@
           
           // Get common proposal details in a single batch
           const [
-            description, 
-            proposer, 
-            createdAt, 
-            supportTotal, 
-            electionTriggered, 
+            description,
+            proposer,
+            createdAt,
+            supportTotal,
+            electionTriggered,
             executed,
-            electionStart
+            electionStart,
+            canTrigger
           ] = await Promise.all([
             baseContract.description(),
             baseContract.proposer(),
@@ -283,9 +287,16 @@
             baseContract.supportTotal(),
             baseContract.electionTriggered(),
             baseContract.executed(),
-            baseContract.electionStart()
+            baseContract.electionStart(),
+            baseContract.canTriggerElection()
           ]);
-          
+
+          // Calculate if proposal has expired
+          const currentBlock = await providerRef.current.getBlockNumber();
+          const maxPropAge = ethers.BigNumber.from(daoInfo.maxProposalAge);
+          const expirationBlock = createdAt.add(maxPropAge);
+          const isExpired = currentBlock >= expirationBlock.toNumber() && !electionTriggered;
+
           let proposalData = {
             address: proposalAddress,
             description,
@@ -295,6 +306,9 @@
             electionTriggered,
             executed,
             electionStart: electionStart.toString(),
+            canTriggerElection: canTrigger,
+            isExpired: isExpired,
+            expirationBlock: expirationBlock.toString(),
             type: 'resolution', // Default type, will be overridden if necessary
             details: {},
             isHistorical: executed, // Default - will be updated for elections
@@ -1285,7 +1299,9 @@
         "function quorumPercentage() view returns (uint256)",
         "function supportThreshold() view returns (uint256)",
         "function vestedBalance(address holder) view returns (uint256)",
-        "function vestingPeriod() view returns (uint256)"
+        "function vestingPeriod() view returns (uint256)",
+        "function maxProposalAge() view returns (uint256)",
+        "function electionDuration() view returns (uint256)"
       ];
       
       // Helper functions to update form data
@@ -1374,7 +1390,7 @@
               await new Promise(resolve => setTimeout(resolve, 1000));
               
               // Try individual reads with better error handling instead of Promise.all
-              let daoName, tokenPrice, tokenBalance, vestedBal, tokenSupply, quorumPercentage, supportThreshold, vestingPer;
+              let daoName, tokenPrice, tokenBalance, vestedBal, tokenSupply, quorumPercentage, supportThreshold, vestingPer, maxPropAge, elecDuration;
 
               try {
                 daoName = await daoContract.name();
@@ -1432,6 +1448,20 @@
                 vestingPer = ethers.BigNumber.from(0);
               }
 
+              try {
+                maxPropAge = await daoContract.maxProposalAge();
+              } catch (e) {
+                console.warn("Error getting max proposal age:", e);
+                maxPropAge = ethers.BigNumber.from(100);
+              }
+
+              try {
+                elecDuration = await daoContract.electionDuration();
+              } catch (e) {
+                console.warn("Error getting election duration:", e);
+                elecDuration = ethers.BigNumber.from(50);
+              }
+
               const unvestedBal = tokenBalance.sub(vestedBal);
 
               setDaoInfo({
@@ -1444,7 +1474,9 @@
                 quorumPercentage: quorumPercentage.toString(),
                 supportThreshold: supportThreshold.toString(),
                 treasuryBalance: treasuryBalance,
-                vestingPeriod: vestingPer.toString()
+                vestingPeriod: vestingPer.toString(),
+                maxProposalAge: maxPropAge.toString(),
+                electionDuration: elecDuration.toString()
               });
               
               // Try loading proposals with better error handling
@@ -1468,7 +1500,9 @@
                 quorumPercentage: '2500',  // 25% in basis points
                 supportThreshold: '1500',  // 15% in basis points
                 treasuryBalance: treasuryBalance,
-                vestingPeriod: '0'
+                vestingPeriod: '0',
+                maxProposalAge: '100',
+                electionDuration: '50'
               });
 
               showNotification('Connected, but there was an error loading some contract data', 'warning');
@@ -1486,7 +1520,9 @@
               quorumPercentage: '2500',  // 25% in basis points
               supportThreshold: '1500',  // 15% in basis points
               treasuryBalance: '0',
-              vestingPeriod: '0'
+              vestingPeriod: '0',
+              maxProposalAge: '100',
+              electionDuration: '50'
             });
             setIsConnected(true);
             showNotification('Connected, but there was an error loading data', 'warning');
@@ -1740,9 +1776,25 @@
                             </div>
                           </div>
                         </div>
+                        <div className="col">
+                          <div className="bg-light rounded p-2" style={{height: '100%'}}>
+                            <div className="text-center">
+                              <div className="fw-bold">{daoInfo.maxProposalAge}</div>
+                              <div className="text-muted small">Max Proposal Age (blocks)</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="col">
+                          <div className="bg-light rounded p-2" style={{height: '100%'}}>
+                            <div className="text-center">
+                              <div className="fw-bold">{daoInfo.electionDuration}</div>
+                              <div className="text-muted small">Election Duration (blocks)</div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    
+
                     <h3 className="mb-3">Purchase Tokens</h3>
                     {Number(daoInfo.tokenPrice) === 0 ? (
                       <div className="alert alert-info">
@@ -2077,20 +2129,38 @@
                               <div>Created at block: {proposal.createdAt}</div>
                               <div>Current support: {proposal.supportTotal}</div>
                             </div>
-                            
+
+                            {/* Expiration status */}
+                            {proposal.isExpired ? (
+                              <div className="alert alert-danger mb-3">
+                                <strong>⏱️ EXPIRED</strong> - This proposal has passed the maximum age limit (block {proposal.expirationBlock}) without reaching the support threshold. No further support can be added.
+                              </div>
+                            ) : proposal.canTriggerElection ? (
+                              <div className="alert alert-success mb-3">
+                                <strong>✓ Ready</strong> - This proposal has enough support to trigger an election!
+                              </div>
+                            ) : (
+                              <div className="alert alert-info mb-3">
+                                <strong>Expires at block:</strong> {proposal.expirationBlock}
+                              </div>
+                            )}
+
                             <div className="row g-3 justify-content-center align-items-center">
                               <div className="col-12 col-md-6">
-                                <input 
-                                  type="number" 
+                                <input
+                                  type="number"
                                   className="form-control"
-                                  placeholder="Support tokens" 
+                                  placeholder="Support tokens"
                                   id={`support-amount-${proposal.address}`}
+                                  disabled={proposal.isExpired}
                                 />
                               </div>
                               <div className="col-12 col-md-6">
-                                <button 
+                                <button
                                   className="btn btn-primary w-100"
                                   onClick={() => addSupport(proposal.address)}
+                                  disabled={proposal.isExpired}
+                                  title={proposal.isExpired ? "Cannot add support to expired proposal" : "Add your support tokens"}
                                 >
                                   Add Support
                                 </button>
