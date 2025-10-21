@@ -133,6 +133,23 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         return balanceOf(holder, GOVERNANCE_TOKEN_ID) - locked;
     }
 
+    // Calculate vested balance at a specific block number (for election snapshots)
+    function vestedBalanceAt(address holder, uint256 blockNumber) public view returns (uint256) {
+        uint256 locked = 0;
+        VestingSchedule[] storage schedules = vestingSchedules[holder];
+        for (uint256 i = 0; i < schedules.length; i++) {
+            if (blockNumber < schedules[i].unlockBlock) {
+                locked += schedules[i].amount;
+            }
+        }
+        uint256 currentBalance = balanceOf(holder, GOVERNANCE_TOKEN_ID);
+        // If locked amount exceeds balance, return 0 (user transferred vested tokens)
+        if (locked >= currentBalance) {
+            return 0;
+        }
+        return currentBalance - locked;
+    }
+
     // Remove expired vesting schedules for gas optimization
     function _cleanupExpiredSchedules(address holder) internal {
         VestingSchedule[] storage schedules = vestingSchedules[holder];

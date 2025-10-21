@@ -179,7 +179,8 @@ abstract contract Proposal {
         // Clean up expired vesting schedules for gas optimization
         dao.cleanupVestingSchedules(msg.sender);
 
-        uint256 vestedBal = dao.vestedBalance(msg.sender);
+        // Use vested balance at election start to prevent tokens vesting during election from inflating voting power
+        uint256 vestedBal = dao.vestedBalanceAt(msg.sender, electionStart);
         require(vestedBal > 0, "No vested governance tokens to claim");
 
         hasClaimed[msg.sender] = true;
@@ -190,7 +191,7 @@ abstract contract Proposal {
         if (!electionTriggered) return 0;
         if (hasClaimed[holder]) return 0;
         if (block.number >= electionStart + dao.electionDuration()) return 0;
-        return dao.vestedBalance(holder);
+        return dao.vestedBalanceAt(holder, electionStart);
     }
     
     function checkEarlyTermination() external virtual {
