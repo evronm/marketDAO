@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "./Proposal.sol";
 
 contract MarketDAO is ERC1155, ReentrancyGuard {
@@ -233,18 +234,25 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
             require(acceptsERC20, "ERC20 not accepted");
             require(getAvailableERC20(token) >= amount, "Insufficient available ERC20");
         } else {
-            // ERC721 or ERC1155
-            if (amount == 1) {
-                require(acceptsERC721, "ERC721 not accepted");
-                try IERC721(token).ownerOf(tokenId) returns (address owner) {
-                    require(owner == address(this), "DAO does not own this ERC721 token");
-                    require(!isERC721Locked(token, tokenId), "ERC721 token already locked");
-                } catch {
-                    revert("Invalid ERC721 token");
+            // ERC721 or ERC1155 - check using ERC165
+            try IERC165(token).supportsInterface(0x80ac58cd) returns (bool isERC721) {
+                if (isERC721) {
+                    // ERC721
+                    require(acceptsERC721, "ERC721 not accepted");
+                    require(amount == 1, "ERC721 amount must be 1");
+                    try IERC721(token).ownerOf(tokenId) returns (address owner) {
+                        require(owner == address(this), "DAO does not own this ERC721 token");
+                        require(!isERC721Locked(token, tokenId), "ERC721 token already locked");
+                    } catch {
+                        revert("Invalid ERC721 token");
+                    }
+                } else {
+                    // ERC1155
+                    require(acceptsERC1155, "ERC1155 not accepted");
+                    require(getAvailableERC1155(token, tokenId) >= amount, "Insufficient available ERC1155");
                 }
-            } else {
-                require(acceptsERC1155, "ERC1155 not accepted");
-                require(getAvailableERC1155(token, tokenId) >= amount, "Insufficient available ERC1155");
+            } catch {
+                revert("Token does not support ERC165");
             }
         }
 
