@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import "../src/MarketDAO.sol";
+import "../src/ProposalFactory.sol";
 
 contract MarketDAOTest is Test {
     MarketDAO dao;
@@ -109,23 +110,23 @@ contract MarketDAOTest is Test {
 
     function testDeployerCanSetFactory() public {
         // The test contract is the deployer since it deployed in setUp
-        address mockFactory = address(0x999);
-        dao.setFactory(mockFactory);
-        assertEq(dao.factory(), mockFactory);
+        ProposalFactory factory = new ProposalFactory(dao);
+        dao.setFactory(address(factory));
+        assertEq(dao.factory(), address(factory));
     }
 
     function testFailNonDeployerCannotSetFactory() public {
-        address mockFactory = address(0x999);
+        ProposalFactory factory = new ProposalFactory(dao);
         // Try to set factory from alice's account (not deployer)
         vm.prank(alice);
-        dao.setFactory(mockFactory);
+        dao.setFactory(address(factory));
     }
 
     function testFailCannotSetFactoryTwice() public {
-        address mockFactory1 = address(0x999);
-        address mockFactory2 = address(0x888);
+        ProposalFactory factory1 = new ProposalFactory(dao);
+        ProposalFactory factory2 = new ProposalFactory(dao);
 
-        dao.setFactory(mockFactory1);
-        dao.setFactory(mockFactory2); // Should fail
+        dao.setFactory(address(factory1));
+        dao.setFactory(address(factory2)); // Should fail
     }
 }

@@ -108,6 +108,10 @@ abstract contract Proposal {
     }
     
     function canTriggerElection() public view returns (bool) {
+        // Check if proposal has expired
+        if (block.number >= createdAt + dao.maxProposalAge()) {
+            return false;
+        }
         uint256 threshold = (dao.totalSupply(0) * dao.supportThreshold()) / 10000;
         return supportTotal >= threshold;
     }

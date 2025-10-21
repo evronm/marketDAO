@@ -522,6 +522,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         require(msg.sender == deployer, "Only deployer can set factory");
         require(factory == address(0), "Factory already set");
         require(_factory != address(0), "Invalid factory address");
+        require(_factory.code.length > 0, "Factory must be a contract");
         factory = _factory;
     }
 
