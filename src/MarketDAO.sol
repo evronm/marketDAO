@@ -12,6 +12,10 @@ import "./Proposal.sol";
 
 contract MarketDAO is ERC1155, ReentrancyGuard {
     using SafeERC20 for IERC20;
+
+    // Custom errors
+    error AccountingError(uint256 unvestedTokens, uint256 totalSupply);
+
     string public name;
     uint256 public supportThreshold;        // basis points (10000 = 100%) needed to trigger election
     uint256 public quorumPercentage;        // basis points (10000 = 100%) needed for valid election
@@ -519,9 +523,10 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     // This is used for quorum calculation to ensure only votable tokens count
     function getTotalVestedSupply() public view returns (uint256) {
         uint256 total = tokenSupply[GOVERNANCE_TOKEN_ID];
-        // Handle edge case where unvested might exceed total due to rounding
+        // This should never happen - if it does, there's a critical accounting bug
+        // Revert instead of returning 0 to prevent governance exploits
         if (totalUnvestedGovernanceTokens > total) {
-            return 0;
+            revert AccountingError(totalUnvestedGovernanceTokens, total);
         }
         return total - totalUnvestedGovernanceTokens;
     }
