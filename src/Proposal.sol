@@ -142,6 +142,19 @@ abstract contract Proposal {
         snapshotTotalVotes = dao.totalSupply(0);
 
         // No upfront minting - users claim voting tokens lazily
+
+        // Lock funds if this is a treasury proposal
+        _lockFunds();
+    }
+
+    // Virtual function for treasury proposals to lock funds
+    function _lockFunds() internal virtual {
+        // Default: do nothing (only TreasuryProposal needs to lock funds)
+    }
+
+    // Virtual function to unlock funds on failure
+    function _unlockFunds() internal virtual {
+        // Default: do nothing (only TreasuryProposal needs to unlock funds)
     }
 
     function claimVotingTokens() external onlyDuringElection {
@@ -186,12 +199,17 @@ abstract contract Proposal {
         if(yesVotes >= majorityThreshold) {
             _execute();
         } else if(noVotes >= majorityThreshold) {
-            electionStart = 0; // End election
+            // Proposal rejected by majority NO votes
+            executed = true;
+            electionStart = 0;
+            _unlockFunds();
+            dao.clearActiveProposal();
         }
     }
     
     function execute() external {
         require(electionTriggered, "Election not triggered");
+        require(!executed, "Already executed");
         require(
             block.number >= electionStart + dao.electionDuration(),
             "Election still ongoing"
@@ -204,10 +222,40 @@ abstract contract Proposal {
         uint256 yesVotes = dao.balanceOf(yesVoteAddress, votingTokenId);
         uint256 noVotes = dao.balanceOf(noVoteAddress, votingTokenId);
 
+        // Check if quorum was met and proposal passed
         require(yesVotes + noVotes >= quorum, "Quorum not met");
         require(yesVotes > noVotes, "Proposal not passed");
 
+        // Proposal passed - execute it
         _execute();
+    }
+
+    // Allow anyone to explicitly fail a proposal after election ends
+    function failProposal() external {
+        require(electionTriggered, "Election not triggered");
+        require(!executed, "Already executed");
+        require(
+            block.number >= electionStart + dao.electionDuration(),
+            "Election still ongoing"
+        );
+
+        // Use snapshot taken at election start (gas optimization)
+        uint256 totalPossibleVotes = snapshotTotalVotes;
+
+        uint256 quorum = (totalPossibleVotes * dao.quorumPercentage()) / 10000;
+        uint256 yesVotes = dao.balanceOf(yesVoteAddress, votingTokenId);
+        uint256 noVotes = dao.balanceOf(noVoteAddress, votingTokenId);
+
+        // Verify proposal actually failed
+        require(
+            (yesVotes + noVotes < quorum) || (yesVotes <= noVotes),
+            "Proposal did not fail"
+        );
+
+        // Mark as executed (failed) and unlock funds
+        executed = true;
+        _unlockFunds();
+        dao.clearActiveProposal();
     }
     
     function _execute() internal virtual {

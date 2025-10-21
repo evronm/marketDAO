@@ -29,6 +29,16 @@ contract TreasuryProposal is Proposal {
     address public token;
     uint256 public tokenId;
 
+    // Override to lock funds when election is triggered
+    function _lockFunds() internal override {
+        dao.lockFunds(token, tokenId, amount);
+    }
+
+    // Override to unlock funds when proposal fails
+    function _unlockFunds() internal override {
+        dao.unlockFunds();
+    }
+
     constructor(
         MarketDAO _dao,
         string memory _description,
@@ -41,14 +51,14 @@ contract TreasuryProposal is Proposal {
         require(_amount > 0, "Amount must be positive");
         require(dao.hasTreasury(), "DAO has no treasury");
 
-        // Validate treasury has sufficient balance
+        // Validate treasury has sufficient AVAILABLE balance (total - locked)
         if(_token == address(0)) {
             require(dao.acceptsETH(), "ETH not accepted");
-            require(address(dao).balance >= _amount, "Insufficient ETH balance");
+            require(dao.getAvailableETH() >= _amount, "Insufficient available ETH balance");
         } else {
             if(_tokenId == 0) {
                 require(dao.acceptsERC20(), "ERC20 not accepted");
-                require(IERC20(_token).balanceOf(address(dao)) >= _amount, "Insufficient ERC20 balance");
+                require(dao.getAvailableERC20(_token) >= _amount, "Insufficient available ERC20 balance");
             } else {
                 if(_amount == 1) {
                     require(dao.acceptsERC721(), "ERC721 not accepted");
@@ -57,9 +67,10 @@ contract TreasuryProposal is Proposal {
                     } catch {
                         revert("Invalid ERC721 token");
                     }
+                    require(!dao.isERC721Locked(_token, _tokenId), "ERC721 token already locked");
                 } else {
                     require(dao.acceptsERC1155(), "ERC1155 not accepted");
-                    require(IERC1155(_token).balanceOf(address(dao), _tokenId) >= _amount, "Insufficient ERC1155 balance");
+                    require(dao.getAvailableERC1155(_token, _tokenId) >= _amount, "Insufficient available ERC1155 balance");
                 }
             }
         }
@@ -91,6 +102,10 @@ contract TreasuryProposal is Proposal {
             }
         }
         executed = true;
+
+        // Unlock funds (they've been consumed by the transfer)
+        dao.unlockFunds();
+
         // Clear the active proposal status at the very end of execution
         dao.clearActiveProposal();
     }

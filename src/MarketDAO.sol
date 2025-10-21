@@ -38,6 +38,17 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     mapping(address => bool) public isVoteAddress;
     mapping(address => address) public voteAddressToProposal;
 
+    // Fund locking for treasury proposals
+    struct LockedFunds {
+        address token;      // address(0) for ETH
+        uint256 tokenId;    // 0 for ETH and ERC20
+        uint256 amount;
+        uint256 lockedAt;   // Block number for chronological ordering
+    }
+    address[] public proposalsWithLockedFunds;
+    mapping(address => LockedFunds) public lockedFunds;
+    mapping(address => uint256) private lockedFundsIndex; // For O(1) removal
+
     // Proposal factory for access control
     address public factory;
     address private immutable deployer;
@@ -197,6 +208,74 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     // Treasury functions
     receive() external payable {
         require(acceptsETH, "DAO does not accept ETH");
+        _tryReleaseLockedProposals();
+    }
+
+    // Lock funds for a treasury proposal when election is triggered
+    function lockFunds(address token, uint256 tokenId, uint256 amount) external {
+        require(activeProposals[msg.sender], "Only active proposal can lock");
+        require(lockedFunds[msg.sender].amount == 0, "Already locked funds");
+        require(amount > 0, "Amount must be positive");
+
+        // Verify sufficient available funds
+        if (token == address(0)) {
+            require(acceptsETH, "ETH not accepted");
+            require(getAvailableETH() >= amount, "Insufficient available ETH");
+        } else if (tokenId == 0) {
+            require(acceptsERC20, "ERC20 not accepted");
+            require(getAvailableERC20(token) >= amount, "Insufficient available ERC20");
+        } else {
+            // ERC721 or ERC1155
+            if (amount == 1) {
+                require(acceptsERC721, "ERC721 not accepted");
+                try IERC721(token).ownerOf(tokenId) returns (address owner) {
+                    require(owner == address(this), "DAO does not own this ERC721 token");
+                    require(!isERC721Locked(token, tokenId), "ERC721 token already locked");
+                } catch {
+                    revert("Invalid ERC721 token");
+                }
+            } else {
+                require(acceptsERC1155, "ERC1155 not accepted");
+                require(getAvailableERC1155(token, tokenId) >= amount, "Insufficient available ERC1155");
+            }
+        }
+
+        // Lock the funds
+        lockedFunds[msg.sender] = LockedFunds({
+            token: token,
+            tokenId: tokenId,
+            amount: amount,
+            lockedAt: block.number
+        });
+
+        lockedFundsIndex[msg.sender] = proposalsWithLockedFunds.length;
+        proposalsWithLockedFunds.push(msg.sender);
+    }
+
+    // Unlock funds when proposal fails or completes
+    function unlockFunds() external {
+        require(activeProposals[msg.sender] || lockedFunds[msg.sender].amount > 0, "No locked funds or not active");
+
+        if (lockedFunds[msg.sender].amount > 0) {
+            // Remove from array using swap-and-pop
+            uint256 index = lockedFundsIndex[msg.sender];
+            address lastProposal = proposalsWithLockedFunds[proposalsWithLockedFunds.length - 1];
+
+            proposalsWithLockedFunds[index] = lastProposal;
+            lockedFundsIndex[lastProposal] = index;
+
+            proposalsWithLockedFunds.pop();
+            delete lockedFundsIndex[msg.sender];
+            delete lockedFunds[msg.sender];
+        }
+    }
+
+    // Try to release locked proposals when new funds arrive
+    function _tryReleaseLockedProposals() internal {
+        // Note: This is a simple implementation that doesn't actually release proposals
+        // In a full implementation, we would track "waiting" proposals and check if they
+        // can now be funded. For MVP, we'll keep this simple and let proposal creators
+        // retry failed proposals manually.
     }
 
     function transferETH(address payable recipient, uint256 amount) external nonReentrant {
@@ -454,5 +533,75 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         // In a real implementation, this would fetch from the ProposalFactory
         // For testing purposes, we'll just return address(0) if not found
         return address(0);
+    }
+
+    // Helper functions to calculate available (unlocked) balances
+
+    function getTotalLockedETH() public view returns (uint256) {
+        uint256 total = 0;
+        for (uint i = 0; i < proposalsWithLockedFunds.length; i++) {
+            address proposal = proposalsWithLockedFunds[i];
+            if (lockedFunds[proposal].token == address(0)) {
+                total += lockedFunds[proposal].amount;
+            }
+        }
+        return total;
+    }
+
+    function getAvailableETH() public view returns (uint256) {
+        uint256 totalLocked = getTotalLockedETH();
+        uint256 balance = address(this).balance;
+        return balance > totalLocked ? balance - totalLocked : 0;
+    }
+
+    function getTotalLockedERC20(address token) public view returns (uint256) {
+        uint256 total = 0;
+        for (uint i = 0; i < proposalsWithLockedFunds.length; i++) {
+            address proposal = proposalsWithLockedFunds[i];
+            LockedFunds memory locked = lockedFunds[proposal];
+            if (locked.token == token && locked.tokenId == 0) {
+                total += locked.amount;
+            }
+        }
+        return total;
+    }
+
+    function getAvailableERC20(address token) public view returns (uint256) {
+        uint256 totalLocked = getTotalLockedERC20(token);
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        return balance > totalLocked ? balance - totalLocked : 0;
+    }
+
+    function isERC721Locked(address token, uint256 tokenId) public view returns (bool) {
+        for (uint i = 0; i < proposalsWithLockedFunds.length; i++) {
+            address proposal = proposalsWithLockedFunds[i];
+            LockedFunds memory locked = lockedFunds[proposal];
+            if (locked.token == token && locked.tokenId == tokenId && locked.amount == 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function getTotalLockedERC1155(address token, uint256 tokenId) public view returns (uint256) {
+        uint256 total = 0;
+        for (uint i = 0; i < proposalsWithLockedFunds.length; i++) {
+            address proposal = proposalsWithLockedFunds[i];
+            LockedFunds memory locked = lockedFunds[proposal];
+            if (locked.token == token && locked.tokenId == tokenId && locked.amount > 1) {
+                total += locked.amount;
+            }
+        }
+        return total;
+    }
+
+    function getAvailableERC1155(address token, uint256 tokenId) public view returns (uint256) {
+        uint256 totalLocked = getTotalLockedERC1155(token, tokenId);
+        uint256 balance = IERC1155(token).balanceOf(address(this), tokenId);
+        return balance > totalLocked ? balance - totalLocked : 0;
+    }
+
+    function getProposalsWithLockedFunds() external view returns (address[] memory) {
+        return proposalsWithLockedFunds;
     }
 }
