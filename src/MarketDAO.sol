@@ -331,7 +331,12 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
             id == GOVERNANCE_TOKEN_ID || _isActiveVotingToken(id),
             "Invalid token transfer"
         );
-        
+
+        // Prevent transfer of unvested governance tokens
+        if (id == GOVERNANCE_TOKEN_ID && from != address(0)) {
+            require(vestedBalance(from) >= amount, "Cannot transfer unvested tokens");
+        }
+
         // Add check for vote transfers to ensure election is still active
         if (_isActiveVotingToken(id) && msg.sender == from) {
             // Check if destination is a registered vote address
@@ -376,12 +381,25 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         uint256[] memory amounts,
         bytes memory data
     ) public virtual override {
+        // Calculate total governance tokens being transferred
+        uint256 totalGovernanceAmount = 0;
         for(uint i = 0; i < ids.length; i++) {
             require(
                 ids[i] == GOVERNANCE_TOKEN_ID || _isActiveVotingToken(ids[i]),
                 "Invalid token transfer"
             );
-            
+
+            if (ids[i] == GOVERNANCE_TOKEN_ID) {
+                totalGovernanceAmount += amounts[i];
+            }
+        }
+
+        // Prevent transfer of unvested governance tokens
+        if (totalGovernanceAmount > 0 && from != address(0)) {
+            require(vestedBalance(from) >= totalGovernanceAmount, "Cannot transfer unvested tokens");
+        }
+
+        for(uint i = 0; i < ids.length; i++) {
             // Add check for vote transfers to ensure election is still active
             if (_isActiveVotingToken(ids[i]) && msg.sender == from) {
                 // Check if destination is a registered vote address
