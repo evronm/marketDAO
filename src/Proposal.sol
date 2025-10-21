@@ -112,7 +112,9 @@ abstract contract Proposal {
         if (block.number >= createdAt + dao.maxProposalAge()) {
             return false;
         }
-        uint256 threshold = (dao.totalSupply(0) * dao.supportThreshold()) / 10000;
+        // Use vested supply for consistency with quorum calculation
+        // This ensures threshold is based on tokens that can actually vote
+        uint256 threshold = (dao.getTotalVestedSupply() * dao.supportThreshold()) / 10000;
         return supportTotal >= threshold;
     }
     
