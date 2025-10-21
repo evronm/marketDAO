@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarketDAO Pitch Deck</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow-x: hidden;
+        }
+
+        .presentation {
+            width: 100vw;
+            height: 100vh;
+            overflow-y: scroll;
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
+        }
+
+        .slide {
+            width: 100%;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 60px 40px;
+            scroll-snap-align: start;
+            position: relative;
+        }
+
+        .slide-content {
+            max-width: 1200px;
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            padding: 60px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            font-size: 64px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1.2;
+        }
+
+        h2 {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 30px;
+            color: #1a202c;
+        }
+
+        h3 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #2d3748;
+        }
+
+        p {
+            font-size: 20px;
+            line-height: 1.8;
+            color: #4a5568;
+            margin-bottom: 20px;
+        }
+
+        .tagline {
+            font-size: 28px;
+            color: #667eea;
+            font-weight: 500;
+            margin-bottom: 40px;
+        }
+
+        .subtitle {
+            font-size: 24px;
+            color: #718096;
+            font-weight: 400;
+            margin-bottom: 30px;
+        }
+
+        ul {
+            list-style: none;
+            margin: 30px 0;
+        }
+
+        li {
+            font-size: 20px;
+            line-height: 1.8;
+            color: #4a5568;
+            margin-bottom: 15px;
+            padding-left: 30px;
+            position: relative;
+        }
+
+        li:before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .problem-box {
+            background: #fff5f5;
+            border-left: 4px solid #f56565;
+            padding: 25px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+
+        .solution-box {
+            background: #f0fff4;
+            border-left: 4px solid #48bb78;
+            padding: 25px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin: 30px 0;
+        }
+
+        .feature-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .feature-card h3 {
+            color: white;
+            margin-bottom: 15px;
+        }
+
+        .feature-card p {
+            color: rgba(255,255,255,0.9);
+            font-size: 18px;
+        }
+
+        .stat {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .stat-number {
+            font-size: 56px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            font-size: 18px;
+            color: #718096;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 50px;
+            font-size: 20px;
+            font-weight: 600;
+            text-decoration: none;
+            margin-top: 30px;
+            transition: transform 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .timeline {
+            position: relative;
+            padding: 30px 0;
+        }
+
+        .timeline-item {
+            display: flex;
+            margin-bottom: 30px;
+            align-items: flex-start;
+        }
+
+        .timeline-number {
+            min-width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 24px;
+            margin-right: 20px;
+        }
+
+        .timeline-content h3 {
+            margin-bottom: 10px;
+        }
+
+        .nav-dots {
+            position: fixed;
+            right: 30px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 1000;
+        }
+
+        .nav-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.5);
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .nav-dot:hover, .nav-dot.active {
+            background: white;
+            transform: scale(1.3);
+        }
+
+        .comparison-table {
+            width: 100%;
+            margin: 30px 0;
+            border-collapse: collapse;
+        }
+
+        .comparison-table th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-size: 18px;
+        }
+
+        .comparison-table td {
+            padding: 15px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 18px;
+        }
+
+        .comparison-table tr:nth-child(even) {
+            background: #f7fafc;
+        }
+
+        .highlight {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
+        }
+
+        .slide-number {
+            position: absolute;
+            bottom: 30px;
+            right: 40px;
+            color: rgba(102, 126, 234, 0.5);
+            font-size: 16px;
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 42px; }
+            h2 { font-size: 36px; }
+            .slide-content { padding: 40px 30px; }
+            .feature-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="nav-dots">
+        <div class="nav-dot active" onclick="scrollToSlide(0)"></div>
+        <div class="nav-dot" onclick="scrollToSlide(1)"></div>
+        <div class="nav-dot" onclick="scrollToSlide(2)"></div>
+        <div class="nav-dot" onclick="scrollToSlide(3)"></div>
+        <div class="nav-dot" onclick="scrollToSlide(4)"></div>
+        <div class="nav-dot" onclick="scrollToSlide(5)"></div>
+        <div class="nav-dot" onclick="scrollToSlide(6)"></div>
+        <div class="nav-dot" onclick="scrollToSlide(7)"></div>
+        <div class="nav-dot" onclick="scrollToSlide(8)"></div>
+        <div class="nav-dot" onclick="scrollToSlide(9)"></div>
+    </div>
+
+    <div class="presentation">
+        <!-- Slide 1: Title -->
+        <div class="slide">
+            <div class="slide-content" style="text-align: center;">
+                <h1>MarketDAO</h1>
+                <p class="tagline">Making Governance Votes Tradeable</p>
+                <p class="subtitle">Bringing Market Efficiency to Organizational Decision-Making</p>
+                <a href="https://evronm.github.io/marketDAO/index.html" class="cta-button" target="_blank">Try Live Demo</a>
+            </div>
+            <div class="slide-number">1 / 10</div>
+        </div>
+
+        <!-- Slide 2: The Problem -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>The Problem with Current Governance</h2>
+                <p>Traditional voting systems—both in governments and DAOs—are fundamentally broken:</p>
+                
+                <div class="problem-box">
+                    <h3>Rational Ignorance</h3>
+                    <p>Voters have little incentive to become informed because individual votes rarely affect outcomes. The cost of research exceeds the expected benefit.</p>
+                </div>
+
+                <div class="problem-box">
+                    <h3>Preference Intensity Blindness</h3>
+                    <p>One-token-one-vote systems treat all decisions as equally important to all voters. There's no way to signal how much you care about an issue.</p>
+                </div>
+
+                <div class="problem-box">
+                    <h3>Tyranny of the Majority</h3>
+                    <p>51% can consistently override 49%, regardless of how strongly each group feels about the issue. No compensation mechanism exists.</p>
+                </div>
+            </div>
+            <div class="slide-number">2 / 10</div>
+        </div>
+
+        <!-- Slide 3: The Solution -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>Our Solution: Tradeable Voting Rights</h2>
+                
+                <div class="solution-box">
+                    <p style="font-size: 24px; font-weight: 600; margin-bottom: 20px;">
+                        For each proposal, governance token holders receive <span class="highlight">tradeable voting tokens</span> that can be bought and sold during the election period.
+                    </p>
+                </div>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h3>🎯 Market Signals</h3>
+                        <p>Vote prices reveal the true importance of proposals to different stakeholders</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>💡 Preference Weighting</h3>
+                        <p>Care deeply? Buy more votes. Don't care? Sell them to those who do</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>🎓 Expert Influence</h3>
+                        <p>Knowledge flows to relevant decisions without creating permanent plutocracy</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>💰 Natural Compensation</h3>
+                        <p>Losing voters can sell their votes, reducing the zero-sum nature of governance</p>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">3 / 10</div>
+        </div>
+
+        <!-- Slide 4: How It Works -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>How MarketDAO Works</h2>
+                
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-number">1</div>
+                        <div class="timeline-content">
+                            <h3>Proposal Creation</h3>
+                            <p>Governance token holders submit proposals (resolutions, treasury transfers, token minting, or price changes)</p>
+                        </div>
+                    </div>
+
+                    <div class="timeline-item">
+                        <div class="timeline-number">2</div>
+                        <div class="timeline-content">
+                            <h3>Support Phase</h3>
+                            <p>Proposals need community support to trigger an election (configurable threshold)</p>
+                        </div>
+                    </div>
+
+                    <div class="timeline-item">
+                        <div class="timeline-number">3</div>
+                        <div class="timeline-content">
+                            <h3>Election Trigger</h3>
+                            <p>Voting tokens are automatically minted 1:1 for all governance token holders</p>
+                        </div>
+                    </div>
+
+                    <div class="timeline-item">
+                        <div class="timeline-number">4</div>
+                        <div class="timeline-content">
+                            <h3>Trading Period</h3>
+                            <p>Voting tokens can be freely bought and sold on any ERC1155 marketplace</p>
+                        </div>
+                    </div>
+
+                    <div class="timeline-item">
+                        <div class="timeline-number">5</div>
+                        <div class="timeline-content">
+                            <h3>Voting</h3>
+                            <p>Cast votes by sending tokens to YES/NO addresses. Early termination possible with clear majority</p>
+                        </div>
+                    </div>
+
+                    <div class="timeline-item">
+                        <div class="timeline-number">6</div>
+                        <div class="timeline-content">
+                            <h3>Execution</h3>
+                            <p>Successful proposals are automatically executed if quorum is met</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">4 / 10</div>
+        </div>
+
+        <!-- Slide 5: Market vs Traditional -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>MarketDAO vs Traditional Governance</h2>
+                
+                <table class="comparison-table">
+                    <tr>
+                        <th>Feature</th>
+                        <th>Traditional DAOs</th>
+                        <th>MarketDAO</th>
+                    </tr>
+                    <tr>
+                        <td><strong>Preference Intensity</strong></td>
+                        <td>Not captured</td>
+                        <td>✓ Revealed through market prices</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Expert Influence</strong></td>
+                        <td>Fixed by token holdings</td>
+                        <td>✓ Flows to relevant decisions</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Minority Compensation</strong></td>
+                        <td>None - zero sum</td>
+                        <td>✓ Can sell votes for value</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Information Discovery</strong></td>
+                        <td>No incentive</td>
+                        <td>✓ Profit from early insights</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Voter Engagement</strong></td>
+                        <td>Rational ignorance</td>
+                        <td>✓ Economic incentive to participate</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Governance Efficiency</strong></td>
+                        <td>Low - all equal weight</td>
+                        <td>✓ High - market optimized</td>
+                    </tr>
+                </table>
+            </div>
+            <div class="slide-number">5 / 10</div>
+        </div>
+
+        <!-- Slide 6: Market Opportunity -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>Market Opportunity</h2>
+                
+                <div class="feature-grid">
+                    <div class="stat">
+                        <span class="stat-number">$25B+</span>
+                        <span class="stat-label">Total Value Locked in DAOs</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number">10,000+</span>
+                        <span class="stat-label">Active DAO Organizations</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number">5M+</span>
+                        <span class="stat-label">DAO Governance Token Holders</span>
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 40px;">Target Use Cases</h3>
+                <ul>
+                    <li><strong>DeFi Protocols:</strong> Complex technical decisions benefit from expert concentration</li>
+                    <li><strong>Investment DAOs:</strong> Portfolio decisions where stake sizes naturally vary</li>
+                    <li><strong>Grant-making DAOs:</strong> Resource allocation with diverse stakeholder interests</li>
+                    <li><strong>Protocol Governance:</strong> Parameter changes requiring specialized knowledge</li>
+                    <li><strong>Community Organizations:</strong> Non-financial decisions with varying preference intensity</li>
+                    <li><strong>Public Goods Funding:</strong> Quadratic funding alternatives with market-based preference revelation</li>
+                </ul>
+            </div>
+            <div class="slide-number">6 / 10</div>
+        </div>
+
+        <!-- Slide 7: Technology -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>Technology & Implementation</h2>
+                
+                <h3>Smart Contract Architecture</h3>
+                <ul>
+                    <li>Built on Solidity ^0.8.20 with OpenZeppelin libraries</li>
+                    <li>ERC1155 multi-token standard for governance and voting tokens</li>
+                    <li>ReentrancyGuard protection for treasury operations</li>
+                    <li>Factory pattern for flexible proposal creation</li>
+                    <li>Gas-optimized with efficient storage patterns</li>
+                </ul>
+
+                <h3 style="margin-top: 30px;">Key Features</h3>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h3>Flexible Configuration</h3>
+                        <p>Customizable thresholds, quorum, election duration, and treasury settings</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>Multi-Asset Treasury</h3>
+                        <p>Support for ETH, ERC20, ERC721, and ERC1155 tokens</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>Early Termination</h3>
+                        <p>Elections end automatically when clear majority reached</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>Marketplace Ready</h3>
+                        <p>Voting tokens compatible with existing NFT/token marketplaces</p>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">7 / 10</div>
+        </div>
+
+        <!-- Slide 8: Traction -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>Current Status & Traction</h2>
+                
+                <div class="solution-box">
+                    <h3>✓ MVP Deployed</h3>
+                    <p>Fully functional implementation live on Polygon Amoy testnet with complete UI</p>
+                </div>
+
+                <div class="solution-box">
+                    <h3>✓ Open Source</h3>
+                    <p>All contracts and frontend code available on GitHub for community review and contribution</p>
+                </div>
+
+                <div class="solution-box">
+                    <h3>✓ Documented</h3>
+                    <p>Comprehensive technical documentation, user guides, and concept explanations published</p>
+                </div>
+
+                <h3 style="margin-top: 40px;">What's Live Today</h3>
+                <ul>
+                    <li>Core governance mechanism with tradeable voting rights</li>
+                    <li>Four proposal types (Resolution, Treasury, Mint, Token Price)</li>
+                    <li>Web-based interface for all governance operations</li>
+                    <li>Integration with Rarible marketplace for token trading</li>
+                    <li>Complete proposal lifecycle from creation to execution</li>
+                </ul>
+            </div>
+            <div class="slide-number">8 / 10</div>
+        </div>
+
+        <!-- Slide 9: Roadmap -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>Roadmap & Future Development</h2>
+                
+                <h3>Phase 1: Foundation (Current)</h3>
+                <ul>
+                    <li>Core governance mechanism with tradeable votes</li>
+                    <li>Basic proposal types and treasury management</li>
+                    <li>Testnet deployment and community testing</li>
+                </ul>
+
+                <h3>Phase 2: Enhanced Features (Q4 2025 - Q1 2026)</h3>
+                <ul>
+                    <li>Integrated voting token marketplace within the app</li>
+                    <li>Advanced proposal types (multi-choice, conditional)</li>
+                    <li>Resolution management (expiration, cancellation)</li>
+                    <li>Staking mechanisms to prevent spam</li>
+                    <li>Mainnet deployment on Ethereum and L2s</li>
+                </ul>
+
+                <h3>Phase 3: Ecosystem Growth (Q2-Q4 2026)</h3>
+                <ul>
+                    <li>DAO-as-a-Service platform for easy deployment</li>
+                    <li>Analytics dashboard for governance insights</li>
+                    <li>API and SDK for third-party integrations</li>
+                    <li>Partnership program with existing DAO platforms</li>
+                    <li>Research into hybrid governance models</li>
+                </ul>
+            </div>
+            <div class="slide-number">9 / 10</div>
+        </div>
+
+        <!-- Slide 10: Call to Action -->
+        <div class="slide">
+            <div class="slide-content" style="text-align: center;">
+                <h2>Support Public Goods Innovation</h2>
+                <p class="subtitle">MarketDAO is open-source infrastructure for more efficient, informed governance</p>
+                
+                <h3 style="margin: 40px 0 30px 0;">Grant Funding Will Enable:</h3>
+                
+                <div class="feature-grid" style="margin: 30px 0;">
+                    <div class="feature-card">
+                        <h3>Mainnet Deployment</h3>
+                        <p>Security audits and deployment to Ethereum mainnet and L2s for production use</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>Enhanced Features</h3>
+                        <p>Built-in marketplace, advanced proposal types, and staking mechanisms</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>Research & Education</h3>
+                        <p>Academic partnerships to study market-driven governance and publish findings</p>
+                    </div>
+                </div>
+
+                <div style="background: #f7fafc; padding: 30px; border-radius: 12px; margin: 40px 0; text-align: left;">
+                    <h3 style="text-align: center; margin-bottom: 20px;">Why MarketDAO is a Public Good</h3>
+                    <ul style="list-style: none; padding: 0;">
+                        <li style="margin: 15px 0; padding-left: 0;">✓ Fully open-source (MIT licensed) - available to all DAOs</li>
+                        <li style="margin: 15px 0; padding-left: 0;">✓ Non-extractive - no fees, tokens, or rent-seeking mechanisms</li>
+                        <li style="margin: 15px 0; padding-left: 0;">✓ Research contribution - advances governance mechanism design</li>
+                        <li style="margin: 15px 0; padding-left: 0;">✓ Composable infrastructure - benefits entire DAO ecosystem</li>
+                    </ul>
+                </div>
+
+                <div style="margin-top: 50px;">
+                    <a href="https://evronm.github.io/marketDAO/index.html" class="cta-button" target="_blank">Try Live Demo</a>
+                    <a href="https://github.com/evronm/marketDAO" class="cta-button" target="_blank" style="margin-left: 20px;">View on GitHub</a>
+                </div>
+
+                <p style="margin-top: 40px; font-size: 18px; color: #718096;">
+                    Contact: github.com/evronm/marketDAO
+                </p>
+            </div>
+            <div class="slide-number">10 / 10</div>
+        </div>
+    </div>
+
+    <script>
+        function scrollToSlide(index) {
+            const slides = document.querySelectorAll('.slide');
+            slides[index].scrollIntoView({ behavior: 'smooth' });
+            
+            // Update active dot
+            document.querySelectorAll('.nav-dot').forEach((dot, i) => {
+                dot.classList.toggle('active', i === index);
+            });
+        }
+
+        // Update active dot on scroll
+        const presentation = document.querySelector('.presentation');
+        const slides = document.querySelectorAll('.slide');
+        const dots = document.querySelectorAll('.nav-dot');
+
+        presentation.addEventListener('scroll', () => {
+            const scrollPosition = presentation.scrollTop;
+            const windowHeight = window.innerHeight;
+            
+            slides.forEach((slide, index) => {
+                const slideTop = slide.offsetTop;
+                const slideBottom = slideTop + slide.offsetHeight;
+                
+                if (scrollPosition >= slideTop - windowHeight / 2 && 
+                    scrollPosition < slideBottom - windowHeight / 2) {
+                    dots.forEach(dot => dot.classList.remove('active'));
+                    dots[index].classList.add('active');
+                }
+            });
+        });
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            const currentDot = document.querySelector('.nav-dot.active');
+            const currentIndex = Array.from(dots).indexOf(currentDot);
+            
+            if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                if (currentIndex < dots.length - 1) {
+                    scrollToSlide(currentIndex + 1);
+                }
+            } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                e.preventDefault();
+                if (currentIndex > 0) {
+                    scrollToSlide(currentIndex - 1);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
