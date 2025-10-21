@@ -351,6 +351,8 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
 
         // Prevent transfer of unvested governance tokens
         if (id == GOVERNANCE_TOKEN_ID && from != address(0)) {
+            // Cleanup expired schedules to keep totalUnvestedGovernanceTokens accurate
+            _cleanupExpiredSchedules(from);
             require(vestedBalance(from) >= amount, "Cannot transfer unvested tokens");
         }
 
@@ -413,6 +415,8 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
 
         // Prevent transfer of unvested governance tokens
         if (totalGovernanceAmount > 0 && from != address(0)) {
+            // Cleanup expired schedules to keep totalUnvestedGovernanceTokens accurate
+            _cleanupExpiredSchedules(from);
             require(vestedBalance(from) >= totalGovernanceAmount, "Cannot transfer unvested tokens");
         }
 
