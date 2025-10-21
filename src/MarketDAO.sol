@@ -519,6 +519,9 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     
     function registerVoteAddress(address voteAddr) external {
         require(activeProposals[msg.sender], "Only active proposal can register vote address");
+        require(!isVoteAddress[voteAddr], "Vote address already registered");
+        require(voteAddr != address(0), "Invalid vote address");
+        require(voteAddr.code.length == 0, "Vote address cannot be a contract");
         isVoteAddress[voteAddr] = true;
         voteAddressToProposal[voteAddr] = msg.sender;
     }

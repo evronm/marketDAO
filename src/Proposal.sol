@@ -117,11 +117,23 @@ abstract contract Proposal {
         electionStart = block.number;
         votingTokenId = dao.getNextVotingTokenId();
 
-        // Generate deterministic vote addresses
+        // Generate deterministic vote addresses with enhanced entropy
+        // Using multiple sources makes collision virtually impossible:
+        // - address(dao): Unique per DAO instance
+        // - votingTokenId: Sequential per DAO
+        // - proposer: Transaction sender
+        // - description: Proposal details
+        // - block.timestamp: Time of election trigger (cannot be predicted)
+        // - block.number: Block height at trigger (cannot be predicted)
+        // - address(this): Unique proposal contract address
         bytes32 salt = keccak256(abi.encodePacked(
+            address(dao),
             votingTokenId,
             proposer,
-            description
+            description,
+            block.timestamp,
+            block.number,
+            address(this)
         ));
         yesVoteAddress = address(uint160(uint256(keccak256(
             abi.encodePacked(salt, "yes")
@@ -130,7 +142,7 @@ abstract contract Proposal {
             abi.encodePacked(salt, "no")
         ))));
 
-        // Register vote addresses with the DAO
+        // Register vote addresses with the DAO (includes collision check)
         dao.registerVoteAddress(yesVoteAddress);
         dao.registerVoteAddress(noVoteAddress);
 
