@@ -147,11 +147,9 @@ abstract contract Proposal {
         dao.registerVoteAddress(noVoteAddress);
 
         // Snapshot total possible votes at election start
-        // Uses total supply for O(1) calculation (unlimited scalability)
-        // Note: This includes unvested tokens in the quorum calculation,
-        // but voting tokens can only be claimed for vested balance,
-        // so this makes quorum slightly more conservative
-        snapshotTotalVotes = dao.totalSupply(0);
+        // Uses vested supply for O(1) calculation (unlimited scalability)
+        // This ensures quorum only counts tokens that can actually vote
+        snapshotTotalVotes = dao.getTotalVestedSupply();
 
         // No upfront minting - users claim voting tokens lazily
 

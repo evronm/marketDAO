@@ -65,6 +65,9 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     mapping(address => bool) private isGovernanceTokenHolder;
     mapping(address => uint256) private holderIndex; // O(1) lookup for holder removal
     mapping(uint256 => uint256) private tokenSupply;
+
+    // Track total unvested governance tokens for efficient quorum calculation
+    uint256 public totalUnvestedGovernanceTokens;
     
     constructor(
         string memory _name,
@@ -130,7 +133,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         VestingSchedule[] storage schedules = vestingSchedules[holder];
         uint256 writeIndex = 0;
 
-        // Copy only non-expired schedules
+        // Copy only non-expired schedules and track what was removed
         for (uint256 readIndex = 0; readIndex < schedules.length; readIndex++) {
             if (block.number < schedules[readIndex].unlockBlock) {
                 // Still locked, keep it
@@ -138,8 +141,10 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
                     schedules[writeIndex] = schedules[readIndex];
                 }
                 writeIndex++;
+            } else {
+                // Expired schedule - decrement unvested counter
+                totalUnvestedGovernanceTokens -= schedules[readIndex].amount;
             }
-            // Expired schedules are skipped (deleted)
         }
 
         // Trim array to new size
@@ -202,6 +207,9 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
                     unlockBlock: unlockBlock
                 }));
             }
+
+            // Increment unvested counter (whether merged or new)
+            totalUnvestedGovernanceTokens += tokenAmount;
         }
     }
     
@@ -497,6 +505,17 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
 
     function getGovernanceTokenHolders() external view returns (address[] memory) {
         return governanceTokenHolders;
+    }
+
+    // Get total supply of vested (unlocked) governance tokens
+    // This is used for quorum calculation to ensure only votable tokens count
+    function getTotalVestedSupply() public view returns (uint256) {
+        uint256 total = tokenSupply[GOVERNANCE_TOKEN_ID];
+        // Handle edge case where unvested might exceed total due to rounding
+        if (totalUnvestedGovernanceTokens > total) {
+            return 0;
+        }
+        return total - totalUnvestedGovernanceTokens;
     }
 
     function setFactory(address _factory) external {
