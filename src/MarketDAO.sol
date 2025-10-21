@@ -315,23 +315,23 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         // retry failed proposals manually.
     }
 
-    function transferETH(address payable recipient, uint256 amount) external nonReentrant {
+    function transferETH(address payable recipient, uint256 amount) external {
         require(activeProposals[msg.sender], "Only active proposal can transfer");
         (bool success, ) = recipient.call{value: amount}("");
         require(success, "ETH transfer failed");
     }
 
-    function transferERC20(address token, address recipient, uint256 amount) external nonReentrant {
+    function transferERC20(address token, address recipient, uint256 amount) external {
         require(activeProposals[msg.sender], "Only active proposal can transfer");
         IERC20(token).safeTransfer(recipient, amount);
     }
 
-    function transferERC721(address token, address recipient, uint256 tokenId) external nonReentrant {
+    function transferERC721(address token, address recipient, uint256 tokenId) external {
         require(activeProposals[msg.sender], "Only active proposal can transfer");
         IERC721(token).safeTransferFrom(address(this), recipient, tokenId);
     }
 
-    function transferERC1155(address token, address recipient, uint256 tokenId, uint256 amount) external nonReentrant {
+    function transferERC1155(address token, address recipient, uint256 tokenId, uint256 amount) external {
         require(activeProposals[msg.sender], "Only active proposal can transfer");
         IERC1155(token).safeTransferFrom(address(this), recipient, tokenId, amount, "");
     }
@@ -343,7 +343,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         uint256 id,
         uint256 amount,
         bytes memory data
-    ) public virtual override {
+    ) public virtual override nonReentrant {
         require(
             id == GOVERNANCE_TOKEN_ID || _isActiveVotingToken(id),
             "Invalid token transfer"
@@ -397,7 +397,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         uint256[] memory ids,
         uint256[] memory amounts,
         bytes memory data
-    ) public virtual override {
+    ) public virtual override nonReentrant {
         // Calculate total governance tokens being transferred
         uint256 totalGovernanceAmount = 0;
         for(uint i = 0; i < ids.length; i++) {
