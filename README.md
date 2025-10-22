@@ -50,11 +50,12 @@ To minimize gas costs when elections are triggered, voting tokens use a "lazy mi
 To prevent governance attacks where an actor purchases enough tokens to immediately control the DAO, purchased tokens are subject to a vesting period:
 
 - **Vested tokens**: Available for governance (creating/supporting proposals, receiving voting tokens)
-- **Unvested tokens**: Locked for governance but transferable
-- **Automatic cleanup**: Expired vesting schedules are automatically removed during user interactions
+- **Unvested tokens**: Locked for governance and not transferable (prevents circumventing vesting)
+- **Automatic cleanup**: Expired vesting schedules are automatically removed when transferring governance tokens
+- **Accurate accounting**: Automatic cleanup maintains accurate `totalUnvestedGovernanceTokens` counter for quorum calculations
 - **Schedule consolidation**: Multiple purchases with the same unlock time are automatically merged
 - **Schedule limit**: Maximum 10 active vesting schedules per address (prevents DoS attacks)
-- **Manual cleanup**: Users can call `cleanupMyVestingSchedules()` to remove expired schedules
+- **Manual cleanup**: Users can call `cleanupMyVestingSchedules()` to remove expired schedules anytime
 - **Frontend display**: Dashboard shows total, vested, and unvested balances separately
 
 Initial token holders (from constructor) are not subject to vesting restrictions.
@@ -63,9 +64,9 @@ Initial token holders (from constructor) are not subject to vesting restrictions
 
 To enable unlimited scalability without gas limit concerns:
 
-- **O(1) snapshot creation**: Uses total supply instead of looping through all holders (~280K gas regardless of holder count)
+- **O(1) snapshot creation**: Uses total vested supply instead of looping through all holders
 - **Truly unlimited holders**: Tested with 10,000+ holders with constant gas costs
-- **Conservative quorum**: Snapshot includes all tokens (vested + unvested) in quorum calculation, but voting tokens can only be claimed for vested balance
+- **Accurate quorum**: Quorum calculated from vested supply only (unvested tokens cannot vote)
 - **Fair voting**: Voting power frozen at election start, preventing mid-election manipulation
 - **No gas limit concerns**: Election triggering cannot fail due to too many holders
 
@@ -74,10 +75,10 @@ To enable unlimited scalability without gas limit concerns:
 MarketDAO has been audited and hardened against common vulnerabilities:
 
 ### Security Features
+- ✅ **Reentrancy protection**: Transfer functions (`safeTransferFrom`, `safeBatchTransferFrom`) use ReentrancyGuard to prevent reentrancy during vote transfers and early termination
 - ✅ **Factory-only proposal registration**: Only the official ProposalFactory can register proposals
 - ✅ **Safe token transfers**: Uses OpenZeppelin's SafeERC20 and safeTransferFrom for all token operations
 - ✅ **Basis points precision**: Thresholds use basis points (10000 = 100%) for 0.01% precision
-- ✅ **ReentrancyGuard**: Protected against reentrancy attacks on critical functions
 - ✅ **Bounded gas costs**: All operations have predictable, capped gas costs
 
 ### Scalability Guarantees
@@ -92,6 +93,29 @@ MarketDAO has been audited and hardened against common vulnerabilities:
 - ✅ **Vesting schedule limits**: Max 10 active schedules per address with auto-cleanup
 - ✅ **Consolidation**: Automatic merging of schedules with same unlock time
 - ✅ **Gas-bounded operations**: Election triggering uses constant gas regardless of holder count
+
+## Known Limitations & Design Decisions
+
+These are intentional design choices that should be understood before deployment:
+
+### Treasury Proposal Competition
+
+**Behavior**: Multiple treasury proposals can be created requesting the same funds. Funds are only locked when a proposal reaches the support threshold and triggers an election. If proposal A locks the funds first, proposal B will fail when trying to start its election.
+
+**Rationale**: Locking funds at proposal creation would enable trivial DoS attacks (spam proposals locking all treasury). Current design ensures only proposals with real community support (20%+ backing) can lock funds.
+
+**Mitigation**: Community should coordinate on competing proposals. Frontend should display when multiple proposals request overlapping funds.
+
+### Support Tracking After Token Transfers
+
+**Behavior**: Support amounts are recorded when added but not automatically adjusted if users transfer their governance tokens afterward. Support only triggers elections - it does not affect voting outcomes.
+
+**Why Not Critical**: Even if support is artificially inflated, winning an election still requires:
+- 51% quorum participation from real token holders
+- Majority YES votes based on actual token holdings at election start
+- Attack cost (gas + token ownership) exceeds any benefit
+
+**Mitigation**: Monitor for unusual support patterns. Set appropriate support thresholds to make attacks expensive.
 
 ## Installation & Development
 
