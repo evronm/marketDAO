@@ -117,6 +117,16 @@ These are intentional design choices that should be understood before deployment
 
 **Mitigation**: Monitor for unusual support patterns. Set appropriate support thresholds to make attacks expensive.
 
+### Fund Locking Gas Costs
+
+**Behavior**: Functions that calculate available treasury balances (`getAvailableETH`, `getAvailableERC20`, etc.) iterate through all proposals with locked funds. Gas costs scale linearly with the number of concurrent treasury proposals in their election phase.
+
+**Impact**: With many concurrent treasury proposals (50+), creating new treasury proposals or triggering elections could become expensive or potentially hit gas limits.
+
+**Likelihood**: Low - Most DAOs will have fewer than 10 concurrent treasury elections at any time since elections are typically short (50 blocks).
+
+**Mitigation**: If your DAO expects high concurrent treasury activity, consider shorter election durations or implementing a proposal limit.
+
 ## Installation & Development
 
 ```bash
