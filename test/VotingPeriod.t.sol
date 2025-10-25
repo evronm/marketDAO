@@ -34,7 +34,7 @@ contract TestMarketDAO is MarketDAO {
         activeProposals[proposal] = true;
     }
     
-    function getProposal(uint256) external view override returns (address) {
+    function getProposal(uint256) external view returns (address) {
         return mockProposal;
     }
 }

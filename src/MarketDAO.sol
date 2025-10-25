@@ -602,13 +602,6 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     function isProposalActive(address proposal) external view returns (bool) {
         return activeProposals[proposal];
     }
-    
-    // Helper function to get a proposal address by index from the ProposalFactory
-    function getProposal(uint256 index) external virtual view returns (address) {
-        // In a real implementation, this would fetch from the ProposalFactory
-        // For testing purposes, we'll just return address(0) if not found
-        return address(0);
-    }
 
     // Helper functions to calculate available (unlocked) balances
 
