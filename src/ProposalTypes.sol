@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 
 contract ResolutionProposal is Proposal {
     constructor(
@@ -62,24 +63,25 @@ contract TreasuryProposal is Proposal {
                 require(dao.getAvailableERC20(_token) >= _amount, "Insufficient available ERC20 balance");
             } else {
                 // ERC721 or ERC1155 - check using ERC165
-                try IERC165(_token).supportsInterface(0x80ac58cd) returns (bool isERC721) {
-                    if (isERC721) {
-                        // ERC721
-                        require(dao.acceptsERC721(), "ERC721 not accepted");
-                        require(_amount == 1, "ERC721 amount must be 1");
-                        try IERC721(_token).ownerOf(_tokenId) returns (address owner) {
-                            require(owner == address(dao), "DAO does not own this ERC721 token");
-                        } catch {
-                            revert("Invalid ERC721 token");
-                        }
-                        require(!dao.isERC721Locked(_token, _tokenId), "ERC721 token already locked");
-                    } else {
-                        // ERC1155
-                        require(dao.acceptsERC1155(), "ERC1155 not accepted");
-                        require(dao.getAvailableERC1155(_token, _tokenId) >= _amount, "Insufficient available ERC1155 balance");
+                bytes4 ERC721_INTERFACE_ID = 0x80ac58cd;
+                bytes4 ERC1155_INTERFACE_ID = 0xd9b67a26;
+
+                if (ERC165Checker.supportsInterface(_token, ERC721_INTERFACE_ID)) {
+                    // ERC721
+                    require(dao.acceptsERC721(), "ERC721 not accepted");
+                    require(_amount == 1, "ERC721 amount must be 1");
+                    try IERC721(_token).ownerOf(_tokenId) returns (address owner) {
+                        require(owner == address(dao), "DAO does not own this ERC721 token");
+                    } catch {
+                        revert("Invalid ERC721 token");
                     }
-                } catch {
-                    revert("Token does not support ERC165");
+                    require(!dao.isERC721Locked(_token, _tokenId), "ERC721 token already locked");
+                } else if (ERC165Checker.supportsInterface(_token, ERC1155_INTERFACE_ID)) {
+                    // ERC1155
+                    require(dao.acceptsERC1155(), "ERC1155 not accepted");
+                    require(dao.getAvailableERC1155(_token, _tokenId) >= _amount, "Insufficient available ERC1155 balance");
+                } else {
+                    revert("Token must support ERC721 or ERC1155 interface");
                 }
             }
         }
@@ -102,19 +104,20 @@ contract TreasuryProposal is Proposal {
                 dao.transferERC20(token, recipient, amount);
             } else {
                 // ERC721 or ERC1155 - check using ERC165
-                try IERC165(token).supportsInterface(0x80ac58cd) returns (bool isERC721) {
-                    if (isERC721) {
-                        // ERC721
-                        require(dao.acceptsERC721(), "ERC721 not accepted");
-                        require(amount == 1, "ERC721 amount must be 1");
-                        dao.transferERC721(token, recipient, tokenId);
-                    } else {
-                        // ERC1155
-                        require(dao.acceptsERC1155(), "ERC1155 not accepted");
-                        dao.transferERC1155(token, recipient, tokenId, amount);
-                    }
-                } catch {
-                    revert("Token does not support ERC165");
+                bytes4 ERC721_INTERFACE_ID = 0x80ac58cd;
+                bytes4 ERC1155_INTERFACE_ID = 0xd9b67a26;
+
+                if (ERC165Checker.supportsInterface(token, ERC721_INTERFACE_ID)) {
+                    // ERC721
+                    require(dao.acceptsERC721(), "ERC721 not accepted");
+                    require(amount == 1, "ERC721 amount must be 1");
+                    dao.transferERC721(token, recipient, tokenId);
+                } else if (ERC165Checker.supportsInterface(token, ERC1155_INTERFACE_ID)) {
+                    // ERC1155
+                    require(dao.acceptsERC1155(), "ERC1155 not accepted");
+                    dao.transferERC1155(token, recipient, tokenId, amount);
+                } else {
+                    revert("Token must support ERC721 or ERC1155 interface");
                 }
             }
         }
