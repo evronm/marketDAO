@@ -656,7 +656,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         for (uint i = 0; i < proposalsWithLockedFunds.length; i++) {
             address proposal = proposalsWithLockedFunds[i];
             LockedFunds memory locked = lockedFunds[proposal];
-            if (locked.token == token && locked.tokenId == tokenId && locked.amount > 1) {
+            if (locked.token == token && locked.tokenId == tokenId && locked.amount >= 1) {
                 total += locked.amount;
             }
         }
