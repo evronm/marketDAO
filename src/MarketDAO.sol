@@ -175,18 +175,21 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         }
     }
 
-    // Public function for users to manually cleanup their schedules
-    function cleanupMyVestingSchedules() external {
-        _cleanupExpiredSchedules(msg.sender);
+    // Check if holder has any expired vesting schedules that need claiming
+    function hasClaimableVesting(address holder) public view returns (bool) {
+        VestingSchedule[] storage schedules = vestingSchedules[holder];
+        for (uint256 i = 0; i < schedules.length; i++) {
+            if (block.number >= schedules[i].unlockBlock) {
+                return true; // Has expired schedules that need claiming
+            }
+        }
+        return false;
     }
 
-    // Cleanup function callable by active proposals or the holder themselves
-    function cleanupVestingSchedules(address holder) external {
-        require(
-            msg.sender == holder || activeProposals[msg.sender],
-            "Only holder or active proposal can cleanup"
-        );
-        _cleanupExpiredSchedules(holder);
+    // Public function for users to manually claim their vested tokens
+    function claimVestedTokens() external {
+        require(hasClaimableVesting(msg.sender), "No vested tokens to claim");
+        _cleanupExpiredSchedules(msg.sender);
     }
 
     // Direct token purchase function
@@ -351,8 +354,8 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
 
         // Prevent transfer of unvested governance tokens
         if (id == GOVERNANCE_TOKEN_ID && from != address(0)) {
-            // Cleanup expired schedules to keep totalUnvestedGovernanceTokens accurate
-            _cleanupExpiredSchedules(from);
+            // Require user to claim vested tokens before transferring
+            require(!hasClaimableVesting(from), "Must claim vested tokens first");
             require(vestedBalance(from) >= amount, "Cannot transfer unvested tokens");
         }
 
@@ -415,8 +418,8 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
 
         // Prevent transfer of unvested governance tokens
         if (totalGovernanceAmount > 0 && from != address(0)) {
-            // Cleanup expired schedules to keep totalUnvestedGovernanceTokens accurate
-            _cleanupExpiredSchedules(from);
+            // Require user to claim vested tokens before transferring
+            require(!hasClaimableVesting(from), "Must claim vested tokens first");
             require(vestedBalance(from) >= totalGovernanceAmount, "Cannot transfer unvested tokens");
         }
 

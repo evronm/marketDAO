@@ -50,13 +50,17 @@ contract VestingAutoCleanupTest is Test {
         // totalUnvestedGovernanceTokens hasn't been updated yet
         assertEq(dao.totalUnvestedGovernanceTokens(), 1, "Counter not updated yet");
 
-        // User1 transfers tokens - this should trigger automatic cleanup
+        // User1 must claim vested tokens before transfer
         vm.prank(user1);
-        dao.safeTransferFrom(user1, user2, 0, 100, "");
+        dao.claimVestedTokens();
 
         // Now totalUnvestedGovernanceTokens should be updated
-        assertEq(dao.totalUnvestedGovernanceTokens(), 0, "Counter should be cleaned up after transfer");
+        assertEq(dao.totalUnvestedGovernanceTokens(), 0, "Counter should be cleaned up after claim");
         assertEq(dao.getTotalVestedSupply(), 1001, "All tokens should now be vested");
+
+        // Now transfer works
+        vm.prank(user1);
+        dao.safeTransferFrom(user1, user2, 0, 100, "");
     }
 
     function testAutoCleanupOnBatchTransfer() public {
@@ -70,7 +74,14 @@ contract VestingAutoCleanupTest is Test {
         // Fast forward past vesting period
         vm.roll(block.number + 101);
 
-        // Batch transfer should also trigger cleanup
+        // Must claim before batch transfer
+        vm.prank(user1);
+        dao.claimVestedTokens();
+
+        // Counter should be cleaned up
+        assertEq(dao.totalUnvestedGovernanceTokens(), 0, "Counter should be cleaned up after claim");
+
+        // Now batch transfer works
         uint256[] memory ids = new uint256[](1);
         ids[0] = 0;
         uint256[] memory amounts = new uint256[](1);
@@ -78,9 +89,6 @@ contract VestingAutoCleanupTest is Test {
 
         vm.prank(user1);
         dao.safeBatchTransferFrom(user1, user2, ids, amounts, "");
-
-        // Counter should be cleaned up
-        assertEq(dao.totalUnvestedGovernanceTokens(), 0, "Counter should be cleaned up after batch transfer");
     }
 
     function testMultipleTransfersKeepCounterAccurate() public {
@@ -102,20 +110,28 @@ contract VestingAutoCleanupTest is Test {
         // Move to block 120 - first schedule expired, second still locked
         vm.roll(120);
 
-        // Transfer triggers cleanup - should remove first schedule only
+        // Claim triggers cleanup - should remove first schedule only
         vm.prank(user1);
-        dao.safeTransferFrom(user1, user2, 0, 100, "");
+        dao.claimVestedTokens();
 
         assertEq(dao.totalUnvestedGovernanceTokens(), 1, "Should have 1 unvested token remaining");
+
+        // Now transfer works
+        vm.prank(user1);
+        dao.safeTransferFrom(user1, user2, 0, 100, "");
 
         // Move past second vesting period
         vm.roll(151);
 
-        // Another transfer cleans up the second schedule
+        // Claim cleans up the second schedule
         vm.prank(user1);
-        dao.safeTransferFrom(user1, user2, 0, 100, "");
+        dao.claimVestedTokens();
 
         assertEq(dao.totalUnvestedGovernanceTokens(), 0, "All vesting should be cleaned up");
+
+        // Now transfer works
+        vm.prank(user1);
+        dao.safeTransferFrom(user1, user2, 0, 100, "");
     }
 
     function testCleanupDoesNotAffectVestedBalance() public {
@@ -133,7 +149,11 @@ contract VestingAutoCleanupTest is Test {
         uint256 vestedAfter = dao.vestedBalance(user1);
         assertEq(vestedAfter, 1001, "All tokens should be vested now");
 
-        // Transfer triggers cleanup
+        // Claim triggers cleanup
+        vm.prank(user1);
+        dao.claimVestedTokens();
+
+        // Transfer now works
         vm.prank(user1);
         dao.safeTransferFrom(user1, user2, 0, 100, "");
 

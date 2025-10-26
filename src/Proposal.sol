@@ -73,8 +73,8 @@ abstract contract Proposal {
             "Proposal expired"
         );
 
-        // Clean up expired vesting schedules for gas optimization
-        dao.cleanupVestingSchedules(msg.sender);
+        // Require user to claim vested tokens before participating in governance
+        require(!dao.hasClaimableVesting(msg.sender), "Must claim vested tokens first");
 
         uint256 availableBalance = dao.vestedBalance(msg.sender);
         require(
@@ -176,8 +176,8 @@ abstract contract Proposal {
     function claimVotingTokens() external onlyDuringElection {
         require(!hasClaimed[msg.sender], "Already claimed voting tokens");
 
-        // Clean up expired vesting schedules for gas optimization
-        dao.cleanupVestingSchedules(msg.sender);
+        // Require user to claim vested tokens before participating in voting
+        require(!dao.hasClaimableVesting(msg.sender), "Must claim vested tokens first");
 
         // Use vested balance at election start to prevent tokens vesting during election from inflating voting power
         uint256 vestedBal = dao.vestedBalanceAt(msg.sender, electionStart);

@@ -91,9 +91,9 @@ contract VestedSupplyTrackingTest is Test {
         // Fast forward past vesting period (100 blocks)
         vm.roll(102);
 
-        // Cleanup expired schedules
+        // Claim vested tokens
         vm.prank(user2);
-        dao.cleanupMyVestingSchedules();
+        dao.claimVestedTokens();
 
         // Unvested counter should be decremented
         assertEq(dao.totalUnvestedGovernanceTokens(), 0, "All tokens now vested");
@@ -173,9 +173,9 @@ contract VestedSupplyTrackingTest is Test {
         uint256 vestedBalance = dao.vestedBalance(user2);
         assertEq(vestedBalance, 50, "User2 should have 50 vested");
 
-        // Cleanup needs to be called explicitly
+        // Claiming vested tokens needs to be done explicitly
         vm.prank(user2);
-        dao.cleanupMyVestingSchedules();
+        dao.claimVestedTokens();
 
         assertEq(dao.getTotalVestedSupply(), 150, "150 total vested after cleanup");
     }
@@ -201,9 +201,9 @@ contract VestedSupplyTrackingTest is Test {
         // Fast forward to block 102 (user2's vesting complete, user3 still vesting)
         vm.roll(102);
 
-        // Cleanup user2
+        // Claim user2's vested tokens
         vm.prank(user2);
-        dao.cleanupMyVestingSchedules();
+        dao.claimVestedTokens();
 
         assertEq(dao.totalUnvestedGovernanceTokens(), 20, "20 tokens still unvested (user3)");
         assertEq(dao.getTotalVestedSupply(), 130, "130 vested (100 + 30)");
@@ -211,9 +211,9 @@ contract VestedSupplyTrackingTest is Test {
         // Fast forward to block 111 (user3's vesting complete)
         vm.roll(111);
 
-        // Cleanup user3
+        // Claim user3's vested tokens
         vm.prank(user3);
-        dao.cleanupMyVestingSchedules();
+        dao.claimVestedTokens();
 
         assertEq(dao.totalUnvestedGovernanceTokens(), 0, "All tokens vested");
         assertEq(dao.getTotalVestedSupply(), 150, "150 total vested");

@@ -211,6 +211,10 @@ contract VestingTest is Test {
         vm.roll(purchaseBlock + VESTING_PERIOD);
         assertEq(dao.vestedBalance(attacker), 10);
 
+        // Attacker must claim their vested tokens before participating
+        vm.prank(attacker);
+        dao.claimVestedTokens();
+
         // Create and trigger election for second proposal AFTER vesting completes
         vm.prank(alice);
         TreasuryProposal proposal2 = factory.createTreasuryProposal(

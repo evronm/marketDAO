@@ -141,7 +141,8 @@
         treasuryBalance: '0',
         vestingPeriod: '0',
         maxProposalAge: '0',
-        electionDuration: '0'
+        electionDuration: '0',
+        hasClaimableVesting: false
       });
       const [electionProposals, setElectionProposals] = React.useState([]);
       const [historyProposals, setHistoryProposals] = React.useState([]);
@@ -755,7 +756,49 @@
           showNotification('Failed to purchase tokens: ' + (error.message || error), 'danger');
         }
       };
-      
+
+      // Claim vested tokens function
+      const claimVestedTokens = async () => {
+        try {
+          if (!daoContractRef.current) {
+            showNotification('Please connect your wallet first', 'danger');
+            return;
+          }
+
+          setIsLoading(true);
+          showNotification('Claiming vested tokens...', 'info');
+
+          // Execute claim
+          const tx = await daoContractRef.current.claimVestedTokens();
+
+          showNotification('Transaction submitted, waiting for confirmation...', 'info');
+
+          // Wait for transaction confirmation
+          const receipt = await tx.wait();
+
+          setIsLoading(false);
+          showNotification('Successfully claimed vested tokens!', 'success');
+
+          // Update user's vested balance and claimable status
+          const newBalance = await daoContractRef.current.balanceOf(walletAddress, 0);
+          const newVestedBalance = await daoContractRef.current.vestedBalance(walletAddress);
+          const hasClaimable = await daoContractRef.current.hasClaimableVesting(walletAddress);
+
+          // Create copy of current state without using spread operator
+          const updatedDaoInfo = Object.assign({}, daoInfo);
+          updatedDaoInfo.tokenBalance = newBalance.toString();
+          updatedDaoInfo.vestedBalance = newVestedBalance.toString();
+          updatedDaoInfo.unvestedBalance = newBalance.sub(newVestedBalance).toString();
+          updatedDaoInfo.hasClaimableVesting = hasClaimable;
+          setDaoInfo(updatedDaoInfo);
+
+        } catch (error) {
+          console.error('Error claiming vested tokens:', error);
+          setIsLoading(false);
+          showNotification('Failed to claim vested tokens: ' + (error.message || error), 'danger');
+        }
+      };
+
       // Create resolution proposal
       const createResolutionProposal = async () => {
         try {
@@ -1301,7 +1344,9 @@
         "function vestedBalance(address holder) view returns (uint256)",
         "function vestingPeriod() view returns (uint256)",
         "function maxProposalAge() view returns (uint256)",
-        "function electionDuration() view returns (uint256)"
+        "function electionDuration() view returns (uint256)",
+        "function hasClaimableVesting(address holder) view returns (bool)",
+        "function claimVestedTokens()"
       ];
       
       // Helper functions to update form data
@@ -1462,6 +1507,14 @@
                 elecDuration = ethers.BigNumber.from(50);
               }
 
+              let hasClaimable = false;
+              try {
+                hasClaimable = await daoContract.hasClaimableVesting(currentAccount);
+              } catch (e) {
+                console.warn("Error checking claimable vesting:", e);
+                hasClaimable = false;
+              }
+
               const unvestedBal = tokenBalance.sub(vestedBal);
 
               setDaoInfo({
@@ -1476,7 +1529,8 @@
                 treasuryBalance: treasuryBalance,
                 vestingPeriod: vestingPer.toString(),
                 maxProposalAge: maxPropAge.toString(),
-                electionDuration: elecDuration.toString()
+                electionDuration: elecDuration.toString(),
+                hasClaimableVesting: hasClaimable
               });
               
               // Try loading proposals with better error handling
@@ -1502,7 +1556,8 @@
                 treasuryBalance: treasuryBalance,
                 vestingPeriod: '0',
                 maxProposalAge: '100',
-                electionDuration: '50'
+                electionDuration: '50',
+                hasClaimableVesting: false
               });
 
               showNotification('Connected, but there was an error loading some contract data', 'warning');
@@ -1733,6 +1788,16 @@
                               <div className="text-warning" style={{fontSize: '0.65rem'}}>
                                 {daoInfo.vestingPeriod !== '0' ? `${daoInfo.vestingPeriod} blocks` : 'No vesting'}
                               </div>
+                              {daoInfo.hasClaimableVesting && (
+                                <button
+                                  className="btn btn-warning btn-sm mt-2"
+                                  onClick={claimVestedTokens}
+                                  disabled={isLoading}
+                                  style={{fontSize: '0.7rem', padding: '0.25rem 0.5rem'}}
+                                >
+                                  Claim Vested
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
