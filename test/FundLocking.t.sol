@@ -37,7 +37,7 @@ contract FundLockingTest is Test {
             5100, // 51% quorum
             100,
             50,
-            false,
+            0, // flags (allowMinting=False)
             0,
             0, // No vesting
             treasuryConfig,

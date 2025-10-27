@@ -35,7 +35,7 @@ contract TokenPriceProposalTest is Test {
             5100,  // 51% quorum (basis points)
             100, // max proposal age
             50,  // election duration
-            true, // allow minting
+            1, // flags (allowMinting=True)
             INITIAL_TOKEN_PRICE, // token price
             0, // No vesting
             treasuryConfig,

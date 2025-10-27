@@ -15,6 +15,7 @@ Unlike traditional DAOs where voting power is static, MarketDAO introduces trada
 - **Saleable voting rights** through transferable voting tokens
 - **Lazy token distribution** for gas-efficient voting token claiming
 - **Token vesting mechanism** to prevent governance attacks from new token purchases
+- **Purchase restrictions** to limit token purchases to existing holders (optional)
 - **Snapshot-based voting power** for unlimited scalability (no holder count limits)
 - **Automatic vesting schedule management** with cleanup and consolidation
 - **Proposal lifecycle** with support thresholds and voting periods
@@ -60,6 +61,23 @@ To prevent governance attacks where an actor purchases enough tokens to immediat
 
 Initial token holders (from constructor) are not subject to vesting restrictions.
 
+### Purchase Restrictions (Optional)
+
+To prevent governance attacks where outsiders buy enough tokens to control the DAO, the purchase restriction feature can be enabled at deployment:
+
+- **Open mode (default)**: Anyone can purchase governance tokens directly
+- **Restricted mode**: Only existing token holders can purchase additional tokens
+- **Voting in new members**: When restricted, new members must be approved via mint proposals
+- **Attack prevention**: Prevents hostile takeovers by requiring community approval for all new members
+- **Configuration option**: Set `RESTRICT_PURCHASES = true` in the deployment script
+
+**Use Cases:**
+- **Investment clubs**: Members vote on admitting new partners
+- **Private DAOs**: Closed membership with proposal-based expansion
+- **Security-focused**: Extra protection against governance attacks
+
+**Note**: Restriction check is based on current token balance (> 0), not historical holder status. If a holder transfers all tokens, they lose purchase privileges until they receive tokens again.
+
 ### Snapshot-Based Voting Power
 
 To enable unlimited scalability without gas limit concerns:
@@ -97,6 +115,16 @@ MarketDAO has been audited and hardened against common vulnerabilities:
 ## Known Limitations & Design Decisions
 
 These are intentional design choices that should be understood before deployment:
+
+### Purchase Restrictions Are Permanent
+
+**Behavior**: The `restrictPurchasesToHolders` setting is configured at deployment and cannot be changed afterward. It's a fundamental characteristic of the DAO, not a governance parameter.
+
+**Rationale**: This ensures trust and predictability. Members joining a restricted DAO know that membership requirements cannot be changed without redeploying. Similarly, open DAOs remain open permanently.
+
+**Consideration**: Choose carefully based on your DAO's purpose:
+- **Open**: Best for community DAOs, protocol governance, broad participation
+- **Restricted**: Best for investment clubs, private organizations, security-focused DAOs
 
 ### Treasury Proposal Competition
 
@@ -158,10 +186,12 @@ When creating a new DAO, you can configure:
 - **Quorum percentage** (in basis points, e.g., 5100 = 51% of tokens needed for valid election)
 - **Maximum proposal age** before expiration (in blocks)
 - **Election duration** (in blocks)
-- **Treasury configuration** (ETH, ERC20, ERC721, ERC1155)
-- **Governance token minting** permissions (true/false)
+- **Flags** (bitfield for boolean options):
+  - **Allow minting** (bit 0): Whether new governance tokens can be minted via proposals
+  - **Restrict purchases** (bit 1): Whether token purchases are limited to existing holders
 - **Initial token price** (in wei, 0 = direct sales disabled)
 - **Vesting period** (in blocks, 0 = no vesting)
+- **Treasury configuration** (ETH, ERC20, ERC721, ERC1155)
 - **Initial token distribution** (addresses and amounts)
 
 **Note on Basis Points**: All percentage parameters use basis points for precision:
@@ -171,6 +201,14 @@ When creating a new DAO, you can configure:
 - 250 = 2.5%
 
 This allows for fractional percentages with 0.01% precision.
+
+**Configuring Flags**: The deployment script (`script/Deploy.s.sol`) provides boolean configuration options that are automatically converted to the flags bitfield:
+```solidity
+bool constant ALLOW_MINTING = true;            // Enable governance token minting
+bool constant RESTRICT_PURCHASES = false;      // Allow anyone to purchase tokens
+```
+
+The `buildFlags()` function handles the conversion automatically.
 
 ## Current Deployment
 

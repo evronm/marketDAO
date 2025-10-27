@@ -112,6 +112,8 @@ export const useDAO = (
         tokenBalance: tokenBalance.toString(),
         vestedBalance: vestedBal.toString(),
         unvestedBalance: unvestedBal.toString(),
+        tokenPrice: tokenPrice.toString(),
+        tokenPriceFormatted: ethers.utils.formatEther(tokenPrice),
         hasClaimable
       });
 

@@ -267,6 +267,8 @@ function App() {
                   try {
                     setIsLoading(true);
                     await voteOnProposal(address, voteYes, amount);
+                    // Refresh DAO info in case proposal executed and changed state
+                    await refreshDAOInfo();
                     showNotificationWithTimeout(setNotification, `Vote cast: ${voteYes ? 'Yes' : 'No'}!`, 'success');
                   } catch (err: any) {
                     showNotificationWithTimeout(setNotification, err.message || 'Failed to vote', 'danger');

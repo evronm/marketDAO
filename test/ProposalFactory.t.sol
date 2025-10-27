@@ -24,7 +24,7 @@ contract ProposalFactoryTest is Test {
             5100,  // 51% (basis points)
             100,
             50,
-            true,
+            1, // flags (allowMinting=True)
             0, //token sales off
             0, // No vesting
             treasuryConfig,

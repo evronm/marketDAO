@@ -32,7 +32,7 @@ contract VestingTest is Test {
             5100,  // 51% (basis points)
             100,
             50,
-            true,
+            1, // flags (allowMinting=True)
             TOKEN_PRICE,
             VESTING_PERIOD,
             treasuryConfig,
@@ -259,7 +259,7 @@ contract VestingTest is Test {
             5100,  // 51% (basis points)
             100,
             50,
-            true,
+            1, // flags (allowMinting=True)
             TOKEN_PRICE,
             0, // No vesting
             treasuryConfig,

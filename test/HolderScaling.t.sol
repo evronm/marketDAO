@@ -24,7 +24,7 @@ contract HolderScalingTest is Test, IERC1155Receiver {
             5100, // 51% quorum
             100,
             50,
-            true,
+            1, // flags (allowMinting=True)
             0,
             0, // No vesting
             treasuryConfig,
@@ -86,7 +86,7 @@ contract HolderScalingTest is Test, IERC1155Receiver {
             5100, // 51% quorum
             100,
             50,
-            true,
+            1, // flags (allowMinting=True)
             0,
             0, // No vesting
             treasuryConfig,

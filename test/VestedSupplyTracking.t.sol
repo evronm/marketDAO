@@ -29,7 +29,7 @@ contract VestedSupplyTrackingTest is Test {
             5100, // 51% quorum
             100,
             50,
-            false,
+            0, // flags (allowMinting=False)
             1 ether, // Token price
             100, // 100 block vesting period
             treasuryConfig,
@@ -258,7 +258,7 @@ contract VestedSupplyTrackingTest is Test {
             5100,
             100,
             50,
-            false,
+            0, // flags (allowMinting=False)
             1 ether,
             100,
             treasuryConfig,

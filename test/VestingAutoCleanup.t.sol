@@ -24,7 +24,7 @@ contract VestingAutoCleanupTest is Test {
             5100,  // 51% quorum
             100,   // max proposal age
             50,    // election duration
-            false, // no minting
+            0, // flags (allowMinting=False)
             1e14,  // token price
             100,   // vesting period of 100 blocks
             treasuryConfig,

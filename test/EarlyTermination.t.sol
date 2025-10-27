@@ -45,7 +45,7 @@ contract EarlyTerminationTest is Test {
             6000, // Quorum 60% (basis points)
             100, // Max proposal age
             100, // Election duration
-            true, // Allow minting
+            1, // flags (allowMinting=True)
             0, // Token price
             0, // No vesting
             treasuryConfig,

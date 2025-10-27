@@ -29,7 +29,7 @@ contract MarketDAOTokenSaleTest is Test {
             5100,  // 51% (basis points)
             100,
             50,
-            true,
+            1, // flags (allowMinting=True)
             TOKEN_PRICE,
             0, // No vesting for these tests
             treasuryConfig,
@@ -108,7 +108,7 @@ contract MarketDAOTokenSaleTest is Test {
             5100,  // 51% (basis points)
             100,
             50,
-            true,
+            1, // flags (allowMinting=True)
             0, // disable direct sales
             0, // No vesting
             treasuryConfig,

@@ -37,7 +37,7 @@ contract ProposalTest is Test {
             5100,  // 51% quorum (basis points)
             100, // max proposal age
             50,  // election duration
-            true, // allow minting
+            1, // flags (allowMinting=True)
             0, //token sales off
             0, // No vesting
             treasuryConfig,

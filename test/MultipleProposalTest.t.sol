@@ -33,7 +33,7 @@ contract MultipleProposalTest is Test {
             2000,  // 20% quorum (basis points, lower for test)
             100, // max proposal age
             50,  // election duration
-            true, // allow minting
+            1, // flags (allowMinting=True)
             0.1 ether, // token price
             0, // No vesting
             treasuryConfig,

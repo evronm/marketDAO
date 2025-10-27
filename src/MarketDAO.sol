@@ -21,9 +21,22 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     uint256 public quorumPercentage;        // basis points (10000 = 100%) needed for valid election
     uint256 public maxProposalAge;          // max age of proposal without election
     uint256 public electionDuration;        // length of election in blocks
-    bool public allowMinting;               // whether new governance tokens can be minted
+    uint256 public flags;                   // bitfield for boolean options
     uint256 public tokenPrice;              // price per token in wei (0 = direct sales disabled)
-    
+
+    // Flag bit positions
+    uint256 private constant FLAG_ALLOW_MINTING = 1 << 0;
+    uint256 private constant FLAG_RESTRICT_PURCHASES = 1 << 1;
+
+    // Helper functions for flag checks
+    function allowMinting() public view returns (bool) {
+        return (flags & FLAG_ALLOW_MINTING) != 0;
+    }
+
+    function restrictPurchasesToHolders() public view returns (bool) {
+        return (flags & FLAG_RESTRICT_PURCHASES) != 0;
+    }
+
     uint256 private constant GOVERNANCE_TOKEN_ID = 0;
     uint256 private nextVotingTokenId = 1;
     uint256 private constant MAX_VESTING_SCHEDULES = 10;
@@ -80,7 +93,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         uint256 _quorumPercentage,
         uint256 _maxProposalAge,
         uint256 _electionDuration,
-        bool _allowMinting,
+        uint256 _flags,
         uint256 _tokenPrice,
         uint256 _vestingPeriod,
         string[] memory _treasuryConfig,
@@ -97,7 +110,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         quorumPercentage = _quorumPercentage;
         maxProposalAge = _maxProposalAge;
         electionDuration = _electionDuration;
-        allowMinting = _allowMinting;
+        flags = _flags;
         tokenPrice = _tokenPrice;
         vestingPeriod = _vestingPeriod;
         
@@ -197,6 +210,11 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         require(tokenPrice > 0, "Direct token sales disabled");
         require(msg.value > 0, "Payment required");
         require(msg.value % tokenPrice == 0, "Payment must be multiple of token price");
+
+        // If restricted, only existing holders can purchase
+        if (restrictPurchasesToHolders()) {
+            require(balanceOf(msg.sender, GOVERNANCE_TOKEN_ID) > 0, "Only existing holders can purchase");
+        }
 
         uint256 tokenAmount = msg.value / tokenPrice;
         _mint(msg.sender, GOVERNANCE_TOKEN_ID, tokenAmount, "");
@@ -542,7 +560,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     
     function mintGovernanceTokens(address to, uint256 amount) external {
         require(activeProposals[msg.sender], "Only active proposal can mint");
-        require(allowMinting, "Minting not allowed");
+        require(allowMinting(), "Minting not allowed");
         _mint(to, GOVERNANCE_TOKEN_ID, amount, "");
         _addGovernanceTokenHolder(to);
         tokenSupply[GOVERNANCE_TOKEN_ID] += amount;

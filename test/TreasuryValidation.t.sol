@@ -21,7 +21,7 @@ contract TreasuryValidationTest is Test {
 
         dao = new MarketDAO(
             "Test DAO",
-            2000, 5100, 100, 50, false, 0, 0,
+            2000, 5100, 100, 50, 0, 0, 0,  // flags=0 (no minting)
             treasuryConfig,
             initialHolders,
             initialAmounts

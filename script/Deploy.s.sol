@@ -14,6 +14,18 @@ contract DeployConfig {
     bool constant ALLOW_MINTING = true;            // can mint new governance tokens
     uint256 constant TOKEN_PRICE = 1e14;           // initial token price
     uint256 constant VESTING_PERIOD = 100;         // initial vesting period is 2 election cycles
+    bool constant RESTRICT_PURCHASES = false;      // if true, only existing holders can purchase
+
+    // Flag bit positions (must match MarketDAO contract)
+    uint256 constant FLAG_ALLOW_MINTING = 1 << 0;
+    uint256 constant FLAG_RESTRICT_PURCHASES = 1 << 1;
+
+    function buildFlags() internal pure returns (uint256) {
+        uint256 flags = 0;
+        if (ALLOW_MINTING) flags |= FLAG_ALLOW_MINTING;
+        if (RESTRICT_PURCHASES) flags |= FLAG_RESTRICT_PURCHASES;
+        return flags;
+    }
 }
 
 contract DeployScript is Script, DeployConfig {
@@ -41,7 +53,7 @@ contract DeployScript is Script, DeployConfig {
             QUORUM,
             MAX_PROPOSAL_AGE,
             ELECTION_DURATION,
-            ALLOW_MINTING,
+            buildFlags(),
             TOKEN_PRICE,
             VESTING_PERIOD,
             getTreasuryConfig(),

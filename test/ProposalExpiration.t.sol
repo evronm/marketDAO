@@ -32,7 +32,7 @@ contract ProposalExpirationTest is Test {
             5100,  // 51% quorum
             MAX_PROPOSAL_AGE, // max proposal age
             50,   // election duration
-            true, // allow minting
+            1, // flags (allowMinting=True)
             0,    // no token sales
             0,    // no vesting
             treasuryConfig,
