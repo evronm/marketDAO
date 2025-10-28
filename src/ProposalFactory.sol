@@ -50,7 +50,15 @@ contract ProposalFactory {
         string memory description,
         address recipient,
         uint256 amount
-    ) external onlyTokenHolder returns (MintProposal) {
+    ) external returns (MintProposal) {
+        uint256 callerBalance = dao.vestedBalance(msg.sender);
+
+        // Non-holders can only create a mint proposal for 1 token to themselves (join request)
+        if (callerBalance == 0) {
+            require(amount == 1, "Non-holders can only request 1 token");
+            require(recipient == msg.sender, "Non-holders can only request tokens for themselves");
+        }
+
         MintProposal proposal = new MintProposal(
             dao,
             description,

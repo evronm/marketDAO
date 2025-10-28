@@ -197,6 +197,8 @@ function App() {
               onCreateTreasury={handleCreateTreasury}
               onCreateMint={handleCreateMint}
               onCreateTokenPrice={handleCreateTokenPrice}
+              daoInfo={daoInfo}
+              walletAddress={walletAddress}
               isLoading={isLoading}
             />
           </>

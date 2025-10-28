@@ -18,7 +18,7 @@ export const ElectionActions: React.FC<ElectionActionsProps> = ({
   isLoading,
 }) => {
   const [voteAmount, setVoteAmount] = useState('');
-  const [selectedVote, setSelectedVote] = useState<'yes' | 'no' | null>(null);
+  const [_selectedVote, setSelectedVote] = useState<'yes' | 'no' | null>(null);
 
   const handleClaimVotingTokens = async () => {
     await onClaimVotingTokens(proposal.address);

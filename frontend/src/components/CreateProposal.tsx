@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { ProposalType, TokenType } from '../types';
+import React, { useState, useEffect } from 'react';
+import { ProposalType, TokenType, DAOInfo } from '../types';
 import { ethers } from 'ethers';
+import { DAO_ADDRESS } from '../types/constants';
 
 interface CreateProposalProps {
   onCreateResolution: (description: string) => Promise<void>;
@@ -13,18 +14,71 @@ interface CreateProposalProps {
   ) => Promise<void>;
   onCreateMint: (description: string, recipient: string, amount: string) => Promise<void>;
   onCreateTokenPrice: (description: string, newPrice: string) => Promise<void>;
+  daoInfo: DAOInfo | null;
+  walletAddress: string | null;
   isLoading: boolean;
 }
+
+// Helper functions for localStorage
+const getJoinRequestKey = (walletAddress: string, daoAddress: string) => {
+  return `joinRequest_${daoAddress}_${walletAddress}`;
+};
+
+const hasSubmittedJoinRequest = (walletAddress: string | null, daoAddress: string): boolean => {
+  if (!walletAddress) return false;
+  const key = getJoinRequestKey(walletAddress, daoAddress);
+  return localStorage.getItem(key) === 'true';
+};
+
+const setJoinRequestSubmitted = (walletAddress: string | null, daoAddress: string, submitted: boolean) => {
+  if (!walletAddress) return;
+  const key = getJoinRequestKey(walletAddress, daoAddress);
+  if (submitted) {
+    localStorage.setItem(key, 'true');
+  } else {
+    localStorage.removeItem(key);
+  }
+};
 
 export const CreateProposal: React.FC<CreateProposalProps> = ({
   onCreateResolution,
   onCreateTreasury,
   onCreateMint,
   onCreateTokenPrice,
+  daoInfo,
+  walletAddress,
   isLoading,
 }) => {
-  const [proposalType, setProposalType] = useState<ProposalType>('resolution');
+  // Check if user has vested tokens (is a token holder)
+  const isTokenHolder = Boolean(daoInfo && daoInfo.vestedBalance !== '0');
+
+  const [proposalType, setProposalType] = useState<ProposalType>(isTokenHolder ? 'resolution' : 'mint');
   const [description, setDescription] = useState('');
+  const [joinRequestSubmitted, setJoinRequestSubmittedState] = useState(
+    hasSubmittedJoinRequest(walletAddress, DAO_ADDRESS)
+  );
+
+  // Load join request status from localStorage when wallet or DAO changes
+  useEffect(() => {
+    const hasSubmitted = hasSubmittedJoinRequest(walletAddress, DAO_ADDRESS);
+    console.log('Checking join request status:', { walletAddress, daoAddress: DAO_ADDRESS, hasSubmitted });
+    setJoinRequestSubmittedState(hasSubmitted);
+  }, [walletAddress]);
+
+  // Update proposal type when token holder status changes
+  useEffect(() => {
+    if (!isTokenHolder) {
+      setProposalType('mint');
+    }
+  }, [isTokenHolder]);
+
+  // Clear join request submitted state when user becomes a token holder
+  useEffect(() => {
+    if (isTokenHolder && joinRequestSubmitted) {
+      setJoinRequestSubmitted(walletAddress, DAO_ADDRESS, false);
+      setJoinRequestSubmittedState(false);
+    }
+  }, [isTokenHolder, joinRequestSubmitted, walletAddress]);
 
   // Treasury form state
   const [treasuryRecipient, setTreasuryRecipient] = useState('');
@@ -57,10 +111,22 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
   };
 
   const handleCreateMint = async () => {
-    await onCreateMint(description, mintRecipient, mintAmount);
+    // For non-holders, use their wallet address and amount of 1
+    const recipient = isTokenHolder ? mintRecipient : (walletAddress || '');
+    const amount = isTokenHolder ? mintAmount : '1';
+
+    await onCreateMint(description, recipient, amount);
     setDescription('');
     setMintRecipient('');
     setMintAmount('');
+
+    // Set flag for non-holders that they submitted a join request
+    if (!isTokenHolder) {
+      console.log('Setting join request submitted for:', { walletAddress, daoAddress: DAO_ADDRESS });
+      setJoinRequestSubmitted(walletAddress, DAO_ADDRESS, true);
+      setJoinRequestSubmittedState(true);
+      console.log('localStorage after setting:', localStorage.getItem(getJoinRequestKey(walletAddress || '', DAO_ADDRESS)));
+    }
   };
 
   const handleCreateTokenPrice = async () => {
@@ -73,41 +139,62 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
   return (
     <div className="card shadow mx-auto mb-4" style={{ maxWidth: '700px' }}>
       <div className="card-body">
-        <h2 className="card-title mb-4">Create Proposal</h2>
+        <h2 className="card-title mb-4">{isTokenHolder ? 'Create Proposal' : 'Request to Join DAO'}</h2>
 
-        <div className="mb-4">
-          <label className="form-label text-center d-block">Proposal Type</label>
-          <div className="btn-group d-flex flex-wrap" role="group">
-            <button
-              type="button"
-              className={`btn ${proposalType === 'resolution' ? 'btn-primary' : 'btn-outline-primary'}`}
-              onClick={() => setProposalType('resolution')}
-            >
-              Resolution
-            </button>
-            <button
-              type="button"
-              className={`btn ${proposalType === 'treasury' ? 'btn-primary' : 'btn-outline-primary'}`}
-              onClick={() => setProposalType('treasury')}
-            >
-              Treasury
-            </button>
-            <button
-              type="button"
-              className={`btn ${proposalType === 'mint' ? 'btn-primary' : 'btn-outline-primary'}`}
-              onClick={() => setProposalType('mint')}
-            >
-              Mint Tokens
-            </button>
-            <button
-              type="button"
-              className={`btn ${proposalType === 'price' ? 'btn-primary' : 'btn-outline-primary'}`}
-              onClick={() => setProposalType('price')}
-            >
-              Token Price
-            </button>
+        {!isTokenHolder && joinRequestSubmitted && (
+          <div className="alert alert-success mb-4">
+            <h5 className="alert-heading">Request Received!</h5>
+            <p>Your request to join the DAO has been received. Existing members will vote on your membership.</p>
+            <hr />
+            <p className="mb-0">
+              You can track your request in the <strong>Proposals</strong> tab (while gathering support)
+              and then in the <strong>Elections</strong> tab (once voting begins).
+            </p>
           </div>
-        </div>
+        )}
+
+        {!isTokenHolder && !joinRequestSubmitted && (
+          <div className="alert alert-info mb-4">
+            You don't have governance tokens yet. You can request to join the DAO by creating a membership request.
+            Existing members will vote on whether to admit you.
+          </div>
+        )}
+
+        {isTokenHolder && (
+          <div className="mb-4">
+            <label className="form-label text-center d-block">Proposal Type</label>
+            <div className="btn-group d-flex flex-wrap" role="group">
+              <button
+                type="button"
+                className={`btn ${proposalType === 'resolution' ? 'btn-primary' : 'btn-outline-primary'}`}
+                onClick={() => setProposalType('resolution')}
+              >
+                Resolution
+              </button>
+              <button
+                type="button"
+                className={`btn ${proposalType === 'treasury' ? 'btn-primary' : 'btn-outline-primary'}`}
+                onClick={() => setProposalType('treasury')}
+              >
+                Treasury
+              </button>
+              <button
+                type="button"
+                className={`btn ${proposalType === 'mint' ? 'btn-primary' : 'btn-outline-primary'}`}
+                onClick={() => setProposalType('mint')}
+              >
+                Mint Tokens
+              </button>
+              <button
+                type="button"
+                className={`btn ${proposalType === 'price' ? 'btn-primary' : 'btn-outline-primary'}`}
+                onClick={() => setProposalType('price')}
+              >
+                Token Price
+              </button>
+            </div>
+          </div>
+        )}
 
         {proposalType === 'resolution' && (
           <div>
@@ -245,11 +332,11 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
           </div>
         )}
 
-        {proposalType === 'mint' && (
+        {proposalType === 'mint' && (!joinRequestSubmitted || isTokenHolder) && (
           <div>
             <div className="mb-3">
               <label htmlFor="mint-description" className="form-label">
-                Description
+                {isTokenHolder ? 'Description' : 'Tell us about yourself'}
               </label>
               <textarea
                 className="form-control"
@@ -257,47 +344,71 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
                 rows={4}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Enter a description for this mint proposal"
+                placeholder={
+                  isTokenHolder
+                    ? 'Enter a description for this mint proposal'
+                    : 'Who are you and why do you want to join the DAO?'
+                }
               />
             </div>
 
-            <div className="mb-3">
-              <label htmlFor="mint-recipient" className="form-label">
-                Recipient Address
-              </label>
-              <input
-                type="text"
-                className="form-control"
-                id="mint-recipient"
-                value={mintRecipient}
-                onChange={(e) => setMintRecipient(e.target.value)}
-                placeholder="0x..."
-              />
-            </div>
+            {isTokenHolder && (
+              <>
+                <div className="mb-3">
+                  <label htmlFor="mint-recipient" className="form-label">
+                    Recipient Address
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    id="mint-recipient"
+                    value={mintRecipient}
+                    onChange={(e) => setMintRecipient(e.target.value)}
+                    placeholder="0x..."
+                  />
+                </div>
 
-            <div className="mb-3">
-              <label htmlFor="mint-amount" className="form-label">
-                Amount
-              </label>
-              <input
-                type="number"
-                className="form-control"
-                id="mint-amount"
-                min="1"
-                step="1"
-                value={mintAmount}
-                onChange={(e) => setMintAmount(e.target.value)}
-                placeholder="Number of tokens to mint"
-              />
-            </div>
+                <div className="mb-3">
+                  <label htmlFor="mint-amount" className="form-label">
+                    Amount
+                  </label>
+                  <input
+                    type="number"
+                    className="form-control"
+                    id="mint-amount"
+                    min="1"
+                    step="1"
+                    value={mintAmount}
+                    onChange={(e) => setMintAmount(e.target.value)}
+                    placeholder="Number of tokens to mint"
+                  />
+                </div>
+              </>
+            )}
+
+            {!isTokenHolder && (
+              <div className="alert alert-secondary mb-3">
+                <small>
+                  <strong>Request Details:</strong>
+                  <br />
+                  Recipient: {walletAddress || 'Not connected'}
+                  <br />
+                  Amount: 1 governance token
+                </small>
+              </div>
+            )}
 
             <div className="text-center">
               <button
                 className="btn btn-primary"
                 onClick={handleCreateMint}
-                disabled={isLoading || !description || !mintRecipient || !mintAmount}
+                disabled={
+                  isLoading ||
+                  !description ||
+                  (isTokenHolder && (!mintRecipient || !mintAmount))
+                }
               >
-                Create Mint Proposal
+                {isTokenHolder ? 'Create Mint Proposal' : 'Submit Join Request'}
               </button>
             </div>
           </div>
