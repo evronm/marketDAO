@@ -12,9 +12,14 @@ contract ProposalFactory {
         dao = _dao;
     }
 
+    modifier onlyTokenHolder() {
+        require(dao.vestedBalance(msg.sender) > 0, "Must hold vested governance tokens");
+        _;
+    }
+
     function createResolutionProposal(
         string memory description
-    ) external returns (ResolutionProposal) {
+    ) external onlyTokenHolder returns (ResolutionProposal) {
         ResolutionProposal proposal = new ResolutionProposal(dao, description);
         dao.setActiveProposal(address(proposal));
         proposals[proposalCount++] = address(proposal);
@@ -27,7 +32,7 @@ contract ProposalFactory {
         uint256 amount,
         address token,
         uint256 tokenId
-    ) external returns (TreasuryProposal) {
+    ) external onlyTokenHolder returns (TreasuryProposal) {
         TreasuryProposal proposal = new TreasuryProposal(
             dao,
             description,
@@ -45,7 +50,7 @@ contract ProposalFactory {
         string memory description,
         address recipient,
         uint256 amount
-    ) external returns (MintProposal) {
+    ) external onlyTokenHolder returns (MintProposal) {
         MintProposal proposal = new MintProposal(
             dao,
             description,
@@ -61,7 +66,7 @@ contract ProposalFactory {
     function createTokenPriceProposal(
         string memory description,
         uint256 newPrice
-    ) external returns (TokenPriceProposal) {
+    ) external onlyTokenHolder returns (TokenPriceProposal) {
         TokenPriceProposal proposal = new TokenPriceProposal(
             dao,
             description,

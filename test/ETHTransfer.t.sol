@@ -54,6 +54,27 @@ contract ReentrantAttacker {
             }
         }
     }
+
+    // ERC1155 receiver interface - required to receive governance tokens
+    function onERC1155Received(
+        address,
+        address,
+        uint256,
+        uint256,
+        bytes calldata
+    ) external pure returns (bytes4) {
+        return this.onERC1155Received.selector;
+    }
+
+    function onERC1155BatchReceived(
+        address,
+        address,
+        uint256[] calldata,
+        uint256[] calldata,
+        bytes calldata
+    ) external pure returns (bytes4) {
+        return this.onERC1155BatchReceived.selector;
+    }
 }
 
 // Contract that rejects ETH
@@ -156,8 +177,16 @@ contract ETHTransferTest is Test {
         ReentrantAttacker attacker = new ReentrantAttacker(dao, factory);
 
         vm.startPrank(proposer);
-        // Give proposer enough tokens to trigger election
+        // Transfer some tokens to attacker so it can create proposals
+        dao.safeTransferFrom(proposer, address(attacker), 0, 10, "");
+        vm.stopPrank();
+
+        vm.startPrank(address(attacker));
+        // Have attacker create the malicious proposal
         attacker.setupAttack();
+        vm.stopPrank();
+
+        vm.startPrank(proposer);
         TreasuryProposal proposal = attacker.attackProposal();
 
         dao.setApprovalForAll(address(proposal), true);
@@ -166,7 +195,7 @@ contract ETHTransferTest is Test {
 
         uint256 votingTokenId = proposal.votingTokenId();
         proposal.claimVotingTokens();
-        dao.safeTransferFrom(proposer, proposal.yesVoteAddress(), votingTokenId, 100, "");
+        dao.safeTransferFrom(proposer, proposal.yesVoteAddress(), votingTokenId, 90, "");
 
         // Explicitly trigger early termination check after vote
         // This will execute and transfer ETH, triggering the attacker's receive function
