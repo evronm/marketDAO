@@ -16,13 +16,14 @@ Unlike traditional DAOs where voting power is static, MarketDAO introduces trada
 - **Lazy token distribution** for gas-efficient voting token claiming
 - **Token vesting mechanism** to prevent governance attacks from new token purchases
 - **Purchase restrictions** to limit token purchases to existing holders (optional)
+- **Join request system** allowing non-holders to request membership via proposals
 - **Snapshot-based voting power** for unlimited scalability (no holder count limits)
 - **Automatic vesting schedule management** with cleanup and consolidation
 - **Proposal lifecycle** with support thresholds and voting periods
 - **Multiple proposal types**:
   - Resolution proposals (text-only governance decisions)
   - Treasury transfers (ETH, ERC20, ERC721, ERC1155)
-  - Governance token minting
+  - Governance token minting (including join requests)
   - Token price updates
 - **Early election termination** when clear majority is reached
 - **Configurable parameters** for tailoring governance to specific needs
@@ -78,6 +79,36 @@ To prevent governance attacks where outsiders buy enough tokens to control the D
 
 **Note**: Restriction check is based on current token balance (> 0), not historical holder status. If a holder transfers all tokens, they lose purchase privileges until they receive tokens again.
 
+### Join Request System
+
+To enable controlled membership growth while maintaining accessibility, non-token holders can request to join the DAO:
+
+- **Open to all**: Anyone without governance tokens can submit a join request
+- **Proposal-based**: Join requests are mint proposals for exactly 1 governance token to the requester's address
+- **Community voting**: Existing token holders vote on whether to admit new members
+- **Self-introduction**: Requesters provide a description explaining who they are and why they want to join
+- **One request per address**: Non-holders can only submit one join request (tracked via frontend localStorage)
+- **Standard proposal flow**: Join requests follow the normal proposal lifecycle (support → election → execution)
+- **Automatic restrictions**: Non-holders cannot create any other proposal types (resolution, treasury, token price)
+
+**How It Works:**
+1. Non-holder connects wallet and is presented with a "Request to Join DAO" interface
+2. They submit a description introducing themselves
+3. The system creates a mint proposal for 1 token to their address
+4. Existing members see the request in the Proposals tab and can add support
+5. Once support threshold is met, an election begins
+6. Members vote YES or NO on admitting the new member
+7. If approved, the new member receives 1 governance token and full DAO access
+8. If rejected, they remain a non-holder but cannot submit another request
+
+**Benefits:**
+- **Controlled growth**: Community decides who joins
+- **Prevents spam**: One request per address limits abuse
+- **Transparency**: All join decisions are on-chain and voted on
+- **Flexibility**: Works with both open and restricted purchase modes
+
+**Note**: Token holders can still create mint proposals for any amount to any address. The 1-token restriction only applies to non-holders creating proposals for themselves.
+
 ### Snapshot-Based Voting Power
 
 To enable unlimited scalability without gas limit concerns:
@@ -95,6 +126,8 @@ MarketDAO has been audited and hardened against common vulnerabilities:
 ### Security Features
 - ✅ **Reentrancy protection**: Transfer functions (`safeTransferFrom`, `safeBatchTransferFrom`) use ReentrancyGuard to prevent reentrancy during vote transfers and early termination
 - ✅ **Factory-only proposal registration**: Only the official ProposalFactory can register proposals
+- ✅ **Token holder restrictions**: Only addresses with vested governance tokens can create proposals (except join requests)
+- ✅ **Join request validation**: Non-holders can only create mint proposals for exactly 1 token to their own address
 - ✅ **Safe token transfers**: Uses OpenZeppelin's SafeERC20 and safeTransferFrom for all token operations
 - ✅ **Basis points precision**: Thresholds use basis points (10000 = 100%) for 0.01% precision
 - ✅ **Bounded gas costs**: All operations have predictable, capped gas costs
@@ -111,6 +144,7 @@ MarketDAO has been audited and hardened against common vulnerabilities:
 - ✅ **Vesting schedule limits**: Max 10 active schedules per address with auto-cleanup
 - ✅ **Consolidation**: Automatic merging of schedules with same unlock time
 - ✅ **Gas-bounded operations**: Election triggering uses constant gas regardless of holder count
+- ✅ **Join request spam prevention**: Non-holders limited to one join request per address (frontend enforced)
 
 ## Known Limitations & Design Decisions
 
@@ -218,6 +252,14 @@ The `buildFlags()` function handles the conversion automatically.
 
 ## Usage Flow
 
+### For New Members (Join Request):
+1. **Connect Wallet**: Non-holder connects their wallet to the DAO interface
+2. **Submit Join Request**: Provide a description introducing yourself and why you want to join
+3. **Wait for Support**: Existing members review your request and add support
+4. **Election**: Once support threshold is met, members vote on your admission
+5. **Admission**: If approved, you receive 1 governance token and full DAO access
+
+### For Token Holders (Standard Proposals):
 1. **Create a Proposal**: Governance token holders can submit proposals
 2. **Support Phase**: Proposals need to reach support threshold to trigger an election
 3. **Election Triggered**: When the threshold is reached, an election period begins
