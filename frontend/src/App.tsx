@@ -300,7 +300,20 @@ function App() {
 
   return (
     <div className="container py-4" style={{ maxWidth: '900px' }}>
-      <h1 className="text-center mb-4">Market DAO</h1>
+      <div className="text-center mb-4">
+        <h1 className="mb-1">{isConnected && daoInfo ? daoInfo.name : 'Market DAO'}</h1>
+        <h2 className="h5 text-muted mb-0">
+          a{' '}
+          <a
+            href="https://marketdao.dev"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-decoration-none"
+          >
+            MarketDAO
+          </a>
+        </h2>
+      </div>
 
       {isConnected && (
         <ul className="nav nav-tabs nav-fill mb-4">
@@ -359,17 +372,6 @@ function App() {
 
       {(isLoading || daoLoading || proposalsLoading) && <LoadingSpinner />}
       <Notification notification={notification} />
-
-      <div className="mt-5 pt-3 text-center border-top text-muted small">
-        <a
-          href="https://github.com/evronm/marketDAO"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-decoration-none"
-        >
-          What's this? View the GitHub repository
-        </a>
-      </div>
     </div>
   );
 }

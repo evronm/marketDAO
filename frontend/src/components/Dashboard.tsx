@@ -25,146 +25,96 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
 
   return (
-    <div className="card shadow mb-4 mx-auto" style={{ maxWidth: '700px' }}>
-      <div className="card-body">
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <h2 className="card-title mb-0">DAO Information</h2>
-          <button
-            className="btn btn-sm btn-outline-primary"
-            onClick={onRefresh}
-            disabled={isLoading}
-            title="Refresh DAO data from blockchain"
-          >
-            🔄 Refresh
-          </button>
-        </div>
-        <div className="container" style={{ maxWidth: '560px' }}>
-          <div className="row row-cols-1 row-cols-md-3 g-2 mb-3 justify-content-center">
-            <div className="col">
-              <div className="bg-light rounded p-2" style={{ height: '100%' }}>
-                <div className="text-center">
-                  <div className="fw-bold">{daoInfo.name}</div>
-                  <div className="text-muted small">DAO Name</div>
-                </div>
+    <div className="mb-4">
+      <div className="d-flex justify-content-end mb-3">
+        <button
+          className="btn btn-sm btn-outline-primary"
+          onClick={onRefresh}
+          disabled={isLoading}
+          title="Refresh DAO data from blockchain"
+        >
+          🔄 Refresh
+        </button>
+      </div>
+
+      <div className="row g-4 mb-4">
+        <div className="col-md-6">
+          <h3 className="h5 mb-3 border-bottom pb-2">Your Info</h3>
+          <dl className="row">
+            <dt className="col-sm-6">Total Balance</dt>
+            <dd className="col-sm-6">
+              {daoInfo.tokenBalance}
+              <div className="small">
+                <a
+                  href={RARIBLE_TESTNET_URL(DAO_ADDRESS, '0')}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary"
+                >
+                  Buy/Sell
+                </a>
               </div>
-            </div>
-            <div className="col">
-              <div className="bg-light rounded p-2" style={{ height: '100%' }}>
-                <div className="text-center">
-                  <div className="fw-bold">{daoInfo.tokenBalance}</div>
-                  <div className="text-muted small">Total Balance</div>
-                  <div className="small">
-                    <a
-                      href={RARIBLE_TESTNET_URL(DAO_ADDRESS, '0')}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary"
-                      style={{ fontSize: '0.7rem' }}
-                    >
-                      Buy/Sell
-                    </a>
-                  </div>
-                </div>
+            </dd>
+
+            <dt className="col-sm-6">Vested (Available)</dt>
+            <dd className="col-sm-6">
+              <span className="text-success fw-bold">{daoInfo.vestedBalance}</span>
+              <div className="text-success small">Can vote & support</div>
+            </dd>
+
+            <dt className="col-sm-6">Unvested (Locked)</dt>
+            <dd className="col-sm-6">
+              <span className="text-warning fw-bold">{daoInfo.unvestedBalance}</span>
+              <div className="text-warning small">
+                {parseInt(daoInfo.unvestedBalance) > 0
+                  ? 'Still vesting'
+                  : 'Fully vested'}
               </div>
-            </div>
-            <div className="col">
-              <div className="bg-success bg-opacity-10 rounded p-2" style={{ height: '100%' }}>
-                <div className="text-center">
-                  <div className="fw-bold text-success">{daoInfo.vestedBalance}</div>
-                  <div className="text-muted small">Vested (Available)</div>
-                  <div className="text-success" style={{ fontSize: '0.65rem' }}>
-                    Can vote & support
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="col">
-              <div className="bg-warning bg-opacity-10 rounded p-2" style={{ height: '100%' }}>
-                <div className="text-center">
-                  <div className="fw-bold text-warning">{daoInfo.unvestedBalance}</div>
-                  <div className="text-muted small">Unvested (Locked)</div>
-                  <div className="text-warning" style={{ fontSize: '0.65rem' }}>
-                    {parseInt(daoInfo.unvestedBalance) > 0
-                      ? 'Still vesting'
-                      : 'Fully vested'}
-                  </div>
-                  {daoInfo.hasClaimableVesting && (
-                    <button
-                      className="btn btn-warning btn-sm mt-2"
-                      onClick={onClaimVested}
-                      disabled={isLoading}
-                      style={{ fontSize: '0.7rem', padding: '0.25rem 0.5rem' }}
-                    >
-                      Claim Vested
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="col">
-              <div className="bg-light rounded p-2" style={{ height: '100%' }}>
-                <div className="text-center">
-                  <div className="fw-bold">{daoInfo.tokenSupply}</div>
-                  <div className="text-muted small">Total Supply</div>
-                </div>
-              </div>
-            </div>
-            <div className="col">
-              <div className="bg-light rounded p-2" style={{ height: '100%' }}>
-                <div className="text-center">
-                  <div className="fw-bold">{daoInfo.tokenPrice} ETH</div>
-                  <div className="text-muted small">Token Price</div>
-                </div>
-              </div>
-            </div>
-            <div className="col">
-              <div className="bg-light rounded p-2" style={{ height: '100%' }}>
-                <div className="text-center">
-                  <div className="fw-bold">
-                    {daoInfo.treasuryBalance ? safeFormatEther(daoInfo.treasuryBalance) : '0'} ETH
-                  </div>
-                  <div className="text-muted small">Treasury</div>
-                </div>
-              </div>
-            </div>
-            <div className="col">
-              <div className="bg-light rounded p-2" style={{ height: '100%' }}>
-                <div className="text-center">
-                  <div className="fw-bold">{basisPointsToPercent(daoInfo.quorumPercentage)}%</div>
-                  <div className="text-muted small">Quorum Requirement</div>
-                </div>
-              </div>
-            </div>
-            <div className="col">
-              <div className="bg-light rounded p-2" style={{ height: '100%' }}>
-                <div className="text-center">
-                  <div className="fw-bold">
-                    {basisPointsToPercent(daoInfo.supportThreshold)}%
-                  </div>
-                  <div className="text-muted small">Support Threshold</div>
-                </div>
-              </div>
-            </div>
-            <div className="col">
-              <div className="bg-light rounded p-2" style={{ height: '100%' }}>
-                <div className="text-center">
-                  <div className="fw-bold">{daoInfo.maxProposalAge}</div>
-                  <div className="text-muted small">Max Proposal Age (blocks)</div>
-                </div>
-              </div>
-            </div>
-            <div className="col">
-              <div className="bg-light rounded p-2" style={{ height: '100%' }}>
-                <div className="text-center">
-                  <div className="fw-bold">{daoInfo.electionDuration}</div>
-                  <div className="text-muted small">Election Duration (blocks)</div>
-                </div>
-              </div>
-            </div>
-          </div>
+              {daoInfo.hasClaimableVesting && (
+                <button
+                  className="btn btn-warning btn-sm mt-2"
+                  onClick={onClaimVested}
+                  disabled={isLoading}
+                >
+                  Claim Vested
+                </button>
+              )}
+            </dd>
+          </dl>
         </div>
 
-        <h3 className="mb-3">Purchase Tokens</h3>
+        <div className="col-md-6">
+          <h3 className="h5 mb-3 border-bottom pb-2">DAO Info</h3>
+          <dl className="row">
+            <dt className="col-sm-6">Total Supply</dt>
+            <dd className="col-sm-6">{daoInfo.tokenSupply}</dd>
+
+            <dt className="col-sm-6">Token Price</dt>
+            <dd className="col-sm-6">{daoInfo.tokenPrice} ETH</dd>
+
+            <dt className="col-sm-6">Treasury</dt>
+            <dd className="col-sm-6">
+              {daoInfo.treasuryBalance ? safeFormatEther(daoInfo.treasuryBalance) : '0'} ETH
+            </dd>
+
+            <dt className="col-sm-6">Quorum</dt>
+            <dd className="col-sm-6">{basisPointsToPercent(daoInfo.quorumPercentage)}%</dd>
+
+            <dt className="col-sm-6">Support Threshold</dt>
+            <dd className="col-sm-6">{basisPointsToPercent(daoInfo.supportThreshold)}%</dd>
+
+            <dt className="col-sm-6">Max Proposal Age</dt>
+            <dd className="col-sm-6">{daoInfo.maxProposalAge} blocks</dd>
+
+            <dt className="col-sm-6">Election Duration</dt>
+            <dd className="col-sm-6">{daoInfo.electionDuration} blocks</dd>
+          </dl>
+        </div>
+      </div>
+
+      <div className="card shadow">
+        <div className="card-body">
+          <h3 className="mb-3">Purchase Tokens</h3>
         {Number(daoInfo.tokenPrice) === 0 ? (
           <div className="alert alert-info">
             <p className="mb-0">
@@ -202,6 +152,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </>
         )}
+        </div>
       </div>
     </div>
   );
