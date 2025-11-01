@@ -49,10 +49,18 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
   walletAddress,
   isLoading,
 }) => {
-  // Check if user has vested tokens (is a token holder)
+  // Check if user has vested tokens (can participate in governance)
   const isTokenHolder = Boolean(daoInfo && daoInfo.vestedBalance !== '0');
 
-  const [proposalType, setProposalType] = useState<ProposalType>(isTokenHolder ? 'resolution' : 'mint');
+  // Check if join request section should be shown
+  // Only show when purchases are disabled (price = 0) AND user has no tokens at all
+  const shouldShowJoinRequest = Boolean(
+    daoInfo &&
+    daoInfo.tokenPrice === '0' &&
+    daoInfo.tokenBalance === '0'
+  );
+
+  const [proposalType, setProposalType] = useState<ProposalType>(shouldShowJoinRequest ? 'mint' : 'resolution');
   const [description, setDescription] = useState('');
   const [joinRequestSubmitted, setJoinRequestSubmittedState] = useState(
     hasSubmittedJoinRequest(walletAddress, DAO_ADDRESS)
@@ -65,12 +73,12 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
     setJoinRequestSubmittedState(hasSubmitted);
   }, [walletAddress]);
 
-  // Update proposal type when token holder status changes
+  // Update proposal type when join request status changes
   useEffect(() => {
-    if (!isTokenHolder) {
+    if (shouldShowJoinRequest) {
       setProposalType('mint');
     }
-  }, [isTokenHolder]);
+  }, [shouldShowJoinRequest]);
 
   // Clear join request submitted state when user becomes a token holder
   useEffect(() => {
@@ -111,17 +119,17 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
   };
 
   const handleCreateMint = async () => {
-    // For non-holders, use their wallet address and amount of 1
-    const recipient = isTokenHolder ? mintRecipient : (walletAddress || '');
-    const amount = isTokenHolder ? mintAmount : '1';
+    // For join requests, use their wallet address and amount of 1
+    const recipient = shouldShowJoinRequest ? (walletAddress || '') : mintRecipient;
+    const amount = shouldShowJoinRequest ? '1' : mintAmount;
 
     await onCreateMint(description, recipient, amount);
     setDescription('');
     setMintRecipient('');
     setMintAmount('');
 
-    // Set flag for non-holders that they submitted a join request
-    if (!isTokenHolder) {
+    // Set flag for join requests
+    if (shouldShowJoinRequest) {
       console.log('Setting join request submitted for:', { walletAddress, daoAddress: DAO_ADDRESS });
       setJoinRequestSubmitted(walletAddress, DAO_ADDRESS, true);
       setJoinRequestSubmittedState(true);
@@ -136,12 +144,17 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
     setNewPrice('');
   };
 
+  // Don't render if user can't create proposals and can't request to join
+  if (!isTokenHolder && !shouldShowJoinRequest) {
+    return null;
+  }
+
   return (
     <div className="card shadow mx-auto mb-4" style={{ maxWidth: '700px' }}>
       <div className="card-body">
-        <h2 className="card-title mb-4">{isTokenHolder ? 'Create Proposal' : 'Request to Join DAO'}</h2>
+        <h2 className="card-title mb-4">{shouldShowJoinRequest ? 'Request to Join DAO' : 'Create Proposal'}</h2>
 
-        {!isTokenHolder && joinRequestSubmitted && (
+        {shouldShowJoinRequest && joinRequestSubmitted && (
           <div className="alert alert-success mb-4">
             <h5 className="alert-heading">Request Received!</h5>
             <p>Your request to join the DAO has been received. Existing members will vote on your membership.</p>
@@ -153,7 +166,7 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
           </div>
         )}
 
-        {!isTokenHolder && !joinRequestSubmitted && (
+        {shouldShowJoinRequest && !joinRequestSubmitted && (
           <div className="alert alert-info mb-4">
             You don't have governance tokens yet. You can request to join the DAO by creating a membership request.
             Existing members will vote on whether to admit you.
@@ -332,11 +345,11 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
           </div>
         )}
 
-        {proposalType === 'mint' && (!joinRequestSubmitted || isTokenHolder) && (
+        {proposalType === 'mint' && (!joinRequestSubmitted || !shouldShowJoinRequest) && (
           <div>
             <div className="mb-3">
               <label htmlFor="mint-description" className="form-label">
-                {isTokenHolder ? 'Description' : 'Tell us about yourself'}
+                {shouldShowJoinRequest ? 'Tell us about yourself' : 'Description'}
               </label>
               <textarea
                 className="form-control"
@@ -345,14 +358,14 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder={
-                  isTokenHolder
-                    ? 'Enter a description for this mint proposal'
-                    : 'Who are you and why do you want to join the DAO?'
+                  shouldShowJoinRequest
+                    ? 'Who are you and why do you want to join the DAO?'
+                    : 'Enter a description for this mint proposal'
                 }
               />
             </div>
 
-            {isTokenHolder && (
+            {!shouldShowJoinRequest && (
               <>
                 <div className="mb-3">
                   <label htmlFor="mint-recipient" className="form-label">
@@ -386,7 +399,7 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
               </>
             )}
 
-            {!isTokenHolder && (
+            {shouldShowJoinRequest && (
               <div className="alert alert-secondary mb-3">
                 <small>
                   <strong>Request Details:</strong>
@@ -405,10 +418,10 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
                 disabled={
                   isLoading ||
                   !description ||
-                  (isTokenHolder && (!mintRecipient || !mintAmount))
+                  (!shouldShowJoinRequest && (!mintRecipient || !mintAmount))
                 }
               >
-                {isTokenHolder ? 'Create Mint Proposal' : 'Submit Join Request'}
+                {shouldShowJoinRequest ? 'Submit Join Request' : 'Create Mint Proposal'}
               </button>
             </div>
           </div>
