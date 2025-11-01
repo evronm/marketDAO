@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 
 // Tab types
-export type TabType = 'dashboard' | 'proposals' | 'elections' | 'history';
+export type TabType = 'dashboard' | 'proposals' | 'elections' | 'history' | 'members';
 
 // Proposal types
 export type ProposalType = 'resolution' | 'treasury' | 'mint' | 'price';
@@ -33,6 +33,14 @@ export interface DAOInfo {
   maxProposalAge: string;
   electionDuration: string;
   hasClaimableVesting: boolean;
+}
+
+// Member Information
+export interface MemberInfo {
+  address: string;
+  totalBalance: string;
+  vestedBalance: string;
+  unvestedBalance: string;
 }
 
 // Voting information

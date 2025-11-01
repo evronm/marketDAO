@@ -3,11 +3,13 @@ import { TabType, NotificationState } from './types';
 import { useWallet } from './hooks/useWallet';
 import { useDAO } from './hooks/useDAO';
 import { useProposals } from './hooks/useProposals';
+import { useMembers } from './hooks/useMembers';
 import { Dashboard } from './components/Dashboard';
 import { ProposalList } from './components/ProposalList';
 import { ProposalActions } from './components/ProposalActions';
 import { ElectionActions } from './components/ElectionActions';
 import { CreateProposal } from './components/CreateProposal';
+import { Members } from './components/Members';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { Notification } from './components/Notification';
 import { showNotificationWithTimeout, hideNotification } from './utils/notification';
@@ -45,6 +47,13 @@ function App() {
     createTokenPriceProposal,
   } = useProposals(contractRefs, walletAddress, daoInfo, isConnected);
 
+  const {
+    members,
+    isLoading: membersLoading,
+    error: membersError,
+    refreshMembers,
+  } = useMembers(contractRefs, isConnected);
+
   // Show errors as notifications
   useEffect(() => {
     if (walletError) {
@@ -63,6 +72,12 @@ function App() {
       showNotificationWithTimeout(setNotification, proposalsError, 'danger');
     }
   }, [proposalsError]);
+
+  useEffect(() => {
+    if (membersError) {
+      showNotificationWithTimeout(setNotification, membersError, 'danger');
+    }
+  }, [membersError]);
 
   // Load proposals when connected
   useEffect(() => {
@@ -293,6 +308,25 @@ function App() {
           />
         );
 
+      case 'members':
+        return (
+          <Members
+            members={members}
+            isLoading={isLoading}
+            onRefresh={async () => {
+              setIsLoading(true);
+              try {
+                await refreshMembers();
+                showNotificationWithTimeout(setNotification, 'Members data refreshed!', 'success');
+              } catch (err: any) {
+                showNotificationWithTimeout(setNotification, 'Failed to refresh', 'danger');
+              } finally {
+                setIsLoading(false);
+              }
+            }}
+          />
+        );
+
       default:
         return null;
     }
@@ -365,12 +399,24 @@ function App() {
               History
             </a>
           </li>
+          <li className="nav-item">
+            <a
+              className={`nav-link ${activeTab === 'members' ? 'active' : ''}`}
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveTab('members');
+              }}
+            >
+              Members
+            </a>
+          </li>
         </ul>
       )}
 
       {renderContent()}
 
-      {(isLoading || daoLoading || proposalsLoading) && <LoadingSpinner />}
+      {(isLoading || daoLoading || proposalsLoading || membersLoading) && <LoadingSpinner />}
       <Notification notification={notification} />
     </div>
   );
