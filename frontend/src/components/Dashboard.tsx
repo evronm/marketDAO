@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { DAOInfo } from '../types';
 import { basisPointsToPercent, safeFormatEther } from '../utils/formatting';
-import { DAO_ADDRESS, RARIBLE_TESTNET_URL } from '../types/constants';
+import { RARIBLE_TESTNET_URL } from '../types/constants';
 
 interface DashboardProps {
   daoInfo: DAOInfo;
+  daoAddress: string;
   onPurchaseTokens: (amount: number) => Promise<void>;
   onClaimVested: () => Promise<void>;
   onRefresh: () => Promise<void>;
@@ -13,6 +14,7 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({
   daoInfo,
+  daoAddress,
   onPurchaseTokens,
   onClaimVested,
   onRefresh,
@@ -46,7 +48,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               {daoInfo.tokenBalance}
               <div className="small">
                 <a
-                  href={RARIBLE_TESTNET_URL(DAO_ADDRESS, '0')}
+                  href={RARIBLE_TESTNET_URL(daoAddress, '0')}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-primary"

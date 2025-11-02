@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ProposalType, TokenType, DAOInfo } from '../types';
 import { ethers } from 'ethers';
-import { DAO_ADDRESS } from '../types/constants';
 
 interface CreateProposalProps {
   onCreateResolution: (description: string) => Promise<void>;
@@ -15,6 +14,7 @@ interface CreateProposalProps {
   onCreateMint: (description: string, recipient: string, amount: string) => Promise<void>;
   onCreateTokenPrice: (description: string, newPrice: string) => Promise<void>;
   daoInfo: DAOInfo | null;
+  daoAddress: string;
   walletAddress: string | null;
   isLoading: boolean;
 }
@@ -46,6 +46,7 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
   onCreateMint,
   onCreateTokenPrice,
   daoInfo,
+  daoAddress,
   walletAddress,
   isLoading,
 }) => {
@@ -63,15 +64,15 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
   const [proposalType, setProposalType] = useState<ProposalType>(shouldShowJoinRequest ? 'mint' : 'resolution');
   const [description, setDescription] = useState('');
   const [joinRequestSubmitted, setJoinRequestSubmittedState] = useState(
-    hasSubmittedJoinRequest(walletAddress, DAO_ADDRESS)
+    hasSubmittedJoinRequest(walletAddress, daoAddress)
   );
 
   // Load join request status from localStorage when wallet or DAO changes
   useEffect(() => {
-    const hasSubmitted = hasSubmittedJoinRequest(walletAddress, DAO_ADDRESS);
-    console.log('Checking join request status:', { walletAddress, daoAddress: DAO_ADDRESS, hasSubmitted });
+    const hasSubmitted = hasSubmittedJoinRequest(walletAddress, daoAddress);
+    console.log('Checking join request status:', { walletAddress, daoAddress, hasSubmitted });
     setJoinRequestSubmittedState(hasSubmitted);
-  }, [walletAddress]);
+  }, [walletAddress, daoAddress]);
 
   // Update proposal type when join request status changes
   useEffect(() => {
@@ -83,10 +84,10 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
   // Clear join request submitted state when user becomes a token holder
   useEffect(() => {
     if (isTokenHolder && joinRequestSubmitted) {
-      setJoinRequestSubmitted(walletAddress, DAO_ADDRESS, false);
+      setJoinRequestSubmitted(walletAddress, daoAddress, false);
       setJoinRequestSubmittedState(false);
     }
-  }, [isTokenHolder, joinRequestSubmitted, walletAddress]);
+  }, [isTokenHolder, joinRequestSubmitted, walletAddress, daoAddress]);
 
   // Treasury form state
   const [treasuryRecipient, setTreasuryRecipient] = useState('');
@@ -130,10 +131,10 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
 
     // Set flag for join requests
     if (shouldShowJoinRequest) {
-      console.log('Setting join request submitted for:', { walletAddress, daoAddress: DAO_ADDRESS });
-      setJoinRequestSubmitted(walletAddress, DAO_ADDRESS, true);
+      console.log('Setting join request submitted for:', { walletAddress, daoAddress });
+      setJoinRequestSubmitted(walletAddress, daoAddress, true);
       setJoinRequestSubmittedState(true);
-      console.log('localStorage after setting:', localStorage.getItem(getJoinRequestKey(walletAddress || '', DAO_ADDRESS)));
+      console.log('localStorage after setting:', localStorage.getItem(getJoinRequestKey(walletAddress || '', daoAddress)));
     }
   };
 

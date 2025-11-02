@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { ContractRefs } from '../types';
-import { DAO_ADDRESS, FACTORY_ADDRESS } from '../types/constants';
 import { DAO_ABI, FACTORY_ABI } from '../types/abis';
 
 declare global {
@@ -18,7 +17,12 @@ interface UseWalletReturn {
   error: string | null;
 }
 
-export const useWallet = (): UseWalletReturn => {
+interface UseWalletParams {
+  daoAddress: string;
+  factoryAddress: string;
+}
+
+export const useWallet = ({ daoAddress, factoryAddress }: UseWalletParams): UseWalletReturn => {
   const [isConnected, setIsConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -48,8 +52,8 @@ export const useWallet = (): UseWalletReturn => {
       const signer = provider.getSigner();
 
       // Initialize contracts
-      const daoContract = new ethers.Contract(DAO_ADDRESS, DAO_ABI, signer);
-      const factoryContract = new ethers.Contract(FACTORY_ADDRESS, FACTORY_ABI, signer);
+      const daoContract = new ethers.Contract(daoAddress, DAO_ABI, signer);
+      const factoryContract = new ethers.Contract(factoryAddress, FACTORY_ABI, signer);
 
       setContractRefs({
         provider,
@@ -64,7 +68,7 @@ export const useWallet = (): UseWalletReturn => {
       setError(message);
       console.error('Wallet connection error:', err);
     }
-  }, []);
+  }, [daoAddress, factoryAddress]);
 
   return {
     isConnected,

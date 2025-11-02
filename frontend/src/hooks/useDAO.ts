@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { DAOInfo, ContractRefs } from '../types';
-import { DAO_ADDRESS } from '../types/constants';
 
 interface UseDAOReturn {
   daoInfo: DAOInfo;
@@ -31,7 +30,8 @@ const DEFAULT_DAO_INFO: DAOInfo = {
 export const useDAO = (
   contractRefs: ContractRefs,
   walletAddress: string,
-  isConnected: boolean
+  isConnected: boolean,
+  daoAddress: string
 ): UseDAOReturn => {
   const [daoInfo, setDaoInfo] = useState<DAOInfo>(DEFAULT_DAO_INFO);
   const [isLoading, setIsLoading] = useState(false);
@@ -57,7 +57,7 @@ export const useDAO = (
       // Get treasury balance - force latest block
       let treasuryBalance: ethers.BigNumber;
       try {
-        treasuryBalance = await provider.getBalance(DAO_ADDRESS, 'latest');
+        treasuryBalance = await provider.getBalance(daoAddress, 'latest');
       } catch (balanceError) {
         console.warn('Error getting treasury balance:', balanceError);
         treasuryBalance = ethers.BigNumber.from(0);
@@ -139,7 +139,7 @@ export const useDAO = (
     } finally {
       setIsLoading(false);
     }
-  }, [contractRefs, walletAddress, isConnected]);
+  }, [contractRefs, walletAddress, isConnected, daoAddress]);
 
   const purchaseTokens = useCallback(
     async (amount: number) => {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TabType, NotificationState } from './types';
+import { useDAOAddress } from './contexts/DAOContext';
 import { useWallet } from './hooks/useWallet';
 import { useDAO } from './hooks/useDAO';
 import { useProposals } from './hooks/useProposals';
@@ -10,6 +11,7 @@ import { ProposalActions } from './components/ProposalActions';
 import { ElectionActions } from './components/ElectionActions';
 import { CreateProposal } from './components/CreateProposal';
 import { Members } from './components/Members';
+import { DAOSelector } from './components/DAOSelector';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { Notification } from './components/Notification';
 import { showNotificationWithTimeout, hideNotification } from './utils/notification';
@@ -19,7 +21,11 @@ function App() {
   const [notification, setNotification] = useState<NotificationState>(hideNotification());
   const [isLoading, setIsLoading] = useState(false);
 
-  const { isConnected, walletAddress, contractRefs, connectWallet, error: walletError } = useWallet();
+  const { daoAddress, factoryAddress } = useDAOAddress();
+  const { isConnected, walletAddress, contractRefs, connectWallet, error: walletError } = useWallet({
+    daoAddress,
+    factoryAddress,
+  });
 
   const {
     daoInfo,
@@ -28,7 +34,7 @@ function App() {
     refreshDAOInfo,
     purchaseTokens,
     claimVestedTokens,
-  } = useDAO(contractRefs, walletAddress, isConnected);
+  } = useDAO(contractRefs, walletAddress, isConnected, daoAddress);
 
   const {
     activeProposals,
@@ -192,6 +198,7 @@ function App() {
           <>
             <Dashboard
               daoInfo={daoInfo}
+              daoAddress={daoAddress}
               onPurchaseTokens={handlePurchaseTokens}
               onClaimVested={handleClaimVested}
               onRefresh={async () => {
@@ -213,6 +220,7 @@ function App() {
               onCreateMint={handleCreateMint}
               onCreateTokenPrice={handleCreateTokenPrice}
               daoInfo={daoInfo}
+              daoAddress={daoAddress}
               walletAddress={walletAddress}
               isLoading={isLoading}
             />
@@ -348,6 +356,8 @@ function App() {
           </a>
         </h2>
       </div>
+
+      <DAOSelector />
 
       {isConnected && (
         <ul className="nav nav-tabs nav-fill mb-4">
