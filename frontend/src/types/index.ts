@@ -38,6 +38,7 @@ export interface DAOInfo {
 // Member Information
 export interface MemberInfo {
   address: string;
+  ensName?: string | null;
   totalBalance: string;
   vestedBalance: string;
   unvestedBalance: string;
