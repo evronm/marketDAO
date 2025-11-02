@@ -9,11 +9,13 @@ import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 
 contract ResolutionProposal is Proposal {
-    constructor(
+    function initialize(
         MarketDAO _dao,
-        string memory _description
-    ) Proposal(_dao, _description) {
+        string memory _description,
+        address _proposer
+    ) external {
         require(bytes(_description).length > 0, "Description required");
+        __Proposal_init(_dao, _description, _proposer);
     }
 
     function _execute() internal override {
@@ -41,14 +43,16 @@ contract TreasuryProposal is Proposal {
         dao.unlockFunds();
     }
 
-    constructor(
+    function initialize(
         MarketDAO _dao,
         string memory _description,
+        address _proposer,
         address _recipient,
         uint256 _amount,
         address _token,
         uint256 _tokenId
-    ) Proposal(_dao, _description) {
+    ) external {
+        __Proposal_init(_dao, _description, _proposer);
         require(_recipient != address(0), "Invalid recipient");
         require(_amount > 0, "Amount must be positive");
         require(dao.hasTreasury(), "DAO has no treasury");
@@ -135,12 +139,14 @@ contract MintProposal is Proposal {
     address public recipient;
     uint256 public amount;
 
-    constructor(
+    function initialize(
         MarketDAO _dao,
         string memory _description,
+        address _proposer,
         address _recipient,
         uint256 _amount
-    ) Proposal(_dao, _description) {
+    ) external {
+        __Proposal_init(_dao, _description, _proposer);
         require(_recipient != address(0), "Invalid recipient");
         require(_amount > 0, "Amount must be positive");
         require(dao.allowMinting(), "Minting not allowed");
@@ -161,12 +167,14 @@ contract MintProposal is Proposal {
 contract TokenPriceProposal is Proposal {
     uint256 public newPrice;
 
-    constructor(
+    function initialize(
         MarketDAO _dao,
         string memory _description,
+        address _proposer,
         uint256 _newPrice
-    ) Proposal(_dao, _description) {
+    ) external {
         require(bytes(_description).length > 0, "Description required");
+        __Proposal_init(_dao, _description, _proposer);
         newPrice = _newPrice;
     }
 

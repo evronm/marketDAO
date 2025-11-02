@@ -8,10 +8,10 @@ abstract contract Proposal {
     address public proposer;
     uint256 public createdAt;
     string public description;
-    
+
     uint256 public supportTotal;
     mapping(address => uint256) public support;
-    
+
     // Election state
     bool public electionTriggered;
     uint256 public electionStart;
@@ -25,6 +25,9 @@ abstract contract Proposal {
 
     // Lazy minting for voting tokens
     mapping(address => bool) public hasClaimed;
+
+    // Initialization guard
+    bool private _initialized;
     
     modifier onlyBeforeElection() {
         require(!electionTriggered, "Election already triggered");
@@ -55,15 +58,18 @@ abstract contract Proposal {
         return true;
     }
     
-    constructor(
+    function __Proposal_init(
         MarketDAO _dao,
-        string memory _description
-    ) {
+        string memory _description,
+        address _proposer
+    ) internal {
+        require(!_initialized, "Already initialized");
+        _initialized = true;
         dao = _dao;
-        proposer = msg.sender;
+        proposer = _proposer;
         description = _description;
         createdAt = block.number;
-        // Note: Factory will call dao.setActiveProposal(address(this)) after construction
+        // Note: Factory will call dao.setActiveProposal(address(this)) after initialization
     }
     
     function addSupport(uint256 amount) external onlyBeforeElection {

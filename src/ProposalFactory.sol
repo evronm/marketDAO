@@ -2,14 +2,27 @@
 pragma solidity ^0.8.20;
 
 import "./ProposalTypes.sol";
+import "@openzeppelin/contracts/proxy/Clones.sol";
 
 contract ProposalFactory {
     MarketDAO public dao;
     mapping(uint256 => address) public proposals;
     uint256 public proposalCount;
 
+    // Implementation contracts for cloning
+    address public resolutionImpl;
+    address public treasuryImpl;
+    address public mintImpl;
+    address public tokenPriceImpl;
+
     constructor(MarketDAO _dao) {
         dao = _dao;
+
+        // Deploy implementation contracts once
+        resolutionImpl = address(new ResolutionProposal());
+        treasuryImpl = address(new TreasuryProposal());
+        mintImpl = address(new MintProposal());
+        tokenPriceImpl = address(new TokenPriceProposal());
     }
 
     modifier onlyTokenHolder() {
@@ -20,10 +33,11 @@ contract ProposalFactory {
     function createResolutionProposal(
         string memory description
     ) external onlyTokenHolder returns (ResolutionProposal) {
-        ResolutionProposal proposal = new ResolutionProposal(dao, description);
-        dao.setActiveProposal(address(proposal));
-        proposals[proposalCount++] = address(proposal);
-        return proposal;
+        address clone = Clones.clone(resolutionImpl);
+        ResolutionProposal(clone).initialize(dao, description, msg.sender);
+        dao.setActiveProposal(clone);
+        proposals[proposalCount++] = clone;
+        return ResolutionProposal(clone);
     }
 
     function createTreasuryProposal(
@@ -33,17 +47,19 @@ contract ProposalFactory {
         address token,
         uint256 tokenId
     ) external onlyTokenHolder returns (TreasuryProposal) {
-        TreasuryProposal proposal = new TreasuryProposal(
+        address clone = Clones.clone(treasuryImpl);
+        TreasuryProposal(clone).initialize(
             dao,
             description,
+            msg.sender,
             recipient,
             amount,
             token,
             tokenId
         );
-        dao.setActiveProposal(address(proposal));
-        proposals[proposalCount++] = address(proposal);
-        return proposal;
+        dao.setActiveProposal(clone);
+        proposals[proposalCount++] = clone;
+        return TreasuryProposal(clone);
     }
 
     function createMintProposal(
@@ -59,15 +75,17 @@ contract ProposalFactory {
             require(recipient == msg.sender, "Non-holders can only request tokens for themselves");
         }
 
-        MintProposal proposal = new MintProposal(
+        address clone = Clones.clone(mintImpl);
+        MintProposal(clone).initialize(
             dao,
             description,
+            msg.sender,
             recipient,
             amount
         );
-        dao.setActiveProposal(address(proposal));
-        proposals[proposalCount++] = address(proposal);
-        return proposal;
+        dao.setActiveProposal(clone);
+        proposals[proposalCount++] = clone;
+        return MintProposal(clone);
     }
 
 
@@ -75,14 +93,16 @@ contract ProposalFactory {
         string memory description,
         uint256 newPrice
     ) external onlyTokenHolder returns (TokenPriceProposal) {
-        TokenPriceProposal proposal = new TokenPriceProposal(
+        address clone = Clones.clone(tokenPriceImpl);
+        TokenPriceProposal(clone).initialize(
             dao,
             description,
+            msg.sender,
             newPrice
         );
-        dao.setActiveProposal(address(proposal));
-        proposals[proposalCount++] = address(proposal);
-        return proposal;
+        dao.setActiveProposal(clone);
+        proposals[proposalCount++] = clone;
+        return TokenPriceProposal(clone);
     }
 
     function getProposal(uint256 index) external view returns (address) {
