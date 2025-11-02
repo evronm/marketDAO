@@ -219,4 +219,52 @@ contract PurchaseRestrictionsTest is Test {
         vm.expectRevert("Only existing holders can purchase");
         daoRestricted.purchaseTokens{value: 1 ether}();
     }
+
+    function testHolderWithOnlyUnvestedTokensCanPurchase() public {
+        // Create DAO with vesting enabled
+        address[] memory initialHolders = new address[](1);
+        initialHolders[0] = alice;
+        uint256[] memory initialAmounts = new uint256[](1);
+        initialAmounts[0] = 100;
+        string[] memory treasuryConfig = new string[](1);
+        treasuryConfig[0] = "ETH";
+
+        MarketDAO daoWithVesting = new MarketDAO(
+            "Vested Restricted DAO",
+            2000,
+            5100,
+            100,
+            50,
+            FLAG_ALLOW_MINTING | FLAG_RESTRICT_PURCHASES,
+            TOKEN_PRICE,
+            10,  // 10 block vesting period
+            treasuryConfig,
+            initialHolders,
+            initialAmounts
+        );
+
+        vm.deal(charlie, 10 ether);
+
+        // Charlie has no tokens, cannot purchase
+        vm.prank(charlie);
+        vm.expectRevert("Only existing holders can purchase");
+        daoWithVesting.purchaseTokens{value: 1 ether}();
+
+        // Alice (a holder) purchases tokens for Charlie through a mint proposal
+        // Then Charlie purchases more
+        // For simplicity, let's have Alice transfer some tokens to Charlie
+        vm.prank(alice);
+        daoWithVesting.safeTransferFrom(alice, charlie, 0, 10, "");
+
+        // Charlie now has 10 tokens, but they're all unvested
+        assertEq(daoWithVesting.balanceOf(charlie, 0), 10);
+        assertEq(daoWithVesting.vestedBalance(charlie), 0);  // All unvested
+
+        // Charlie should STILL be able to purchase because he has tokens (even if unvested)
+        vm.prank(charlie);
+        daoWithVesting.purchaseTokens{value: 1 ether}();
+
+        // Charlie should now have 20 tokens
+        assertEq(daoWithVesting.balanceOf(charlie, 0), 20);
+    }
 }

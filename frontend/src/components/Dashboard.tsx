@@ -114,17 +114,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      <div className="card shadow">
-        <div className="card-body">
-          <h3 className="mb-3">Purchase Tokens</h3>
-        {Number(daoInfo.tokenPrice) === 0 ? (
-          <div className="alert alert-info">
-            <p className="mb-0">
-              Direct token purchases are currently disabled (token price is set to 0).
-            </p>
-          </div>
-        ) : (
-          <>
+      {/* Only show purchase section if: price > 0 AND (not restricted OR user has tokens) */}
+      {Number(daoInfo.tokenPrice) > 0 && (!daoInfo.restrictPurchases || daoInfo.tokenBalance !== '0') && (
+        <div className="card shadow">
+          <div className="card-body">
+            <h3 className="mb-3">Purchase Tokens</h3>
             <div className="row g-3 align-items-end justify-content-center mb-3">
               <div className="col-12 col-md-4">
                 <label htmlFor="purchase-amount" className="form-label">
@@ -152,10 +146,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="text-center text-muted small">
               Cost: {(Number(daoInfo.tokenPrice) * purchaseAmount).toFixed(4)} ETH
             </div>
-          </>
-        )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

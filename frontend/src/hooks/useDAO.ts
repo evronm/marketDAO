@@ -25,6 +25,8 @@ const DEFAULT_DAO_INFO: DAOInfo = {
   maxProposalAge: '0',
   electionDuration: '0',
   hasClaimableVesting: false,
+  restrictPurchases: false,
+  allowMinting: false,
 };
 
 export const useDAO = (
@@ -92,6 +94,8 @@ export const useDAO = (
         maxPropAge,
         elecDuration,
         hasClaimable,
+        restrictPurchases,
+        allowMinting,
       ] = await Promise.all([
         loadField(() => daoContract.name({ blockTag }), 'Market DAO', 'DAO name'),
         loadField(() => daoContract.tokenPrice({ blockTag }), ethers.utils.parseEther('0.1'), 'token price'),
@@ -104,6 +108,8 @@ export const useDAO = (
         loadField(() => daoContract.maxProposalAge({ blockTag }), ethers.BigNumber.from(100), 'max proposal age'),
         loadField(() => daoContract.electionDuration({ blockTag }), ethers.BigNumber.from(50), 'election duration'),
         loadField(() => daoContract.hasClaimableVesting(walletAddress, { blockTag }), false, 'has claimable vesting'),
+        loadField(() => daoContract.restrictPurchasesToHolders({ blockTag }), false, 'restrict purchases'),
+        loadField(() => daoContract.allowMinting({ blockTag }), false, 'allow minting'),
       ]);
 
       const unvestedBal = tokenBalance.sub(vestedBal);
@@ -131,6 +137,8 @@ export const useDAO = (
         maxProposalAge: maxPropAge.toString(),
         electionDuration: elecDuration.toString(),
         hasClaimableVesting: hasClaimable,
+        restrictPurchases,
+        allowMinting,
       });
     } catch (err: any) {
       const message = err.message || 'Failed to load DAO information';

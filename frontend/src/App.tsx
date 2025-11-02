@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ethers } from 'ethers';
 import { TabType, NotificationState } from './types';
 import { useDAOAddress } from './contexts/DAOContext';
 import { useWallet } from './hooks/useWallet';
@@ -15,11 +16,13 @@ import { DAOSelector } from './components/DAOSelector';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { Notification } from './components/Notification';
 import { showNotificationWithTimeout, hideNotification } from './utils/notification';
+import { DAO_ABI } from './types/abis';
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [notification, setNotification] = useState<NotificationState>(hideNotification());
   const [isLoading, setIsLoading] = useState(false);
+  const [preConnectDAOName, setPreConnectDAOName] = useState<string>('Market DAO');
 
   const { daoAddress, factoryAddress } = useDAOAddress();
   const { isConnected, walletAddress, contractRefs, connectWallet, error: walletError } = useWallet({
@@ -84,6 +87,31 @@ function App() {
       showNotificationWithTimeout(setNotification, membersError, 'danger');
     }
   }, [membersError]);
+
+  // Load DAO name before wallet connection using read-only provider
+  useEffect(() => {
+    const loadDAOName = async () => {
+      try {
+        // Use window.ethereum if available, otherwise use a public RPC
+        let provider: ethers.providers.Provider;
+        if (typeof window.ethereum !== 'undefined') {
+          provider = new ethers.providers.Web3Provider(window.ethereum);
+        } else {
+          // Fallback to localhost for development
+          provider = new ethers.providers.JsonRpcProvider('http://localhost:8545');
+        }
+
+        const daoContract = new ethers.Contract(daoAddress, DAO_ABI, provider);
+        const name = await daoContract.name();
+        setPreConnectDAOName(name);
+      } catch (err) {
+        console.warn('Failed to load DAO name:', err);
+        setPreConnectDAOName('Market DAO');
+      }
+    };
+
+    loadDAOName();
+  }, [daoAddress]);
 
   // Load proposals when connected
   useEffect(() => {
@@ -182,7 +210,7 @@ function App() {
       return (
         <div className="card shadow">
           <div className="card-body text-center p-5">
-            <h2 className="mb-4">Welcome to Market DAO</h2>
+            <h2 className="mb-4">Welcome to {preConnectDAOName}</h2>
             <p className="mb-4">Please connect your wallet to interact with the DAO</p>
             <button className="btn btn-primary btn-lg" onClick={handleConnectWallet}>
               Connect Wallet
@@ -343,7 +371,7 @@ function App() {
   return (
     <div className="container py-4" style={{ maxWidth: '900px' }}>
       <div className="text-center mb-4">
-        <h1 className="mb-1">{isConnected && daoInfo ? daoInfo.name : 'Market DAO'}</h1>
+        <h1 className="mb-1">{isConnected && daoInfo ? daoInfo.name : preConnectDAOName}</h1>
         <h2 className="h5 text-muted mb-0">
           a{' '}
           <a

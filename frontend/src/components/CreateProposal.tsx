@@ -54,11 +54,11 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
   const isTokenHolder = Boolean(daoInfo && daoInfo.vestedBalance !== '0');
 
   // Check if join request section should be shown
-  // Only show when purchases are disabled (price = 0) AND user has no tokens at all
+  // Show when: (purchases disabled AND no tokens) OR (purchases restricted AND no tokens)
   const shouldShowJoinRequest = Boolean(
     daoInfo &&
-    daoInfo.tokenPrice === '0' &&
-    daoInfo.tokenBalance === '0'
+    daoInfo.tokenBalance === '0' &&
+    (daoInfo.tokenPrice === '0' || daoInfo.restrictPurchases)
   );
 
   const [proposalType, setProposalType] = useState<ProposalType>(shouldShowJoinRequest ? 'mint' : 'resolution');

@@ -54,7 +54,9 @@ export const DAO_ABI = [
   "function claimVestedTokens()",
   "function purchaseTokens() payable",
   "function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes data)",
-  "function getGovernanceTokenHolders() view returns (address[])"
+  "function getGovernanceTokenHolders() view returns (address[])",
+  "function restrictPurchasesToHolders() view returns (bool)",
+  "function allowMinting() view returns (bool)"
 ];
 
 export const FACTORY_ABI = [

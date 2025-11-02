@@ -33,6 +33,8 @@ export interface DAOInfo {
   maxProposalAge: string;
   electionDuration: string;
   hasClaimableVesting: boolean;
+  restrictPurchases: boolean;
+  allowMinting: boolean;
 }
 
 // Member Information

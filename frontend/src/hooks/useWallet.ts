@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { ContractRefs } from '../types';
 import { DAO_ABI, FACTORY_ABI } from '../types/abis';
@@ -69,6 +69,68 @@ export const useWallet = ({ daoAddress, factoryAddress }: UseWalletParams): UseW
       console.error('Wallet connection error:', err);
     }
   }, [daoAddress, factoryAddress]);
+
+  // Listen for account changes in MetaMask
+  useEffect(() => {
+    if (typeof window.ethereum === 'undefined') {
+      return;
+    }
+
+    const handleAccountsChanged = async (accounts: string[]) => {
+      console.log('MetaMask accounts changed:', accounts);
+
+      if (accounts.length === 0) {
+        // User disconnected their wallet
+        setIsConnected(false);
+        setWalletAddress('');
+        setContractRefs({
+          provider: null,
+          signer: null,
+          daoContract: null,
+          factoryContract: null,
+        });
+      } else if (accounts[0] !== walletAddress) {
+        // User switched to a different account
+        const newAccount = accounts[0];
+        setWalletAddress(newAccount);
+
+        // Reinitialize contracts with new signer if we were connected
+        if (isConnected) {
+          try {
+            const provider = new ethers.providers.Web3Provider(window.ethereum);
+            const signer = provider.getSigner();
+            const daoContract = new ethers.Contract(daoAddress, DAO_ABI, signer);
+            const factoryContract = new ethers.Contract(factoryAddress, FACTORY_ABI, signer);
+
+            setContractRefs({
+              provider,
+              signer,
+              daoContract,
+              factoryContract,
+            });
+          } catch (err) {
+            console.error('Error updating contracts after account change:', err);
+          }
+        }
+      }
+    };
+
+    const handleChainChanged = () => {
+      // Reload the page when chain changes (recommended by MetaMask)
+      window.location.reload();
+    };
+
+    window.ethereum.on('accountsChanged', handleAccountsChanged);
+    window.ethereum.on('chainChanged', handleChainChanged);
+
+    // Cleanup listeners
+    return () => {
+      if (window.ethereum.removeListener) {
+        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        window.ethereum.removeListener('chainChanged', handleChainChanged);
+      }
+    };
+  }, [isConnected, walletAddress, daoAddress, factoryAddress]);
 
   return {
     isConnected,
