@@ -94,6 +94,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <dt className="col-sm-6">Token Price</dt>
             <dd className="col-sm-6">{daoInfo.tokenPrice} ETH</dd>
 
+            {daoInfo.mintOnPurchase && (
+              <>
+                <dt className="col-sm-6">Available for Purchase</dt>
+                <dd className="col-sm-6">
+                  <span className={parseInt(daoInfo.availableTokensForPurchase) > 0 ? 'text-success fw-bold' : 'text-muted'}>
+                    {daoInfo.availableTokensForPurchase}
+                  </span>
+                  <div className="small text-muted">
+                    {parseInt(daoInfo.availableTokensForPurchase) > 0 ? 'In DAO treasury' : 'No tokens available'}
+                  </div>
+                </dd>
+              </>
+            )}
+
             <dt className="col-sm-6">Treasury</dt>
             <dd className="col-sm-6">
               {daoInfo.treasuryBalance ? safeFormatEther(daoInfo.treasuryBalance) : '0'} ETH
@@ -114,8 +128,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Only show purchase section if: price > 0 AND (not restricted OR user has tokens) */}
-      {Number(daoInfo.tokenPrice) > 0 && (!daoInfo.restrictPurchases || daoInfo.tokenBalance !== '0') && (
+      {/* Only show purchase section if: price > 0 AND (not restricted OR user has tokens) AND (!mintOnPurchase OR tokens available) */}
+      {Number(daoInfo.tokenPrice) > 0 &&
+       (!daoInfo.restrictPurchases || daoInfo.tokenBalance !== '0') &&
+       (!daoInfo.mintOnPurchase || parseInt(daoInfo.availableTokensForPurchase) > 0) && (
         <div className="card shadow">
           <div className="card-body">
             <h3 className="mb-3">Purchase Tokens</h3>
@@ -129,8 +145,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   className="form-control"
                   id="purchase-amount"
                   min="1"
+                  max={daoInfo.mintOnPurchase ? parseInt(daoInfo.availableTokensForPurchase) : undefined}
                   value={purchaseAmount}
                   onChange={(e) => setPurchaseAmount(Number(e.target.value))}
+                  disabled={isLoading}
                 />
               </div>
               <div className="col-12 col-md-4 text-center">
@@ -145,6 +163,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <div className="text-center text-muted small">
               Cost: {(Number(daoInfo.tokenPrice) * purchaseAmount).toFixed(4)} ETH
+              {daoInfo.mintOnPurchase && (
+                <div className="mt-1">
+                  <span className="badge bg-info">
+                    {parseInt(daoInfo.availableTokensForPurchase)} tokens available from DAO treasury
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -35,6 +35,8 @@ export interface DAOInfo {
   hasClaimableVesting: boolean;
   restrictPurchases: boolean;
   allowMinting: boolean;
+  mintOnPurchase: boolean;
+  availableTokensForPurchase: string;
 }
 
 // Member Information

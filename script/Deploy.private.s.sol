@@ -14,16 +14,19 @@ contract DeployConfig {
     bool constant ALLOW_MINTING = true;            // can mint new governance tokens
     uint256 constant TOKEN_PRICE = 1e14;           // initial token price
     uint256 constant VESTING_PERIOD = 100;         // initial vesting period is 2 election cycles
-    bool constant RESTRICT_PURCHASES = true;      // if true, only existing holders can purchase
+    bool constant RESTRICT_PURCHASES = true;       // if true, only existing holders can purchase
+    bool constant MINT_ON_PURCHASE = false;        // if true, purchases transfer from DAO; if false, purchases mint new tokens
 
     // Flag bit positions (must match MarketDAO contract)
     uint256 constant FLAG_ALLOW_MINTING = 1 << 0;
     uint256 constant FLAG_RESTRICT_PURCHASES = 1 << 1;
+    uint256 constant FLAG_MINT_ON_PURCHASE = 1 << 2;
 
     function buildFlags() internal pure returns (uint256) {
         uint256 flags = 0;
         if (ALLOW_MINTING) flags |= FLAG_ALLOW_MINTING;
         if (RESTRICT_PURCHASES) flags |= FLAG_RESTRICT_PURCHASES;
+        if (MINT_ON_PURCHASE) flags |= FLAG_MINT_ON_PURCHASE;
         return flags;
     }
 }

@@ -6,7 +6,7 @@ import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
 
 contract DeployConfig {
-    string constant DAO_NAME = "Market DAO";
+    string constant DAO_NAME = "Controlled Sale DAO";
     uint256 constant SUPPORT_THRESHOLD = 2000;     // 20% (basis points: 2000/10000)
     uint256 constant QUORUM = 5100;                // 51% (basis points: 5100/10000)
     uint256 constant MAX_PROPOSAL_AGE = 100;       // blocks until proposal expires
@@ -15,7 +15,7 @@ contract DeployConfig {
     uint256 constant TOKEN_PRICE = 1e14;           // initial token price
     uint256 constant VESTING_PERIOD = 100;         // initial vesting period is 2 election cycles
     bool constant RESTRICT_PURCHASES = false;      // if true, only existing holders can purchase
-    bool constant MINT_ON_PURCHASE = false;        // if true, purchases transfer from DAO; if false, purchases mint new tokens
+    bool constant MINT_ON_PURCHASE = true;         // if true, purchases transfer from DAO; if false, purchases mint new tokens
 
     // Flag bit positions (must match MarketDAO contract)
     uint256 constant FLAG_ALLOW_MINTING = 1 << 0;
@@ -46,7 +46,7 @@ contract DeployScript is Script, DeployConfig {
 
         address[] memory initialHolders = new address[](1);
         initialHolders[0] = msg.sender;
-        
+
         uint256[] memory initialAmounts = new uint256[](1);
         initialAmounts[0] = 100;
 
@@ -70,5 +70,21 @@ contract DeployScript is Script, DeployConfig {
         dao.setFactory(address(factory));
 
         vm.stopBroadcast();
+
+        // Log deployment info
+        console.log("Deployed Controlled Sale DAO at:", address(dao));
+        console.log("Deployed ProposalFactory at:", address(factory));
+        console.log("");
+        console.log("Configuration:");
+        console.log("- Token purchases transfer from DAO treasury (not minted)");
+        console.log("- DAO must mint tokens to itself via governance before they can be purchased");
+        console.log("- Anyone can purchase tokens (no restrictions)");
+        console.log("- Token price:", TOKEN_PRICE);
+        console.log("");
+        console.log("To make tokens available for purchase:");
+        console.log("1. Create a mint proposal to mint tokens to the DAO address");
+        console.log("2. Pass the proposal through voting");
+        console.log("3. Execute the proposal");
+        console.log("4. Tokens in DAO treasury will be available for public purchase");
     }
 }

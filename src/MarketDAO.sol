@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
@@ -10,7 +11,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import "./Proposal.sol";
 
-contract MarketDAO is ERC1155, ReentrancyGuard {
+contract MarketDAO is ERC1155, ReentrancyGuard, IERC1155Receiver {
     using SafeERC20 for IERC20;
 
     // Custom errors
@@ -27,6 +28,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     // Flag bit positions
     uint256 private constant FLAG_ALLOW_MINTING = 1 << 0;
     uint256 private constant FLAG_RESTRICT_PURCHASES = 1 << 1;
+    uint256 private constant FLAG_MINT_ON_PURCHASE = 1 << 2;
 
     // Helper functions for flag checks
     function allowMinting() public view returns (bool) {
@@ -35,6 +37,10 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
 
     function restrictPurchasesToHolders() public view returns (bool) {
         return (flags & FLAG_RESTRICT_PURCHASES) != 0;
+    }
+
+    function mintOnPurchase() public view returns (bool) {
+        return (flags & FLAG_MINT_ON_PURCHASE) != 0;
     }
 
     uint256 private constant GOVERNANCE_TOKEN_ID = 0;
@@ -217,8 +223,21 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         }
 
         uint256 tokenAmount = msg.value / tokenPrice;
-        _mint(msg.sender, GOVERNANCE_TOKEN_ID, tokenAmount, "");
-        tokenSupply[GOVERNANCE_TOKEN_ID] += tokenAmount;
+
+        // Handle token acquisition based on FLAG_MINT_ON_PURCHASE
+        if (!mintOnPurchase()) {
+            // Default behavior: mint new tokens
+            _mint(msg.sender, GOVERNANCE_TOKEN_ID, tokenAmount, "");
+            tokenSupply[GOVERNANCE_TOKEN_ID] += tokenAmount;
+        } else {
+            // New behavior (when FLAG_MINT_ON_PURCHASE is set): transfer from DAO's token balance
+            require(
+                balanceOf(address(this), GOVERNANCE_TOKEN_ID) >= tokenAmount,
+                "Insufficient tokens available for purchase"
+            );
+            _safeTransferFrom(address(this), msg.sender, GOVERNANCE_TOKEN_ID, tokenAmount, "");
+        }
+
         _addGovernanceTokenHolder(msg.sender);
 
         // Add vesting schedule if vesting period is set
@@ -591,6 +610,12 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         return total - totalUnvestedGovernanceTokens;
     }
 
+    // Get the number of governance tokens available for purchase from the DAO
+    // When FLAG_MINT_ON_PURCHASE is false, purchases transfer from this balance
+    function getAvailableTokensForPurchase() public view returns (uint256) {
+        return balanceOf(address(this), GOVERNANCE_TOKEN_ID);
+    }
+
     function setFactory(address _factory) external {
         require(msg.sender == deployer, "Only deployer can set factory");
         require(factory == address(0), "Factory already set");
@@ -692,5 +717,31 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
 
     function getProposalsWithLockedFunds() external view returns (address[] memory) {
         return proposalsWithLockedFunds;
+    }
+
+    // ERC1155Receiver implementation to allow DAO to receive ERC1155 tokens
+    function onERC1155Received(
+        address,
+        address,
+        uint256,
+        uint256,
+        bytes calldata
+    ) external pure override returns (bytes4) {
+        return this.onERC1155Received.selector;
+    }
+
+    function onERC1155BatchReceived(
+        address,
+        address,
+        uint256[] calldata,
+        uint256[] calldata,
+        bytes calldata
+    ) external pure override returns (bytes4) {
+        return this.onERC1155BatchReceived.selector;
+    }
+
+    // Override supportsInterface to include IERC1155Receiver
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC1155, IERC165) returns (bool) {
+        return interfaceId == type(IERC1155Receiver).interfaceId || super.supportsInterface(interfaceId);
     }
 }
