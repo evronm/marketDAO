@@ -86,7 +86,18 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({ proposal, children }
         <h3 className="mb-2">{proposal.description}</h3>
 
         <div className="text-muted small mb-3">
-          Proposer: {truncateAddress(proposal.proposer)}
+          <div>
+            <strong>Proposal:</strong>{' '}
+            <code style={{ fontSize: '0.85em', cursor: 'pointer' }} onClick={() => navigator.clipboard.writeText(proposal.address)} title="Click to copy">
+              {proposal.address}
+            </code>
+          </div>
+          <div>
+            <strong>Proposer:</strong>{' '}
+            <code style={{ fontSize: '0.85em', cursor: 'pointer' }} onClick={() => navigator.clipboard.writeText(proposal.proposer)} title="Click to copy">
+              {proposal.proposer}
+            </code>
+          </div>
         </div>
 
         {renderProposalDetails()}

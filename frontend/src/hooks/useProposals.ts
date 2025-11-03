@@ -284,12 +284,14 @@ export const useProposals = (
       }
 
       // Fetch details for all proposals
+      console.log('Loading proposals from addresses:', proposalAddresses);
       const proposalDetails = await Promise.all(
         proposalAddresses.map((addr) => fetchProposalDetails(addr))
       );
 
       // Filter out null results
       const allProposals = proposalDetails.filter((p) => p !== null) as Proposal[];
+      console.log('Loaded proposals:', allProposals.map(p => ({ address: p.address, type: p.type, status: p.electionStatus })));
 
       // Store the full list
       proposalListRef.current = allProposals;
