@@ -399,8 +399,6 @@ RESTRICT_PURCHASES = true  // Only holders can purchase
 
 ```bash
 # Local deployment
-./deploy.sh
-# or
 forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast
 
 # Testnet deployment (Polygon Amoy example)
@@ -436,10 +434,6 @@ forge test
 
 # Format code
 forge fmt
-
-# Deploy locally
-./deploy.sh
-```
 
 ### Creating Proposals (Frontend)
 
@@ -587,7 +581,7 @@ Current uncommitted changes:
 ### Deploying Changes
 
 1. Update deployment script if needed
-2. Deploy to local testnet first: `./deploy.sh`
+2. Deploy to local testnet first
 3. Test thoroughly with frontend
 4. Deploy to public testnet when ready
 5. Update frontend default addresses if changed
