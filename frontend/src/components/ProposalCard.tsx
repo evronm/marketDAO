@@ -67,7 +67,7 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({ proposal, children }
         [ParameterType.MaxProposalAge]: 'Max Proposal Age',
         [ParameterType.ElectionDuration]: 'Election Duration',
         [ParameterType.VestingPeriod]: 'Vesting Period',
-        [ParameterType.Flags]: 'Flags',
+        [ParameterType.Flags]: 'Configuration Flags',
       };
 
       const formatValue = (type: ParameterType, value: string): string => {
@@ -89,14 +89,40 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({ proposal, children }
         }
       };
 
+      const renderFlagsValue = (flagsValue: string) => {
+        const flags = parseInt(flagsValue);
+        const allowMinting = (flags & 1) !== 0;
+        const restrictPurchases = (flags & 2) !== 0;
+        const mintOnPurchase = (flags & 4) !== 0;
+
+        return (
+          <dl className="row mb-0">
+            <dt className="col-sm-8">Allow Minting:</dt>
+            <dd className="col-sm-4">{allowMinting ? '✓ Enabled' : '✗ Disabled'}</dd>
+
+            <dt className="col-sm-8">Restrict Purchases:</dt>
+            <dd className="col-sm-4">{restrictPurchases ? '✓ Enabled' : '✗ Disabled'}</dd>
+
+            <dt className="col-sm-8">Mint on Purchase:</dt>
+            <dd className="col-sm-4">{mintOnPurchase ? '✓ Enabled' : '✗ Disabled'}</dd>
+          </dl>
+        );
+      };
+
       return (
         <div className="bg-light p-3 rounded mb-3">
           <div>
             <strong>Parameter:</strong> {parameterNames[proposal.details.parameterType]}
           </div>
-          <div>
-            <strong>New Value:</strong> {formatValue(proposal.details.parameterType, proposal.details.newValue)}
-          </div>
+          {proposal.details.parameterType === ParameterType.Flags ? (
+            <div className="mt-2">
+              {renderFlagsValue(proposal.details.newValue)}
+            </div>
+          ) : (
+            <div>
+              <strong>New Value:</strong> {formatValue(proposal.details.parameterType, proposal.details.newValue)}
+            </div>
+          )}
         </div>
       );
     }

@@ -104,6 +104,11 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
   const [parameterType, setParameterType] = useState<ParameterType>(ParameterType.TokenPrice);
   const [parameterValue, setParameterValue] = useState('');
 
+  // Flag checkbox states
+  const [flagAllowMinting, setFlagAllowMinting] = useState(false);
+  const [flagRestrictPurchases, setFlagRestrictPurchases] = useState(false);
+  const [flagMintOnPurchase, setFlagMintOnPurchase] = useState(false);
+
   const handleCreateResolution = async () => {
     await onCreateResolution(description);
     setDescription('');
@@ -156,9 +161,16 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
       case ParameterType.MaxProposalAge:
       case ParameterType.ElectionDuration:
       case ParameterType.VestingPeriod:
-      case ParameterType.Flags:
-        // Use value directly (blocks or flags)
+        // Use value directly (blocks)
         valueToSubmit = parameterValue;
+        break;
+      case ParameterType.Flags:
+        // Compute flags from checkboxes
+        let flagsValue = 0;
+        if (flagAllowMinting) flagsValue |= 1;      // Bit 0
+        if (flagRestrictPurchases) flagsValue |= 2; // Bit 1
+        if (flagMintOnPurchase) flagsValue |= 4;    // Bit 2
+        valueToSubmit = flagsValue.toString();
         break;
       default:
         valueToSubmit = parameterValue;
@@ -167,6 +179,10 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
     await onCreateParameter(description, parameterType, valueToSubmit);
     setDescription('');
     setParameterValue('');
+    // Reset flag checkboxes
+    setFlagAllowMinting(false);
+    setFlagRestrictPurchases(false);
+    setFlagMintOnPurchase(false);
   };
 
   // Don't render if user can't create proposals and can't request to join
@@ -491,52 +507,98 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
               </select>
             </div>
 
-            <div className="mb-3">
-              <label htmlFor="parameter-value" className="form-label">
-                {parameterType === ParameterType.TokenPrice && 'New Token Price (ETH)'}
-                {parameterType === ParameterType.SupportThreshold && 'New Support Threshold (%)'}
-                {parameterType === ParameterType.QuorumPercentage && 'New Quorum Percentage (%)'}
-                {parameterType === ParameterType.MaxProposalAge && 'New Max Proposal Age (blocks)'}
-                {parameterType === ParameterType.ElectionDuration && 'New Election Duration (blocks)'}
-                {parameterType === ParameterType.VestingPeriod && 'New Vesting Period (blocks)'}
-                {parameterType === ParameterType.Flags && 'New Flags (0-7)'}
-              </label>
-              <input
-                type="number"
-                className="form-control"
-                id="parameter-value"
-                min="0"
-                step={
-                  parameterType === ParameterType.TokenPrice ? 'any' :
-                  (parameterType === ParameterType.SupportThreshold || parameterType === ParameterType.QuorumPercentage) ? '0.01' :
-                  '1'
-                }
-                value={parameterValue}
-                onChange={(e) => setParameterValue(e.target.value)}
-                placeholder={
-                  parameterType === ParameterType.TokenPrice ? 'e.g., 0.1' :
-                  (parameterType === ParameterType.SupportThreshold || parameterType === ParameterType.QuorumPercentage) ? 'e.g., 51' :
-                  parameterType === ParameterType.Flags ? '0-7' :
-                  'Enter number of blocks'
-                }
-              />
-              {(parameterType === ParameterType.SupportThreshold || parameterType === ParameterType.QuorumPercentage) && (
-                <small className="form-text text-muted">
-                  Enter as percentage (e.g., 51 for 51%)
-                </small>
-              )}
-              {parameterType === ParameterType.Flags && (
-                <small className="form-text text-muted">
-                  Bit 0: Allow Minting, Bit 1: Restrict Purchases, Bit 2: Mint on Purchase
-                </small>
-              )}
-            </div>
+            {parameterType !== ParameterType.Flags && (
+              <div className="mb-3">
+                <label htmlFor="parameter-value" className="form-label">
+                  {parameterType === ParameterType.TokenPrice && 'New Token Price (ETH)'}
+                  {parameterType === ParameterType.SupportThreshold && 'New Support Threshold (%)'}
+                  {parameterType === ParameterType.QuorumPercentage && 'New Quorum Percentage (%)'}
+                  {parameterType === ParameterType.MaxProposalAge && 'New Max Proposal Age (blocks)'}
+                  {parameterType === ParameterType.ElectionDuration && 'New Election Duration (blocks)'}
+                  {parameterType === ParameterType.VestingPeriod && 'New Vesting Period (blocks)'}
+                </label>
+                <input
+                  type="number"
+                  className="form-control"
+                  id="parameter-value"
+                  min="0"
+                  step={
+                    parameterType === ParameterType.TokenPrice ? 'any' :
+                    (parameterType === ParameterType.SupportThreshold || parameterType === ParameterType.QuorumPercentage) ? '0.01' :
+                    '1'
+                  }
+                  value={parameterValue}
+                  onChange={(e) => setParameterValue(e.target.value)}
+                  placeholder={
+                    parameterType === ParameterType.TokenPrice ? 'e.g., 0.1' :
+                    (parameterType === ParameterType.SupportThreshold || parameterType === ParameterType.QuorumPercentage) ? 'e.g., 51' :
+                    'Enter number of blocks'
+                  }
+                />
+                {(parameterType === ParameterType.SupportThreshold || parameterType === ParameterType.QuorumPercentage) && (
+                  <small className="form-text text-muted">
+                    Enter as percentage (e.g., 51 for 51%)
+                  </small>
+                )}
+              </div>
+            )}
+
+            {parameterType === ParameterType.Flags && (
+              <div className="mb-3">
+                <label className="form-label">Configuration Flags</label>
+                <div className="form-check">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    id="flag-allow-minting"
+                    checked={flagAllowMinting}
+                    onChange={(e) => setFlagAllowMinting(e.target.checked)}
+                  />
+                  <label className="form-check-label" htmlFor="flag-allow-minting">
+                    Allow Minting (Bit 0)
+                  </label>
+                  <small className="form-text text-muted d-block">
+                    Enable governance token minting via proposals
+                  </small>
+                </div>
+                <div className="form-check">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    id="flag-restrict-purchases"
+                    checked={flagRestrictPurchases}
+                    onChange={(e) => setFlagRestrictPurchases(e.target.checked)}
+                  />
+                  <label className="form-check-label" htmlFor="flag-restrict-purchases">
+                    Restrict Purchases (Bit 1)
+                  </label>
+                  <small className="form-text text-muted d-block">
+                    Only existing token holders can purchase additional tokens
+                  </small>
+                </div>
+                <div className="form-check">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    id="flag-mint-on-purchase"
+                    checked={flagMintOnPurchase}
+                    onChange={(e) => setFlagMintOnPurchase(e.target.checked)}
+                  />
+                  <label className="form-check-label" htmlFor="flag-mint-on-purchase">
+                    Mint on Purchase (Bit 2)
+                  </label>
+                  <small className="form-text text-muted d-block">
+                    Purchases transfer from DAO treasury instead of minting new tokens
+                  </small>
+                </div>
+              </div>
+            )}
 
             <div className="text-center">
               <button
                 className="btn btn-primary"
                 onClick={handleCreateParameter}
-                disabled={isLoading || !description || !parameterValue}
+                disabled={isLoading || !description || (parameterType !== ParameterType.Flags && !parameterValue)}
               >
                 Create Parameter Proposal
               </button>
