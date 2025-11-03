@@ -27,7 +27,7 @@ const DEFAULT_DAO_INFO: DAOInfo = {
   hasClaimableVesting: false,
   restrictPurchases: false,
   allowMinting: false,
-  mintOnPurchase: false,
+  mintToPurchase: false,
   availableTokensForPurchase: '0',
 };
 
@@ -98,7 +98,7 @@ export const useDAO = (
         hasClaimable,
         restrictPurchases,
         allowMinting,
-        mintOnPurchase,
+        mintToPurchase,
         availableTokens,
       ] = await Promise.all([
         loadField(() => daoContract.name({ blockTag }), 'Market DAO', 'DAO name'),
@@ -114,7 +114,7 @@ export const useDAO = (
         loadField(() => daoContract.hasClaimableVesting(walletAddress, { blockTag }), false, 'has claimable vesting'),
         loadField(() => daoContract.restrictPurchasesToHolders({ blockTag }), false, 'restrict purchases'),
         loadField(() => daoContract.allowMinting({ blockTag }), false, 'allow minting'),
-        loadField(() => daoContract.mintOnPurchase({ blockTag }), false, 'mint on purchase'),
+        loadField(() => daoContract.mintToPurchase({ blockTag }), false, 'mint to purchase'),
         loadField(() => daoContract.getAvailableTokensForPurchase({ blockTag }), ethers.BigNumber.from(0), 'available tokens for purchase'),
       ]);
 
@@ -145,7 +145,7 @@ export const useDAO = (
         hasClaimableVesting: hasClaimable,
         restrictPurchases,
         allowMinting,
-        mintOnPurchase,
+        mintToPurchase,
         availableTokensForPurchase: availableTokens.toString(),
       });
     } catch (err: any) {

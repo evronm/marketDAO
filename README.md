@@ -188,7 +188,7 @@ These are intentional design choices that should be understood before deployment
 - Election Duration
 - Vesting Period
 - Token Price
-- Flags (Allow Minting, Restrict Purchases, Mint on Purchase)
+- Flags (Allow Minting, Restrict Purchases, Mint to Purchase)
 
 **Rationale**: Immutable parameters ensure trust and predictability. Members joining a DAO know that fundamental characteristics (name, treasury capabilities, core access controls) cannot be changed without redeploying. All governance-related parameters can be modified democratically as the DAO evolves.
 
@@ -300,7 +300,7 @@ When creating a new DAO, you can configure:
 - **Flags** (bitfield for boolean options) *[changeable via Parameter Proposal]*:
   - **Allow minting** (bit 0): Whether new governance tokens can be minted via proposals
   - **Restrict purchases** (bit 1): Whether token purchases are limited to existing holders
-  - **Mint on purchase** (bit 2): Whether purchases transfer from DAO treasury or mint new tokens
+  - **Mint to purchase** (bit 2): Whether purchases transfer from DAO treasury or mint new tokens
 - **Initial token price** (in wei, 0 = direct sales disabled) *[changeable via Parameter Proposal]*
 - **Vesting period** (in blocks, 0 = no vesting) *[changeable via Parameter Proposal]*
 - **Treasury configuration** (ETH, ERC20, ERC721, ERC1155) (permanent, cannot be changed)

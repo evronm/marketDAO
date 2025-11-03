@@ -152,7 +152,7 @@ contract ParameterProposalTest is Test {
         assertTrue(dao.flags() != initialFlags);
         assertTrue(dao.allowMinting());
         assertTrue(dao.restrictPurchasesToHolders());
-        assertTrue(dao.mintOnPurchase());
+        assertTrue(dao.mintToPurchase());
     }
 
     function testInvalidSupportThreshold() public {

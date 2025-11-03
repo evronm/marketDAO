@@ -94,7 +94,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <dt className="col-sm-6">Token Price</dt>
             <dd className="col-sm-6">{daoInfo.tokenPrice} ETH</dd>
 
-            {daoInfo.mintOnPurchase && (
+            {daoInfo.mintToPurchase && (
               <>
                 <dt className="col-sm-6">Available for Purchase</dt>
                 <dd className="col-sm-6">
@@ -128,10 +128,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Only show purchase section if: price > 0 AND (not restricted OR user has tokens) AND (!mintOnPurchase OR tokens available) */}
+      {/* Only show purchase section if: price > 0 AND (not restricted OR user has tokens) AND (!mintToPurchase OR tokens available) */}
       {Number(daoInfo.tokenPrice) > 0 &&
        (!daoInfo.restrictPurchases || daoInfo.tokenBalance !== '0') &&
-       (!daoInfo.mintOnPurchase || parseInt(daoInfo.availableTokensForPurchase) > 0) && (
+       (!daoInfo.mintToPurchase || parseInt(daoInfo.availableTokensForPurchase) > 0) && (
         <div className="card shadow">
           <div className="card-body">
             <h3 className="mb-3">Purchase Tokens</h3>
@@ -145,7 +145,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   className="form-control"
                   id="purchase-amount"
                   min="1"
-                  max={daoInfo.mintOnPurchase ? parseInt(daoInfo.availableTokensForPurchase) : undefined}
+                  max={daoInfo.mintToPurchase ? parseInt(daoInfo.availableTokensForPurchase) : undefined}
                   value={purchaseAmount}
                   onChange={(e) => setPurchaseAmount(Number(e.target.value))}
                   disabled={isLoading}
@@ -163,7 +163,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <div className="text-center text-muted small">
               Cost: {(Number(daoInfo.tokenPrice) * purchaseAmount).toFixed(4)} ETH
-              {daoInfo.mintOnPurchase && (
+              {daoInfo.mintToPurchase && (
                 <div className="mt-1">
                   <span className="badge bg-info">
                     {parseInt(daoInfo.availableTokensForPurchase)} tokens available from DAO treasury

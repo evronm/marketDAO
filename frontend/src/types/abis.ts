@@ -58,7 +58,7 @@ export const DAO_ABI = [
   "function getGovernanceTokenHolders() view returns (address[])",
   "function restrictPurchasesToHolders() view returns (bool)",
   "function allowMinting() view returns (bool)",
-  "function mintOnPurchase() view returns (bool)",
+  "function mintToPurchase() view returns (bool)",
   "function getAvailableTokensForPurchase() view returns (uint256)"
 ];
 

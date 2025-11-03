@@ -107,7 +107,7 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
   // Flag checkbox states
   const [flagAllowMinting, setFlagAllowMinting] = useState(false);
   const [flagRestrictPurchases, setFlagRestrictPurchases] = useState(false);
-  const [flagMintOnPurchase, setFlagMintOnPurchase] = useState(false);
+  const [flagMintToPurchase, setFlagMintToPurchase] = useState(false);
 
   const handleCreateResolution = async () => {
     await onCreateResolution(description);
@@ -169,7 +169,7 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
         let flagsValue = 0;
         if (flagAllowMinting) flagsValue |= 1;      // Bit 0
         if (flagRestrictPurchases) flagsValue |= 2; // Bit 1
-        if (flagMintOnPurchase) flagsValue |= 4;    // Bit 2
+        if (flagMintToPurchase) flagsValue |= 4;    // Bit 2
         valueToSubmit = flagsValue.toString();
         break;
       default:
@@ -580,12 +580,12 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
                   <input
                     className="form-check-input"
                     type="checkbox"
-                    id="flag-mint-on-purchase"
-                    checked={flagMintOnPurchase}
-                    onChange={(e) => setFlagMintOnPurchase(e.target.checked)}
+                    id="flag-mint-to-purchase"
+                    checked={flagMintToPurchase}
+                    onChange={(e) => setFlagMintToPurchase(e.target.checked)}
                   />
-                  <label className="form-check-label" htmlFor="flag-mint-on-purchase">
-                    Mint on Purchase (Bit 2)
+                  <label className="form-check-label" htmlFor="flag-mint-to-purchase">
+                    Mint to Purchase (Bit 2)
                   </label>
                   <small className="form-text text-muted d-block">
                     Purchases transfer from DAO treasury instead of minting new tokens

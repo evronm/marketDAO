@@ -93,7 +93,7 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({ proposal, children }
         const flags = parseInt(flagsValue);
         const allowMinting = (flags & 1) !== 0;
         const restrictPurchases = (flags & 2) !== 0;
-        const mintOnPurchase = (flags & 4) !== 0;
+        const mintToPurchase = (flags & 4) !== 0;
 
         return (
           <dl className="row mb-0">
@@ -103,8 +103,8 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({ proposal, children }
             <dt className="col-sm-8">Restrict Purchases:</dt>
             <dd className="col-sm-4">{restrictPurchases ? '✓ Enabled' : '✗ Disabled'}</dd>
 
-            <dt className="col-sm-8">Mint on Purchase:</dt>
-            <dd className="col-sm-4">{mintOnPurchase ? '✓ Enabled' : '✗ Disabled'}</dd>
+            <dt className="col-sm-8">Mint to Purchase:</dt>
+            <dd className="col-sm-4">{mintToPurchase ? '✓ Enabled' : '✗ Disabled'}</dd>
           </dl>
         );
       };

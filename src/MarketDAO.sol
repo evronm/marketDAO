@@ -28,7 +28,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard, IERC1155Receiver {
     // Flag bit positions
     uint256 private constant FLAG_ALLOW_MINTING = 1 << 0;
     uint256 private constant FLAG_RESTRICT_PURCHASES = 1 << 1;
-    uint256 private constant FLAG_MINT_ON_PURCHASE = 1 << 2;
+    uint256 private constant FLAG_MINT_TO_PURCHASE = 1 << 2;
 
     // Helper functions for flag checks
     function allowMinting() public view returns (bool) {
@@ -39,8 +39,8 @@ contract MarketDAO is ERC1155, ReentrancyGuard, IERC1155Receiver {
         return (flags & FLAG_RESTRICT_PURCHASES) != 0;
     }
 
-    function mintOnPurchase() public view returns (bool) {
-        return (flags & FLAG_MINT_ON_PURCHASE) != 0;
+    function mintToPurchase() public view returns (bool) {
+        return (flags & FLAG_MINT_TO_PURCHASE) != 0;
     }
 
     uint256 private constant GOVERNANCE_TOKEN_ID = 0;
@@ -224,13 +224,13 @@ contract MarketDAO is ERC1155, ReentrancyGuard, IERC1155Receiver {
 
         uint256 tokenAmount = msg.value / tokenPrice;
 
-        // Handle token acquisition based on FLAG_MINT_ON_PURCHASE
-        if (!mintOnPurchase()) {
+        // Handle token acquisition based on FLAG_MINT_TO_PURCHASE
+        if (!mintToPurchase()) {
             // Default behavior: mint new tokens
             _mint(msg.sender, GOVERNANCE_TOKEN_ID, tokenAmount, "");
             tokenSupply[GOVERNANCE_TOKEN_ID] += tokenAmount;
         } else {
-            // New behavior (when FLAG_MINT_ON_PURCHASE is set): transfer from DAO's token balance
+            // New behavior (when FLAG_MINT_TO_PURCHASE is set): transfer from DAO's token balance
             require(
                 balanceOf(address(this), GOVERNANCE_TOKEN_ID) >= tokenAmount,
                 "Insufficient tokens available for purchase"
@@ -649,7 +649,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard, IERC1155Receiver {
     }
 
     // Get the number of governance tokens available for purchase from the DAO
-    // When FLAG_MINT_ON_PURCHASE is false, purchases transfer from this balance
+    // When FLAG_MINT_TO_PURCHASE is false, purchases transfer from this balance
     function getAvailableTokensForPurchase() public view returns (uint256) {
         return balanceOf(address(this), GOVERNANCE_TOKEN_ID);
     }
