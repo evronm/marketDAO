@@ -179,7 +179,6 @@ These are intentional design choices that should be understood before deployment
 **Immutable (Set at Deployment)**:
 - **DAO Name**: Cannot be changed after deployment
 - **Treasury Configuration**: Which asset types (ETH, ERC20, ERC721, ERC1155) the DAO accepts
-- **Purchase Restrictions**: Whether token purchases are limited to existing holders
 
 **Changeable via Parameter Proposals**:
 - Support Threshold
@@ -190,13 +189,13 @@ These are intentional design choices that should be understood before deployment
 - Token Price
 - Flags (Allow Minting, Restrict Purchases, Mint to Purchase)
 
-**Rationale**: Immutable parameters ensure trust and predictability. Members joining a DAO know that fundamental characteristics (name, treasury capabilities, core access controls) cannot be changed without redeploying. All governance-related parameters can be modified democratically as the DAO evolves.
+**Rationale**: Immutable parameters ensure trust and predictability. Members joining a DAO know that fundamental characteristics (name, treasury capabilities) cannot be changed without redeploying. All governance-related parameters can be modified democratically as the DAO evolves.
 
-**Consideration for Purchase Restrictions**: Choose carefully based on your DAO's purpose:
-- **Open**: Best for community DAOs, protocol governance, broad participation
-- **Restricted**: Best for investment clubs, private organizations, security-focused DAOs
+**Important Note on Purchase Restrictions**: The "Restrict Purchases" flag can be enabled or disabled through Parameter Proposals (democratic voting). This allows DAOs to evolve their membership model:
+- **Open mode**: Anyone can purchase governance tokens directly
+- **Restricted mode**: Only existing token holders can purchase additional tokens
 
-Note: While the "Restrict Purchases" flag can technically be modified via Parameter Proposal, it affects the fundamental nature of DAO membership and should only be changed with broad consensus.
+While this flag is changeable, it affects the fundamental nature of DAO membership and should only be modified with broad consensus.
 
 ### Treasury Proposal Competition
 
