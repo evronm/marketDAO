@@ -4,7 +4,7 @@ import { ethers } from 'ethers';
 export type TabType = 'dashboard' | 'proposals' | 'elections' | 'history' | 'members';
 
 // Proposal types
-export type ProposalType = 'resolution' | 'treasury' | 'mint' | 'price';
+export type ProposalType = 'resolution' | 'treasury' | 'mint' | 'parameter';
 
 // Token type for treasury proposals
 export type TokenType = 'eth' | 'erc20' | 'erc721' | 'erc1155';
@@ -109,18 +109,30 @@ export interface MintProposal extends BaseProposal {
   details: MintProposalDetails;
 }
 
-// Token price proposal details
-export interface TokenPriceProposalDetails {
-  newPrice: string;
+// Parameter types enum matching Solidity
+export enum ParameterType {
+  SupportThreshold = 0,
+  QuorumPercentage = 1,
+  MaxProposalAge = 2,
+  ElectionDuration = 3,
+  VestingPeriod = 4,
+  TokenPrice = 5,
+  Flags = 6
 }
 
-export interface TokenPriceProposal extends BaseProposal {
-  type: 'price';
-  details: TokenPriceProposalDetails;
+// Parameter proposal details
+export interface ParameterProposalDetails {
+  parameterType: ParameterType;
+  newValue: string;
+}
+
+export interface ParameterProposal extends BaseProposal {
+  type: 'parameter';
+  details: ParameterProposalDetails;
 }
 
 // Union type for all proposals
-export type Proposal = ResolutionProposal | TreasuryProposal | MintProposal | TokenPriceProposal;
+export type Proposal = ResolutionProposal | TreasuryProposal | MintProposal | ParameterProposal;
 
 // Form data interfaces
 export interface TreasuryFormData {
@@ -138,9 +150,10 @@ export interface MintFormData {
   amount: string;
 }
 
-export interface PriceFormData {
+export interface ParameterFormData {
   description: string;
-  newPrice: string;
+  parameterType: ParameterType;
+  newValue: string;
 }
 
 // Notification state

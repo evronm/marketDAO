@@ -164,25 +164,72 @@ contract MintProposal is Proposal {
     }
 }
 
-contract TokenPriceProposal is Proposal {
-    uint256 public newPrice;
+contract ParameterProposal is Proposal {
+    enum ParameterType {
+        SupportThreshold,
+        QuorumPercentage,
+        MaxProposalAge,
+        ElectionDuration,
+        VestingPeriod,
+        TokenPrice,
+        Flags
+    }
+
+    ParameterType public parameterType;
+    uint256 public newValue;
 
     function initialize(
         MarketDAO _dao,
         string memory _description,
         address _proposer,
-        uint256 _newPrice
+        ParameterType _parameterType,
+        uint256 _newValue
     ) external {
         require(bytes(_description).length > 0, "Description required");
         __Proposal_init(_dao, _description, _proposer);
-        newPrice = _newPrice;
+
+        parameterType = _parameterType;
+        newValue = _newValue;
+
+        // Validate based on parameter type
+        if (_parameterType == ParameterType.SupportThreshold) {
+            require(_newValue > 0 && _newValue <= 10000, "Threshold must be > 0 and <= 10000");
+        } else if (_parameterType == ParameterType.QuorumPercentage) {
+            require(_newValue >= 100 && _newValue <= 10000, "Quorum must be >= 1% and <= 100%");
+        } else if (_parameterType == ParameterType.MaxProposalAge) {
+            require(_newValue > 0, "Proposal age must be greater than 0");
+        } else if (_parameterType == ParameterType.ElectionDuration) {
+            require(_newValue > 0, "Election duration must be greater than 0");
+        } else if (_parameterType == ParameterType.VestingPeriod) {
+            // Vesting period can be 0 (no vesting)
+        } else if (_parameterType == ParameterType.TokenPrice) {
+            require(_newValue > 0, "Price must be greater than 0");
+        } else if (_parameterType == ParameterType.Flags) {
+            require(_newValue <= 7, "Invalid flags - only bits 0-2 are valid");
+        }
     }
 
     function _execute() internal override {
         super._execute();
-        dao.setTokenPrice(newPrice);
+
+        // Call the appropriate setter based on parameter type
+        if (parameterType == ParameterType.SupportThreshold) {
+            dao.setSupportThreshold(newValue);
+        } else if (parameterType == ParameterType.QuorumPercentage) {
+            dao.setQuorumPercentage(newValue);
+        } else if (parameterType == ParameterType.MaxProposalAge) {
+            dao.setMaxProposalAge(newValue);
+        } else if (parameterType == ParameterType.ElectionDuration) {
+            dao.setElectionDuration(newValue);
+        } else if (parameterType == ParameterType.VestingPeriod) {
+            dao.setVestingPeriod(newValue);
+        } else if (parameterType == ParameterType.TokenPrice) {
+            dao.setTokenPrice(newValue);
+        } else if (parameterType == ParameterType.Flags) {
+            dao.setFlags(newValue);
+        }
+
         executed = true;
-        // Clear the active proposal status at the very end of execution
         dao.clearActiveProposal();
     }
 }

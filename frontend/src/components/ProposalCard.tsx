@@ -1,5 +1,5 @@
 import React from 'react';
-import { Proposal } from '../types';
+import { Proposal, ParameterType } from '../types';
 import { ProposalBadge } from './ProposalBadge';
 import { truncateAddress, safeValue, safeFormatEther } from '../utils/formatting';
 import { ethers } from 'ethers';
@@ -12,7 +12,7 @@ interface ProposalCardProps {
 const BORDER_COLORS: Record<string, string> = {
   treasury: '#4caf50',
   mint: '#ff9800',
-  price: '#2196f3',
+  parameter: '#2196f3',
   resolution: '#9c27b0',
 };
 
@@ -59,11 +59,43 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({ proposal, children }
       );
     }
 
-    if (proposal.type === 'price') {
+    if (proposal.type === 'parameter') {
+      const parameterNames: Record<ParameterType, string> = {
+        [ParameterType.TokenPrice]: 'Token Price',
+        [ParameterType.SupportThreshold]: 'Support Threshold',
+        [ParameterType.QuorumPercentage]: 'Quorum Percentage',
+        [ParameterType.MaxProposalAge]: 'Max Proposal Age',
+        [ParameterType.ElectionDuration]: 'Election Duration',
+        [ParameterType.VestingPeriod]: 'Vesting Period',
+        [ParameterType.Flags]: 'Flags',
+      };
+
+      const formatValue = (type: ParameterType, value: string): string => {
+        switch (type) {
+          case ParameterType.TokenPrice:
+            return `${safeFormatEther(value)} ETH`;
+          case ParameterType.SupportThreshold:
+          case ParameterType.QuorumPercentage:
+            // Convert from basis points to percentage
+            return `${(parseInt(value) / 100).toFixed(2)}%`;
+          case ParameterType.MaxProposalAge:
+          case ParameterType.ElectionDuration:
+          case ParameterType.VestingPeriod:
+            return `${value} blocks`;
+          case ParameterType.Flags:
+            return value;
+          default:
+            return value;
+        }
+      };
+
       return (
         <div className="bg-light p-3 rounded mb-3">
           <div>
-            <strong>New Price:</strong> {safeFormatEther(proposal.details.newPrice)} ETH
+            <strong>Parameter:</strong> {parameterNames[proposal.details.parameterType]}
+          </div>
+          <div>
+            <strong>New Value:</strong> {formatValue(proposal.details.parameterType, proposal.details.newValue)}
           </div>
         </div>
       );

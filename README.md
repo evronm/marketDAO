@@ -24,7 +24,7 @@ Unlike traditional DAOs where voting power is static, MarketDAO introduces trada
   - Resolution proposals (text-only governance decisions)
   - Treasury transfers (ETH, ERC20, ERC721, ERC1155)
   - Governance token minting (including join requests)
-  - Token price updates
+  - Parameter changes (modify any DAO configuration through governance)
 - **Early election termination** when clear majority is reached
 - **Configurable parameters** for tailoring governance to specific needs
 - **Security-hardened** with factory-based proposal registration and bounded gas costs
@@ -46,6 +46,30 @@ To minimize gas costs when elections are triggered, voting tokens use a "lazy mi
 - **User-initiated**: Each governance token holder claims their voting tokens when they're ready to participate
 - **One-time claim**: Each address can claim once per election, receiving voting tokens equal to their vested governance token balance
 - **Flexible participation**: Holders can claim and vote at any point during the election period
+
+### Parameter Proposals (Governance Configuration)
+
+All DAO configuration parameters can be modified through democratic governance via Parameter Proposals:
+
+- **Flexible governance**: Any configuration parameter set at deployment can be changed through voting
+- **7 parameter types**:
+  - **Support Threshold**: Percentage of vested tokens needed to trigger elections (basis points)
+  - **Quorum Percentage**: Participation required for valid elections (basis points, minimum 1%)
+  - **Max Proposal Age**: Block limit before proposals expire (must be > 0)
+  - **Election Duration**: Voting period length in blocks (must be > 0)
+  - **Vesting Period**: Token unlock time in blocks (0 = no vesting)
+  - **Token Price**: Cost per governance token in wei (must be > 0)
+  - **Flags**: Boolean configuration bitfield (0-7, controls minting/purchasing options)
+- **Built-in validation**: Each parameter type has appropriate constraints to prevent invalid configurations
+- **Democratic changes**: All parameter changes require the standard proposal lifecycle (support → election → execution)
+- **No special privileges**: Parameter changes use the same voting thresholds as other proposals
+
+**Example Use Cases:**
+- Lower support threshold to make it easier to trigger elections
+- Increase quorum to require broader participation for important decisions
+- Adjust token price based on market conditions or treasury needs
+- Modify vesting period to balance security with accessibility
+- Change election duration to allow more time for deliberation
 
 ### Token Vesting System
 
@@ -150,15 +174,29 @@ MarketDAO has been audited and hardened against common vulnerabilities:
 
 These are intentional design choices that should be understood before deployment:
 
-### Purchase Restrictions Are Permanent
+### Immutable vs. Changeable Parameters
 
-**Behavior**: The `restrictPurchasesToHolders` setting is configured at deployment and cannot be changed afterward. It's a fundamental characteristic of the DAO, not a governance parameter.
+**Immutable (Set at Deployment)**:
+- **DAO Name**: Cannot be changed after deployment
+- **Treasury Configuration**: Which asset types (ETH, ERC20, ERC721, ERC1155) the DAO accepts
+- **Purchase Restrictions**: Whether token purchases are limited to existing holders
 
-**Rationale**: This ensures trust and predictability. Members joining a restricted DAO know that membership requirements cannot be changed without redeploying. Similarly, open DAOs remain open permanently.
+**Changeable via Parameter Proposals**:
+- Support Threshold
+- Quorum Percentage
+- Max Proposal Age
+- Election Duration
+- Vesting Period
+- Token Price
+- Flags (Allow Minting, Restrict Purchases, Mint on Purchase)
 
-**Consideration**: Choose carefully based on your DAO's purpose:
+**Rationale**: Immutable parameters ensure trust and predictability. Members joining a DAO know that fundamental characteristics (name, treasury capabilities, core access controls) cannot be changed without redeploying. All governance-related parameters can be modified democratically as the DAO evolves.
+
+**Consideration for Purchase Restrictions**: Choose carefully based on your DAO's purpose:
 - **Open**: Best for community DAOs, protocol governance, broad participation
 - **Restricted**: Best for investment clubs, private organizations, security-focused DAOs
+
+Note: While the "Restrict Purchases" flag can technically be modified via Parameter Proposal, it affects the fundamental nature of DAO membership and should only be changed with broad consensus.
 
 ### Treasury Proposal Competition
 
@@ -208,24 +246,64 @@ forge test
 # Format code
 forge fmt
 
-# Deploy locally
-./deploy.sh
+# Start local Anvil node
+anvil
+
+# Deploy locally (in another terminal)
+forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast
 ```
+
+## Frontend Development
+
+The project includes a React/TypeScript frontend for interacting with the DAO:
+
+```bash
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Update contract addresses in src/contexts/DAOContext.tsx with deployed addresses
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+```
+
+The frontend provides a complete interface for:
+- Connecting wallet and viewing DAO information
+- Purchasing governance tokens
+- Creating proposals (Resolution, Treasury, Mint, Parameter)
+- Supporting proposals and triggering elections
+- Claiming voting tokens and casting votes
+- Viewing proposal history and results
+- Seeing all DAO members and their token balances
+
+**Parameter Proposal UI Features:**
+- Dropdown selection for all 7 parameter types
+- Contextual input fields with appropriate units (ETH, %, blocks, bitfield)
+- Automatic value conversion (percentages → basis points, ETH → wei)
+- Inline hints and validation for each parameter type
+- Clear display of current vs. proposed values
 
 ## Configuration Parameters
 
 When creating a new DAO, you can configure:
-- **Name** of the DAO
-- **Support threshold** (in basis points, e.g., 2000 = 20% of tokens needed to trigger an election)
-- **Quorum percentage** (in basis points, e.g., 5100 = 51% of tokens needed for valid election)
-- **Maximum proposal age** before expiration (in blocks)
-- **Election duration** (in blocks)
-- **Flags** (bitfield for boolean options):
+- **Name** of the DAO (permanent, cannot be changed)
+- **Support threshold** (in basis points, e.g., 2000 = 20% of tokens needed to trigger an election) *[changeable via Parameter Proposal]*
+- **Quorum percentage** (in basis points, e.g., 5100 = 51% of tokens needed for valid election) *[changeable via Parameter Proposal]*
+- **Maximum proposal age** before expiration (in blocks) *[changeable via Parameter Proposal]*
+- **Election duration** (in blocks) *[changeable via Parameter Proposal]*
+- **Flags** (bitfield for boolean options) *[changeable via Parameter Proposal]*:
   - **Allow minting** (bit 0): Whether new governance tokens can be minted via proposals
   - **Restrict purchases** (bit 1): Whether token purchases are limited to existing holders
-- **Initial token price** (in wei, 0 = direct sales disabled)
-- **Vesting period** (in blocks, 0 = no vesting)
-- **Treasury configuration** (ETH, ERC20, ERC721, ERC1155)
+  - **Mint on purchase** (bit 2): Whether purchases transfer from DAO treasury or mint new tokens
+- **Initial token price** (in wei, 0 = direct sales disabled) *[changeable via Parameter Proposal]*
+- **Vesting period** (in blocks, 0 = no vesting) *[changeable via Parameter Proposal]*
+- **Treasury configuration** (ETH, ERC20, ERC721, ERC1155) (permanent, cannot be changed)
 - **Initial token distribution** (addresses and amounts)
 
 **Note on Basis Points**: All percentage parameters use basis points for precision:
@@ -266,8 +344,11 @@ The `buildFlags()` function handles the conversion automatically.
 
 - Resolution enhancements: Expiring resolutions, cancellation proposals
 - Multiple choice proposals beyond binary YES/NO
-- Variable election lengths
-- Staking mechanisms for proposals
+- Delegation mechanisms for voting power
+- Staking mechanisms for proposal prioritization
+- Quadratic voting options
+- Time-weighted voting power
+- Proposal templates and batch operations
 
 ## License
 

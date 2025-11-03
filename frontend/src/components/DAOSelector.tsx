@@ -3,7 +3,7 @@ import { useDAOAddress } from '../contexts/DAOContext';
 import { ethers } from 'ethers';
 
 export const DAOSelector: React.FC = () => {
-  const { daoAddress, factoryAddress, setDAOAddress, recentDAOs } = useDAOAddress();
+  const { daoAddress, factoryAddress: _factoryAddress, setDAOAddress, recentDAOs } = useDAOAddress();
   const [isOpen, setIsOpen] = useState(false);
   const [customDAO, setCustomDAO] = useState('');
   const [customFactory, setCustomFactory] = useState('');

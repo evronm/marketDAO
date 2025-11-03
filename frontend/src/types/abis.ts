@@ -34,8 +34,9 @@ export const MINT_PROPOSAL_ABI = BASE_PROPOSAL_ABI.concat([
   "function amount() view returns (uint256)"
 ]);
 
-export const TOKEN_PRICE_PROPOSAL_ABI = BASE_PROPOSAL_ABI.concat([
-  "function newPrice() view returns (uint256)"
+export const PARAMETER_PROPOSAL_ABI = BASE_PROPOSAL_ABI.concat([
+  "function parameterType() view returns (uint8)",
+  "function newValue() view returns (uint256)"
 ]);
 
 export const DAO_ABI = [
@@ -67,7 +68,7 @@ export const FACTORY_ABI = [
   "function createResolutionProposal(string description) returns (address)",
   "function createTreasuryProposal(string description, address recipient, uint256 amount, address token, uint256 tokenId) returns (address)",
   "function createMintProposal(string description, address recipient, uint256 amount) returns (address)",
-  "function createTokenPriceProposal(string description, uint256 newPrice) returns (address)"
+  "function createParameterProposal(string description, uint8 parameterType, uint256 newValue) returns (address)"
 ];
 
 export const VOTE_TOKEN_ABI = [

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { TabType, NotificationState } from './types';
+import { TabType, NotificationState, ParameterType } from './types';
 import { useDAOAddress } from './contexts/DAOContext';
 import { useWallet } from './hooks/useWallet';
 import { useDAO } from './hooks/useDAO';
@@ -53,7 +53,7 @@ function App() {
     createResolutionProposal,
     createTreasuryProposal,
     createMintProposal,
-    createTokenPriceProposal,
+    createParameterProposal,
   } = useProposals(contractRefs, walletAddress, daoInfo, isConnected);
 
   const {
@@ -193,11 +193,11 @@ function App() {
     }
   };
 
-  const handleCreateTokenPrice = async (description: string, newPrice: string) => {
+  const handleCreateParameter = async (description: string, parameterType: ParameterType, newValue: string) => {
     try {
       setIsLoading(true);
-      await createTokenPriceProposal(description, newPrice);
-      showNotificationWithTimeout(setNotification, 'Token price proposal created!', 'success');
+      await createParameterProposal(description, parameterType, newValue);
+      showNotificationWithTimeout(setNotification, 'Parameter proposal created!', 'success');
     } catch (err: any) {
       showNotificationWithTimeout(setNotification, err.message || 'Failed to create proposal', 'danger');
     } finally {
@@ -246,7 +246,7 @@ function App() {
               onCreateResolution={handleCreateResolution}
               onCreateTreasury={handleCreateTreasury}
               onCreateMint={handleCreateMint}
-              onCreateTokenPrice={handleCreateTokenPrice}
+              onCreateParameter={handleCreateParameter}
               daoInfo={daoInfo}
               daoAddress={daoAddress}
               walletAddress={walletAddress}

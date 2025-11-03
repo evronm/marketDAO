@@ -9,8 +9,8 @@ interface DAOContextType {
 
 const DAOContext = createContext<DAOContextType | undefined>(undefined);
 
-const DEFAULT_DAO_ADDRESS = '0x0165878A594ca255338adfa4d48449f69242Eb8F';
-const DEFAULT_FACTORY_ADDRESS = '0xa513E6E4b8f2a923D98304ec87F64353C4D5C853';
+const DEFAULT_DAO_ADDRESS = '0x5fbdb2315678afecb367f032d93f642f64180aa3';
+const DEFAULT_FACTORY_ADDRESS = '0xe7f1725e7734ce288f8367e1bb143e90bb3f0512';
 
 const STORAGE_KEY = 'marketdao_recent_daos';
 const CURRENT_DAO_KEY = 'marketdao_current_dao';

@@ -587,7 +587,45 @@ contract MarketDAO is ERC1155, ReentrancyGuard, IERC1155Receiver {
 
     function setTokenPrice(uint256 newPrice) external {
         require(activeProposals[msg.sender], "Only active proposal can set price");
+        require(newPrice > 0, "Price must be greater than 0");
         tokenPrice = newPrice;
+    }
+
+    function setSupportThreshold(uint256 newThreshold) external {
+        require(activeProposals[msg.sender], "Only active proposal can set threshold");
+        require(newThreshold > 0 && newThreshold <= 10000, "Threshold must be > 0 and <= 10000");
+        supportThreshold = newThreshold;
+    }
+
+    function setQuorumPercentage(uint256 newQuorum) external {
+        require(activeProposals[msg.sender], "Only active proposal can set quorum");
+        require(newQuorum >= 100 && newQuorum <= 10000, "Quorum must be >= 1% and <= 100%");
+        quorumPercentage = newQuorum;
+    }
+
+    function setMaxProposalAge(uint256 newAge) external {
+        require(activeProposals[msg.sender], "Only active proposal can set proposal age");
+        require(newAge > 0, "Proposal age must be greater than 0");
+        maxProposalAge = newAge;
+    }
+
+    function setElectionDuration(uint256 newDuration) external {
+        require(activeProposals[msg.sender], "Only active proposal can set election duration");
+        require(newDuration > 0, "Election duration must be greater than 0");
+        electionDuration = newDuration;
+    }
+
+    function setVestingPeriod(uint256 newPeriod) external {
+        require(activeProposals[msg.sender], "Only active proposal can set vesting period");
+        // Vesting period can be 0 (no vesting)
+        vestingPeriod = newPeriod;
+    }
+
+    function setFlags(uint256 newFlags) external {
+        require(activeProposals[msg.sender], "Only active proposal can set flags");
+        // Validate that only known flags are set (bits 0-2)
+        require(newFlags <= 7, "Invalid flags - only bits 0-2 are valid");
+        flags = newFlags;
     }
 
     function totalSupply(uint256 tokenId) external view returns (uint256) {

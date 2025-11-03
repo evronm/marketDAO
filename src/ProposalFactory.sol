@@ -13,7 +13,7 @@ contract ProposalFactory {
     address public resolutionImpl;
     address public treasuryImpl;
     address public mintImpl;
-    address public tokenPriceImpl;
+    address public parameterImpl;
 
     constructor(MarketDAO _dao) {
         dao = _dao;
@@ -22,7 +22,7 @@ contract ProposalFactory {
         resolutionImpl = address(new ResolutionProposal());
         treasuryImpl = address(new TreasuryProposal());
         mintImpl = address(new MintProposal());
-        tokenPriceImpl = address(new TokenPriceProposal());
+        parameterImpl = address(new ParameterProposal());
     }
 
     modifier onlyTokenHolder() {
@@ -89,20 +89,22 @@ contract ProposalFactory {
     }
 
 
-    function createTokenPriceProposal(
+    function createParameterProposal(
         string memory description,
-        uint256 newPrice
-    ) external onlyTokenHolder returns (TokenPriceProposal) {
-        address clone = Clones.clone(tokenPriceImpl);
-        TokenPriceProposal(clone).initialize(
+        ParameterProposal.ParameterType parameterType,
+        uint256 newValue
+    ) external onlyTokenHolder returns (ParameterProposal) {
+        address clone = Clones.clone(parameterImpl);
+        ParameterProposal(clone).initialize(
             dao,
             description,
             msg.sender,
-            newPrice
+            parameterType,
+            newValue
         );
         dao.setActiveProposal(clone);
         proposals[proposalCount++] = clone;
-        return TokenPriceProposal(clone);
+        return ParameterProposal(clone);
     }
 
     function getProposal(uint256 index) external view returns (address) {

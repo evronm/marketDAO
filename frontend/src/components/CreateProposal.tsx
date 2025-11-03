@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ProposalType, TokenType, DAOInfo } from '../types';
+import { ProposalType, TokenType, DAOInfo, ParameterType } from '../types';
 import { ethers } from 'ethers';
 
 interface CreateProposalProps {
@@ -12,7 +12,7 @@ interface CreateProposalProps {
     tokenId: string
   ) => Promise<void>;
   onCreateMint: (description: string, recipient: string, amount: string) => Promise<void>;
-  onCreateTokenPrice: (description: string, newPrice: string) => Promise<void>;
+  onCreateParameter: (description: string, parameterType: ParameterType, newValue: string) => Promise<void>;
   daoInfo: DAOInfo | null;
   daoAddress: string;
   walletAddress: string | null;
@@ -44,7 +44,7 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
   onCreateResolution,
   onCreateTreasury,
   onCreateMint,
-  onCreateTokenPrice,
+  onCreateParameter,
   daoInfo,
   daoAddress,
   walletAddress,
@@ -100,8 +100,9 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
   const [mintRecipient, setMintRecipient] = useState('');
   const [mintAmount, setMintAmount] = useState('');
 
-  // Price form state
-  const [newPrice, setNewPrice] = useState('');
+  // Parameter form state
+  const [parameterType, setParameterType] = useState<ParameterType>(ParameterType.TokenPrice);
+  const [parameterValue, setParameterValue] = useState('');
 
   const handleCreateResolution = async () => {
     await onCreateResolution(description);
@@ -138,11 +139,34 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
     }
   };
 
-  const handleCreateTokenPrice = async () => {
-    const priceInWei = ethers.utils.parseEther(newPrice).toString();
-    await onCreateTokenPrice(description, priceInWei);
+  const handleCreateParameter = async () => {
+    // Convert value based on parameter type
+    let valueToSubmit: string;
+
+    switch (parameterType) {
+      case ParameterType.TokenPrice:
+        // Convert ETH to wei
+        valueToSubmit = ethers.utils.parseEther(parameterValue).toString();
+        break;
+      case ParameterType.SupportThreshold:
+      case ParameterType.QuorumPercentage:
+        // Convert percentage to basis points (e.g., 51 -> 5100)
+        valueToSubmit = (parseFloat(parameterValue) * 100).toString();
+        break;
+      case ParameterType.MaxProposalAge:
+      case ParameterType.ElectionDuration:
+      case ParameterType.VestingPeriod:
+      case ParameterType.Flags:
+        // Use value directly (blocks or flags)
+        valueToSubmit = parameterValue;
+        break;
+      default:
+        valueToSubmit = parameterValue;
+    }
+
+    await onCreateParameter(description, parameterType, valueToSubmit);
     setDescription('');
-    setNewPrice('');
+    setParameterValue('');
   };
 
   // Don't render if user can't create proposals and can't request to join
@@ -201,10 +225,10 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
               </button>
               <button
                 type="button"
-                className={`btn ${proposalType === 'price' ? 'btn-primary' : 'btn-outline-primary'}`}
-                onClick={() => setProposalType('price')}
+                className={`btn ${proposalType === 'parameter' ? 'btn-primary' : 'btn-outline-primary'}`}
+                onClick={() => setProposalType('parameter')}
               >
-                Token Price
+                Parameters
               </button>
             </div>
           </div>
@@ -428,45 +452,93 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
           </div>
         )}
 
-        {proposalType === 'price' && (
+        {proposalType === 'parameter' && (
           <div>
             <div className="mb-3">
-              <label htmlFor="price-description" className="form-label">
+              <label htmlFor="parameter-description" className="form-label">
                 Description
               </label>
               <textarea
                 className="form-control"
-                id="price-description"
+                id="parameter-description"
                 rows={4}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Enter a description for this price change"
+                placeholder="Enter a description for this parameter change"
               />
             </div>
 
             <div className="mb-3">
-              <label htmlFor="new-price" className="form-label">
-                New Token Price (ETH)
+              <label htmlFor="parameter-type" className="form-label">
+                Parameter Type
+              </label>
+              <select
+                className="form-select"
+                id="parameter-type"
+                value={parameterType}
+                onChange={(e) => {
+                  setParameterType(parseInt(e.target.value) as ParameterType);
+                  setParameterValue(''); // Clear value when type changes
+                }}
+              >
+                <option value={ParameterType.TokenPrice}>Token Price</option>
+                <option value={ParameterType.SupportThreshold}>Support Threshold (%)</option>
+                <option value={ParameterType.QuorumPercentage}>Quorum Percentage (%)</option>
+                <option value={ParameterType.MaxProposalAge}>Max Proposal Age (blocks)</option>
+                <option value={ParameterType.ElectionDuration}>Election Duration (blocks)</option>
+                <option value={ParameterType.VestingPeriod}>Vesting Period (blocks)</option>
+                <option value={ParameterType.Flags}>Flags (bitfield)</option>
+              </select>
+            </div>
+
+            <div className="mb-3">
+              <label htmlFor="parameter-value" className="form-label">
+                {parameterType === ParameterType.TokenPrice && 'New Token Price (ETH)'}
+                {parameterType === ParameterType.SupportThreshold && 'New Support Threshold (%)'}
+                {parameterType === ParameterType.QuorumPercentage && 'New Quorum Percentage (%)'}
+                {parameterType === ParameterType.MaxProposalAge && 'New Max Proposal Age (blocks)'}
+                {parameterType === ParameterType.ElectionDuration && 'New Election Duration (blocks)'}
+                {parameterType === ParameterType.VestingPeriod && 'New Vesting Period (blocks)'}
+                {parameterType === ParameterType.Flags && 'New Flags (0-7)'}
               </label>
               <input
                 type="number"
                 className="form-control"
-                id="new-price"
+                id="parameter-value"
                 min="0"
-                step="any"
-                value={newPrice}
-                onChange={(e) => setNewPrice(e.target.value)}
-                placeholder="New price in ETH"
+                step={
+                  parameterType === ParameterType.TokenPrice ? 'any' :
+                  (parameterType === ParameterType.SupportThreshold || parameterType === ParameterType.QuorumPercentage) ? '0.01' :
+                  '1'
+                }
+                value={parameterValue}
+                onChange={(e) => setParameterValue(e.target.value)}
+                placeholder={
+                  parameterType === ParameterType.TokenPrice ? 'e.g., 0.1' :
+                  (parameterType === ParameterType.SupportThreshold || parameterType === ParameterType.QuorumPercentage) ? 'e.g., 51' :
+                  parameterType === ParameterType.Flags ? '0-7' :
+                  'Enter number of blocks'
+                }
               />
+              {(parameterType === ParameterType.SupportThreshold || parameterType === ParameterType.QuorumPercentage) && (
+                <small className="form-text text-muted">
+                  Enter as percentage (e.g., 51 for 51%)
+                </small>
+              )}
+              {parameterType === ParameterType.Flags && (
+                <small className="form-text text-muted">
+                  Bit 0: Allow Minting, Bit 1: Restrict Purchases, Bit 2: Mint on Purchase
+                </small>
+              )}
             </div>
 
             <div className="text-center">
               <button
                 className="btn btn-primary"
-                onClick={handleCreateTokenPrice}
-                disabled={isLoading || !description || !newPrice}
+                onClick={handleCreateParameter}
+                disabled={isLoading || !description || !parameterValue}
               >
-                Create Token Price Proposal
+                Create Parameter Proposal
               </button>
             </div>
           </div>

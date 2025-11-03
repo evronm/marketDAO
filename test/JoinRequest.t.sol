@@ -225,9 +225,9 @@ contract JoinRequestTest is Test {
             0
         );
 
-        // Charlie cannot create a token price proposal
+        // Charlie cannot create a parameter proposal
         vm.prank(charlie);
         vm.expectRevert("Must hold vested governance tokens");
-        factory.createTokenPriceProposal("Change price", 0.5 ether);
+        factory.createParameterProposal("Change price", ParameterProposal.ParameterType.TokenPrice, 0.5 ether);
     }
 }

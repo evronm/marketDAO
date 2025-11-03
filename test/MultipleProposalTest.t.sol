@@ -167,8 +167,9 @@ contract MultipleProposalTest is Test {
         
         // Create a second proposal to make sure the DAO can still accept new proposals
         vm.prank(proposer);
-        TokenPriceProposal priceProposal = factory.createTokenPriceProposal(
+        ParameterProposal priceProposal = factory.createParameterProposal(
             "Increase Token Price",
+            ParameterProposal.ParameterType.TokenPrice,
             0.2 ether
         );
         

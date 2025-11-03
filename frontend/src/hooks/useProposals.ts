@@ -5,8 +5,9 @@ import {
   BASE_PROPOSAL_ABI,
   TREASURY_PROPOSAL_ABI,
   MINT_PROPOSAL_ABI,
-  TOKEN_PRICE_PROPOSAL_ABI,
+  PARAMETER_PROPOSAL_ABI,
 } from '../types/abis';
+import { ParameterType } from '../types';
 import { retryContractCall } from '../utils/contractHelpers';
 
 interface UseProposalsReturn {
@@ -29,7 +30,7 @@ interface UseProposalsReturn {
     tokenId: string
   ) => Promise<void>;
   createMintProposal: (description: string, recipient: string, amount: string) => Promise<void>;
-  createTokenPriceProposal: (description: string, newPrice: string) => Promise<void>;
+  createParameterProposal: (description: string, parameterType: ParameterType, newValue: string) => Promise<void>;
 }
 
 export const useProposals = (
@@ -223,16 +224,20 @@ export const useProposals = (
             };
           } catch (e) {
             try {
-              const priceContract = new ethers.Contract(
+              const parameterContract = new ethers.Contract(
                 proposalAddress,
-                TOKEN_PRICE_PROPOSAL_ABI,
+                PARAMETER_PROPOSAL_ABI,
                 contractRefs.signer
               );
-              const newPrice = await priceContract.newPrice();
+              const [parameterType, newValue] = await Promise.all([
+                parameterContract.parameterType(),
+                parameterContract.newValue(),
+              ]);
 
-              proposalData.type = 'price';
+              proposalData.type = 'parameter';
               proposalData.details = {
-                newPrice: newPrice.toString(),
+                parameterType: parameterType as ParameterType,
+                newValue: newValue.toString(),
               };
             } catch (e) {
               // Must be a resolution proposal (already set as default)
@@ -483,13 +488,13 @@ export const useProposals = (
     [contractRefs.factoryContract, loadAllProposals]
   );
 
-  const createTokenPriceProposal = useCallback(
-    async (description: string, newPrice: string) => {
+  const createParameterProposal = useCallback(
+    async (description: string, parameterType: ParameterType, newValue: string) => {
       if (!contractRefs.factoryContract) {
         throw new Error('Factory contract not initialized');
       }
 
-      const tx = await contractRefs.factoryContract.createTokenPriceProposal(description, newPrice);
+      const tx = await contractRefs.factoryContract.createParameterProposal(description, parameterType, newValue);
       await tx.wait();
       await loadAllProposals();
     },
@@ -510,6 +515,6 @@ export const useProposals = (
     createResolutionProposal,
     createTreasuryProposal,
     createMintProposal,
-    createTokenPriceProposal,
+    createParameterProposal,
   };
 };
