@@ -1,6 +1,6 @@
 // Contract addresses (these are from local deployment - should be configurable)
-export const DAO_ADDRESS = '0x5fbdb2315678afecb367f032d93f642f64180aa3';
-export const FACTORY_ADDRESS = '0xe7f1725e7734ce288f8367e1bb143e90bb3f0512';
+export const DAO_ADDRESS = '0xcf7ed3acca5a467e9e704c703e8d87f634fb0fc9';
+export const FACTORY_ADDRESS = '0xdc64a140aa3e981100a9beca4e685f962f0cf6c9';
 
 // Rarible testnet URL template
 export const RARIBLE_TESTNET_URL = (daoAddress: string, tokenId: string) =>
