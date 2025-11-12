@@ -50,10 +50,13 @@ function App() {
     triggerElection,
     voteOnProposal,
     claimVotingTokens,
+    registerForDistribution,
+    claimDistribution,
     createResolutionProposal,
     createTreasuryProposal,
     createMintProposal,
     createParameterProposal,
+    createDistributionProposal,
   } = useProposals(contractRefs, walletAddress, daoInfo, isConnected);
 
   const {
@@ -92,14 +95,8 @@ function App() {
   useEffect(() => {
     const loadDAOName = async () => {
       try {
-        // Use window.ethereum if available, otherwise use a public RPC
-        let provider: ethers.providers.Provider;
-        if (typeof window.ethereum !== 'undefined') {
-          provider = new ethers.providers.Web3Provider(window.ethereum);
-        } else {
-          // Fallback to localhost for development
-          provider = new ethers.providers.JsonRpcProvider('http://localhost:8545');
-        }
+        // Always use direct JsonRpcProvider for localhost to avoid MetaMask network issues
+        const provider = new ethers.providers.JsonRpcProvider('http://localhost:8545');
 
         const daoContract = new ethers.Contract(daoAddress, DAO_ABI, provider);
         const name = await daoContract.name();
@@ -205,6 +202,47 @@ function App() {
     }
   };
 
+  const handleCreateDistribution = async (
+    description: string,
+    token: string,
+    tokenId: string,
+    amountPerToken: string
+  ) => {
+    try {
+      setIsLoading(true);
+      await createDistributionProposal(description, token, tokenId, amountPerToken);
+      showNotificationWithTimeout(setNotification, 'Distribution proposal created!', 'success');
+    } catch (err: any) {
+      showNotificationWithTimeout(setNotification, err.message || 'Failed to create proposal', 'danger');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRegisterForDistribution = async (proposalAddress: string) => {
+    try {
+      setIsLoading(true);
+      await registerForDistribution(proposalAddress);
+      showNotificationWithTimeout(setNotification, 'Registered for distribution!', 'success');
+    } catch (err: any) {
+      showNotificationWithTimeout(setNotification, err.message || 'Failed to register', 'danger');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleClaimDistribution = async (redemptionAddress: string) => {
+    try {
+      setIsLoading(true);
+      await claimDistribution(redemptionAddress);
+      showNotificationWithTimeout(setNotification, 'Distribution claimed!', 'success');
+    } catch (err: any) {
+      showNotificationWithTimeout(setNotification, err.message || 'Failed to claim', 'danger');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const renderContent = () => {
     if (!isConnected) {
       return (
@@ -247,6 +285,7 @@ function App() {
               onCreateTreasury={handleCreateTreasury}
               onCreateMint={handleCreateMint}
               onCreateParameter={handleCreateParameter}
+              onCreateDistribution={handleCreateDistribution}
               daoInfo={daoInfo}
               daoAddress={daoAddress}
               walletAddress={walletAddress}
@@ -329,6 +368,7 @@ function App() {
                     setIsLoading(false);
                   }
                 }}
+                onRegisterForDistribution={handleRegisterForDistribution}
                 isLoading={isLoading}
               />
             )}
@@ -341,7 +381,51 @@ function App() {
             proposals={historyProposals}
             title="Proposal History"
             emptyMessage="No proposal history found."
-          />
+          >
+            {(proposal) => {
+              // Show claim button for distribution proposals with redemption contracts
+              // Distribution proposals don't have a traditional "execute" step - users claim directly from redemption contract
+              if (
+                proposal.type === 'distribution' &&
+                proposal.details.redemptionContract &&
+                proposal.details.redemptionContract !== ethers.constants.AddressZero
+              ) {
+                // Check if already claimed
+                if (proposal.details.hasClaimedDistribution) {
+                  return (
+                    <div className="alert alert-success mb-0">
+                      ✅ You have already claimed this distribution
+                    </div>
+                  );
+                }
+
+                // Check if not registered
+                if (!proposal.details.isRegistered) {
+                  return (
+                    <div className="alert alert-info mb-0">
+                      ℹ️ You did not register for this distribution
+                    </div>
+                  );
+                }
+
+                // User is registered and hasn't claimed yet
+                return (
+                  <div className="d-grid">
+                    <button
+                      className="btn btn-success"
+                      onClick={async () => {
+                        await handleClaimDistribution(proposal.details.redemptionContract);
+                      }}
+                      disabled={isLoading}
+                    >
+                      💰 Claim Distribution
+                    </button>
+                  </div>
+                );
+              }
+              return null;
+            }}
+          </ProposalList>
         );
 
       case 'members':

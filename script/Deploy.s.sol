@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "forge-std/Script.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
+import "../src/ProposalTypes.sol";
 
 contract DeployConfig {
     string constant DAO_NAME = "Market DAO";
@@ -50,6 +51,7 @@ contract DeployScript is Script, DeployConfig {
         uint256[] memory initialAmounts = new uint256[](1);
         initialAmounts[0] = 100;
 
+        // Deploy DAO
         MarketDAO dao = new MarketDAO(
             DAO_NAME,
             SUPPORT_THRESHOLD,
@@ -64,7 +66,22 @@ contract DeployScript is Script, DeployConfig {
             initialAmounts
         );
 
-        ProposalFactory factory = new ProposalFactory(dao);
+        // Deploy implementation contracts
+        ResolutionProposal resolutionImpl = new ResolutionProposal();
+        TreasuryProposal treasuryImpl = new TreasuryProposal();
+        MintProposal mintImpl = new MintProposal();
+        ParameterProposal parameterImpl = new ParameterProposal();
+        DistributionProposal distributionImpl = new DistributionProposal();
+
+        // Deploy factory with implementation addresses
+        ProposalFactory factory = new ProposalFactory(
+            dao,
+            address(resolutionImpl),
+            address(treasuryImpl),
+            address(mintImpl),
+            address(parameterImpl),
+            address(distributionImpl)
+        );
 
         // Register the factory with the DAO to enable proposal creation
         dao.setFactory(address(factory));

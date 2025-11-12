@@ -4,7 +4,7 @@ import { ethers } from 'ethers';
 export type TabType = 'dashboard' | 'proposals' | 'elections' | 'history' | 'members';
 
 // Proposal types
-export type ProposalType = 'resolution' | 'treasury' | 'mint' | 'parameter';
+export type ProposalType = 'resolution' | 'treasury' | 'mint' | 'parameter' | 'distribution';
 
 // Token type for treasury proposals
 export type TokenType = 'eth' | 'erc20' | 'erc721' | 'erc1155';
@@ -131,8 +131,25 @@ export interface ParameterProposal extends BaseProposal {
   details: ParameterProposalDetails;
 }
 
+// Distribution proposal details
+export interface DistributionProposalDetails {
+  token: string;
+  tokenId: string;
+  amountPerGovernanceToken: string;
+  totalAmount: string;
+  redemptionContract: string;
+  hasClaimedDistribution?: boolean;
+  isRegistered?: boolean;
+  registeredBalance?: string;
+}
+
+export interface DistributionProposal extends BaseProposal {
+  type: 'distribution';
+  details: DistributionProposalDetails;
+}
+
 // Union type for all proposals
-export type Proposal = ResolutionProposal | TreasuryProposal | MintProposal | ParameterProposal;
+export type Proposal = ResolutionProposal | TreasuryProposal | MintProposal | ParameterProposal | DistributionProposal;
 
 // Form data interfaces
 export interface TreasuryFormData {
@@ -154,6 +171,14 @@ export interface ParameterFormData {
   description: string;
   parameterType: ParameterType;
   newValue: string;
+}
+
+export interface DistributionFormData {
+  description: string;
+  tokenType: TokenType;
+  tokenAddress: string;
+  tokenId: string;
+  amountPerToken: string;
 }
 
 // Notification state

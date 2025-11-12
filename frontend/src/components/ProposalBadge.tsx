@@ -10,6 +10,7 @@ const BADGE_CONFIG: Record<ProposalType, { label: string; className: string }> =
   treasury: { label: 'Treasury', className: 'badge-treasury' },
   mint: { label: 'Mint', className: 'badge-mint' },
   parameter: { label: 'Parameter', className: 'badge-parameter' },
+  distribution: { label: 'Distribution', className: 'badge-distribution' },
 };
 
 export const ProposalBadge: React.FC<ProposalBadgeProps> = ({ type }) => {

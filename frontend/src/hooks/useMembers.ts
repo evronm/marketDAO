@@ -18,7 +18,7 @@ export const useMembers = (
   const [error, setError] = useState<string | null>(null);
 
   const loadMembers = useCallback(async () => {
-    if (!isConnected || !contractRefs.daoContract) {
+    if (!isConnected || !contractRefs.daoContract || !contractRefs.provider) {
       return;
     }
 

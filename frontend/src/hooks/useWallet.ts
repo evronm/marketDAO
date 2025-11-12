@@ -37,6 +37,8 @@ export const useWallet = ({ daoAddress, factoryAddress }: UseWalletParams): UseW
     try {
       setError(null);
 
+      console.log('Connecting wallet with addresses:', { daoAddress, factoryAddress });
+
       // Check if MetaMask is installed
       if (typeof window.ethereum === 'undefined') {
         throw new Error('Please install MetaMask to use this dApp');
@@ -50,6 +52,20 @@ export const useWallet = ({ daoAddress, factoryAddress }: UseWalletParams): UseW
       // Initialize ethers provider and signer
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
+
+      // Check network
+      const network = await provider.getNetwork();
+      console.log('Connected to network:', network);
+      console.log('Network chain ID:', network.chainId);
+      console.log('Network name:', network.name);
+
+      if (network.chainId !== 31337) {
+        const errorMsg = `Wrong network! Please switch MetaMask to Localhost 8545 (Chain ID: 31337). Currently on chain ID: ${network.chainId}`;
+        console.error(errorMsg);
+        throw new Error(errorMsg);
+      }
+
+      console.log('✅ Network check passed - on chain ID 31337');
 
       // Initialize contracts
       const daoContract = new ethers.Contract(daoAddress, DAO_ABI, signer);

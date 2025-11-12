@@ -39,11 +39,32 @@ export const PARAMETER_PROPOSAL_ABI = BASE_PROPOSAL_ABI.concat([
   "function newValue() view returns (uint256)"
 ]);
 
+export const DISTRIBUTION_PROPOSAL_ABI = BASE_PROPOSAL_ABI.concat([
+  "function token() view returns (address)",
+  "function tokenId() view returns (uint256)",
+  "function amountPerGovernanceToken() view returns (uint256)",
+  "function totalAmount() view returns (uint256)",
+  "function redemptionContract() view returns (address)",
+  "function registerForDistribution()"
+]);
+
+export const DISTRIBUTION_REDEMPTION_ABI = [
+  "function proposal() view returns (address)",
+  "function token() view returns (address)",
+  "function tokenId() view returns (uint256)",
+  "function amountPerGovernanceToken() view returns (uint256)",
+  "function registeredBalance(address user) view returns (uint256)",
+  "function hasClaimed(address user) view returns (bool)",
+  "function totalRegisteredGovernanceTokens() view returns (uint256)",
+  "function getClaimableAmount(address user) view returns (uint256)",
+  "function isRegistered(address user) view returns (bool)",
+  "function claim()"
+];
+
 export const DAO_ABI = [
   "function name() view returns (string)",
   "function balanceOf(address account, uint256 id) view returns (uint256)",
   "function totalSupply(uint256 id) view returns (uint256)",
-  "function tokenSupply() view returns (uint256)",
   "function tokenPrice() view returns (uint256)",
   "function quorumPercentage() view returns (uint256)",
   "function supportThreshold() view returns (uint256)",
@@ -68,7 +89,8 @@ export const FACTORY_ABI = [
   "function createResolutionProposal(string description) returns (address)",
   "function createTreasuryProposal(string description, address recipient, uint256 amount, address token, uint256 tokenId) returns (address)",
   "function createMintProposal(string description, address recipient, uint256 amount) returns (address)",
-  "function createParameterProposal(string description, uint8 parameterType, uint256 newValue) returns (address)"
+  "function createParameterProposal(string description, uint8 parameterType, uint256 newValue) returns (address)",
+  "function createDistributionProposal(string description, address token, uint256 tokenId, uint256 amountPerToken) returns (address)"
 ];
 
 export const VOTE_TOKEN_ABI = [

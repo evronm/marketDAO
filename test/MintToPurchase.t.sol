@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
+import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
 import "../src/ProposalTypes.sol";
 
-contract MintToPurchaseTest is Test {
+contract MintToPurchaseTest is TestHelper {
     MarketDAO public daoMintToPurchase;     // FLAG_MINT_TO_PURCHASE = true (default behavior)
     MarketDAO public daoTransferToPurchase; // FLAG_MINT_TO_PURCHASE = false (new behavior)
     ProposalFactory public factory;
@@ -63,7 +63,7 @@ contract MintToPurchaseTest is Test {
             initialAmounts
         );
 
-        factory = new ProposalFactory(daoTransferToPurchase);
+        factory = deployFactory(daoTransferToPurchase);
         daoTransferToPurchase.setFactory(address(factory));
 
         // Fund test accounts

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
+import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
 import "../src/ProposalTypes.sol";
 
-contract PurchaseRestrictionsTest is Test {
+contract PurchaseRestrictionsTest is TestHelper {
     MarketDAO public daoOpen;           // No purchase restrictions
     MarketDAO public daoRestricted;     // Purchase restrictions enabled
     ProposalFactory public factory;
@@ -62,7 +62,7 @@ contract PurchaseRestrictionsTest is Test {
             initialAmounts
         );
 
-        factory = new ProposalFactory(daoRestricted);
+        factory = deployFactory(daoRestricted);
         daoRestricted.setFactory(address(factory));
 
         // Fund test accounts

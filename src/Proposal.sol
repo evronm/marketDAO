@@ -204,7 +204,6 @@ abstract contract Proposal {
         require(electionTriggered, "Election not triggered");
         require(!executed, "Already executed");
         require(block.number >= electionStart, "Election not started");
-        require(block.number < electionStart + dao.electionDuration(), "Election ended");
 
         // Use snapshot taken at election start (gas optimization)
         uint256 totalPossibleVotes = snapshotTotalVotes;

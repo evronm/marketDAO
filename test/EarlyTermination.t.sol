@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
+import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/Proposal.sol";
 import "../src/ProposalFactory.sol";
 import "../src/ProposalTypes.sol";
 
 // Test contract for early termination functionality
-contract EarlyTerminationTest is Test {
+contract EarlyTerminationTest is TestHelper {
     MarketDAO public dao;
     ProposalFactory public factory;
     address public alice;
@@ -53,7 +53,7 @@ contract EarlyTerminationTest is Test {
             initialAmounts
         );
         
-        factory = new ProposalFactory(dao);
+        factory = deployFactory(dao);
         dao.setFactory(address(factory));
 
         vm.stopPrank();

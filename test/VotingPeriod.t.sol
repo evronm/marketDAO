@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
+import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/Proposal.sol";
 import "../src/ProposalTypes.sol";
@@ -40,7 +40,7 @@ contract TestMarketDAO is MarketDAO {
 }
 
 // Custom Proposal for testing
-contract TestProposal is Test {
+contract TestProposal is TestHelper {
     TestMarketDAO dao;
     address public yesVoteAddress;
     address public noVoteAddress;
@@ -70,7 +70,7 @@ contract TestProposal is Test {
 }
 
 // This mock directly implements the function we need to test
-contract MockTransferVote is Test {
+contract MockTransferVote is TestHelper {
     bool public electionActive;
     address public yesVoteAddress;
     
@@ -123,7 +123,7 @@ contract MockTransferVote is Test {
 }
 
 // Simplified test contract to directly test voting period check
-contract VotingPeriodTest is Test {
+contract VotingPeriodTest is TestHelper {
     MockTransferVote mock;
     
     function setUp() public {

@@ -25,7 +25,8 @@ Unlike traditional DAOs where voting power is static, MarketDAO introduces trada
   - Treasury transfers (ETH, ERC20, ERC721, ERC1155)
   - Governance token minting (including join requests)
   - Parameter changes (modify any DAO configuration through governance)
-- **Early election termination** when clear majority is reached
+  - Distribution proposals (proportional distributions to all token holders)
+- **Early election termination** when clear majority is reached (works even after election ends)
 - **Configurable parameters** for tailoring governance to specific needs
 - **Security-hardened** with factory-based proposal registration and bounded gas costs
 
@@ -46,6 +47,30 @@ To minimize gas costs when elections are triggered, voting tokens use a "lazy mi
 - **User-initiated**: Each governance token holder claims their voting tokens when they're ready to participate
 - **One-time claim**: Each address can claim once per election, receiving voting tokens equal to their vested governance token balance
 - **Flexible participation**: Holders can claim and vote at any point during the election period
+
+### Early Election Termination
+
+To allow proposals with overwhelming support to execute quickly without waiting for the full election period:
+
+- **Automatic termination**: When YES or NO votes reach a strict majority (>50% of total possible votes), the proposal can terminate early
+- **Post-election calling**: `checkEarlyTermination()` can be called even after the election period formally ends
+- **Multiple attempts**: MarketDAO automatically attempts early termination on each vote transfer
+- **Manual fallback**: Anyone can manually call `checkEarlyTermination()` at any time during or after the election
+- **Graceful failure**: If automatic early termination fails (e.g., called after election ends), it's silently caught and execution can be triggered later
+- **Gas efficiency**: Allows winning proposals to execute immediately without waiting for the full voting period
+
+**Why Post-Election Support Matters:**
+- If the last vote to reach majority is cast near the end of the election, the automatic early termination might fail due to timing
+- Previously, this would prevent the proposal from ever executing via early termination
+- Now, `checkEarlyTermination()` can be called after the election ends, ensuring proposals with majority support always execute
+- This provides a robust fallback mechanism for edge cases
+
+**Example Scenario:**
+1. Election ends at block 1000
+2. At block 999, votes reach 51% YES (clear majority)
+3. Automatic early termination is attempted but fails due to timing
+4. At block 1001, anyone can call `checkEarlyTermination()` to execute the proposal
+5. Proposal executes immediately based on the majority, no need to wait or call regular `execute()`
 
 ### Parameter Proposals (Governance Configuration)
 
@@ -70,6 +95,41 @@ All DAO configuration parameters can be modified through democratic governance v
 - Adjust token price based on market conditions or treasury needs
 - Modify vesting period to balance security with accessibility
 - Change election duration to allow more time for deliberation
+
+### Distribution Proposals (Proportional Distributions)
+
+Distribution Proposals enable fair, proportional distributions of assets (ETH, ERC20, ERC1155) to all token holders based on their governance token holdings:
+
+- **Proportional distribution**: Each holder receives an amount based on their registered token balance
+- **Registration system**: Token holders must register before the election to receive distributions
+- **Redemption contract**: Approved distributions transfer funds to a separate redemption contract where users claim individually
+- **Claimable by holders**: Each registered holder claims their share when ready (no batch distribution gas costs)
+- **Asset support**: Works with ETH, ERC20, and ERC1155 tokens
+- **Flexible timing**: Users can claim at any time after proposal execution
+
+**How It Works:**
+1. **Create proposal**: Specify the asset type, amount per governance token, and description
+2. **Registration phase**: Token holders register during the support/election phases to be included
+3. **Voting**: Standard election process with support threshold and voting
+4. **Execution**: On approval, funds transfer to a DistributionRedemption contract
+5. **Claiming**: Registered holders claim their proportional share from the redemption contract
+
+**Example Use Cases:**
+- **Revenue sharing**: Distribute profits or royalties proportionally to all token holders
+- **Dividend payments**: Regular distributions based on treasury performance
+- **Airdrops**: Distribute ERC20 tokens or NFTs proportionally
+- **Liquidation**: Fair distribution when winding down a DAO
+
+**Frontend Features:**
+- Registration button during election phase
+- Claim button in History tab after execution
+- Status indicators: "Not Registered", "Already Claimed", or "Claim Available"
+- Clear error messages for all edge cases
+
+**Gas Efficiency:**
+- No upfront distribution to all holders (would be prohibitively expensive)
+- Each holder claims individually, paying their own gas
+- Scales to unlimited holders without gas limit concerns
 
 ### Token Vesting System
 
@@ -275,10 +335,12 @@ npm run build
 The frontend provides a complete interface for:
 - Connecting wallet and viewing DAO information
 - Purchasing governance tokens
-- Creating proposals (Resolution, Treasury, Mint, Parameter)
+- Creating proposals (Resolution, Treasury, Mint, Parameter, Distribution)
 - Supporting proposals and triggering elections
+- Registering for distribution proposals during elections
 - Claiming voting tokens and casting votes
-- Viewing proposal history and results
+- Claiming distributions from approved proposals
+- Viewing proposal history and results with context-aware actions
 - Seeing all DAO members and their token balances
 
 **Parameter Proposal UI Features:**
@@ -287,6 +349,17 @@ The frontend provides a complete interface for:
 - Automatic value conversion (percentages → basis points, ETH → wei)
 - Inline hints and validation for each parameter type
 - Clear display of current vs. proposed values
+
+**Distribution Proposal UI Features:**
+- Asset type selection (ETH, ERC20, ERC1155)
+- Amount per governance token configuration
+- Registration button during active elections
+- Smart claim button in History tab:
+  - Shows "Claim Distribution" button if registered and not claimed
+  - Shows "Already Claimed" success message if claimed
+  - Shows "Not Registered" info message if user didn't register
+- Automatic calculation of claimable amounts
+- User-friendly error messages for all claim scenarios
 
 ## Configuration Parameters
 
@@ -331,13 +404,21 @@ The `buildFlags()` function handles the conversion automatically.
 5. **Admission**: If approved, you receive 1 governance token and full DAO access
 
 ### For Token Holders (Standard Proposals):
-1. **Create a Proposal**: Governance token holders can submit proposals
+1. **Create a Proposal**: Governance token holders can submit proposals (Resolution, Treasury, Mint, Parameter, or Distribution)
 2. **Support Phase**: Proposals need to reach support threshold to trigger an election
 3. **Election Triggered**: When the threshold is reached, an election period begins
 4. **Claim Voting Tokens**: Governance token holders claim their voting tokens (1:1 with vested governance tokens)
 5. **Trading Period**: During elections, voting tokens can be freely bought and sold
 6. **Voting**: Cast votes by sending voting tokens to YES/NO addresses
 7. **Execution**: Successful proposals are executed automatically
+
+### For Distribution Proposals (Additional Steps):
+1. **Create Distribution Proposal**: Specify asset type (ETH/ERC20/ERC1155) and amount per governance token
+2. **Registration Phase**: Token holders who want to receive the distribution must register during support/election phases
+3. **Standard Voting**: Proposal follows normal support → election → voting flow
+4. **Execution**: If approved, funds transfer to a DistributionRedemption contract
+5. **Claiming**: Registered holders claim their proportional share from the History tab at any time
+6. **Status Tracking**: UI shows whether you're registered, already claimed, or eligible to claim
 
 ## Future Possibilities
 

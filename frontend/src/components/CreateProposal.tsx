@@ -13,6 +13,12 @@ interface CreateProposalProps {
   ) => Promise<void>;
   onCreateMint: (description: string, recipient: string, amount: string) => Promise<void>;
   onCreateParameter: (description: string, parameterType: ParameterType, newValue: string) => Promise<void>;
+  onCreateDistribution: (
+    description: string,
+    token: string,
+    tokenId: string,
+    amountPerToken: string
+  ) => Promise<void>;
   daoInfo: DAOInfo | null;
   daoAddress: string;
   walletAddress: string | null;
@@ -45,6 +51,7 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
   onCreateTreasury,
   onCreateMint,
   onCreateParameter,
+  onCreateDistribution,
   daoInfo,
   daoAddress,
   walletAddress,
@@ -103,6 +110,12 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
   // Parameter form state
   const [parameterType, setParameterType] = useState<ParameterType>(ParameterType.TokenPrice);
   const [parameterValue, setParameterValue] = useState('');
+
+  // Distribution form state
+  const [distributionTokenType, setDistributionTokenType] = useState<TokenType>('eth');
+  const [distributionTokenAddress, setDistributionTokenAddress] = useState('');
+  const [distributionTokenId, setDistributionTokenId] = useState('');
+  const [distributionAmountPerToken, setDistributionAmountPerToken] = useState('');
 
   // Flag checkbox states
   const [flagAllowMinting, setFlagAllowMinting] = useState(false);
@@ -185,6 +198,21 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
     setFlagMintOnPurchase(false);
   };
 
+  const handleCreateDistribution = async () => {
+    const token = distributionTokenType === 'eth' ? ethers.constants.AddressZero : distributionTokenAddress;
+    const tid = distributionTokenType === 'erc721' || distributionTokenType === 'erc1155' ? distributionTokenId : '0';
+    // Convert amount per token to wei for ETH, or use as-is for ERC20/ERC1155
+    const amountPerToken = distributionTokenType === 'eth'
+      ? ethers.utils.parseEther(distributionAmountPerToken).toString()
+      : distributionAmountPerToken;
+
+    await onCreateDistribution(description, token, tid, amountPerToken);
+    setDescription('');
+    setDistributionTokenAddress('');
+    setDistributionTokenId('');
+    setDistributionAmountPerToken('');
+  };
+
   // Don't render if user can't create proposals and can't request to join
   if (!isTokenHolder && !shouldShowJoinRequest) {
     return null;
@@ -245,6 +273,13 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
                 onClick={() => setProposalType('parameter')}
               >
                 Parameters
+              </button>
+              <button
+                type="button"
+                className={`btn ${proposalType === 'distribution' ? 'btn-primary' : 'btn-outline-primary'}`}
+                onClick={() => setProposalType('distribution')}
+              >
+                Distribution
               </button>
             </div>
           </div>
@@ -601,6 +636,109 @@ export const CreateProposal: React.FC<CreateProposalProps> = ({
                 disabled={isLoading || !description || (parameterType !== ParameterType.Flags && !parameterValue)}
               >
                 Create Parameter Proposal
+              </button>
+            </div>
+          </div>
+        )}
+
+        {proposalType === 'distribution' && (
+          <div>
+            <div className="mb-3">
+              <label htmlFor="distribution-description" className="form-label">
+                Description
+              </label>
+              <textarea
+                className="form-control"
+                id="distribution-description"
+                rows={4}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Enter a description for this distribution (e.g., 'Quarterly profit sharing')"
+              />
+            </div>
+
+            <div className="mb-3">
+              <label htmlFor="distribution-token-type" className="form-label">
+                Token Type
+              </label>
+              <select
+                className="form-select"
+                id="distribution-token-type"
+                value={distributionTokenType}
+                onChange={(e) => setDistributionTokenType(e.target.value as TokenType)}
+              >
+                <option value="eth">ETH</option>
+                <option value="erc20">ERC20</option>
+                <option value="erc1155">ERC1155</option>
+              </select>
+              <small className="form-text text-muted">
+                Note: ERC721 distributions are not supported (can't split NFTs)
+              </small>
+            </div>
+
+            {distributionTokenType !== 'eth' && (
+              <div className="mb-3">
+                <label htmlFor="distribution-token-address" className="form-label">
+                  Token Address
+                </label>
+                <input
+                  type="text"
+                  className="form-control"
+                  id="distribution-token-address"
+                  value={distributionTokenAddress}
+                  onChange={(e) => setDistributionTokenAddress(e.target.value)}
+                  placeholder="0x..."
+                />
+              </div>
+            )}
+
+            {distributionTokenType === 'erc1155' && (
+              <div className="mb-3">
+                <label htmlFor="distribution-token-id" className="form-label">
+                  Token ID
+                </label>
+                <input
+                  type="number"
+                  className="form-control"
+                  id="distribution-token-id"
+                  min="0"
+                  step="1"
+                  value={distributionTokenId}
+                  onChange={(e) => setDistributionTokenId(e.target.value)}
+                  placeholder="Token ID"
+                />
+              </div>
+            )}
+
+            <div className="mb-3">
+              <label htmlFor="distribution-amount-per-token" className="form-label">
+                Amount Per Governance Token
+                {distributionTokenType === 'eth' && ' (ETH)'}
+                {distributionTokenType === 'erc20' && ' (tokens)'}
+                {distributionTokenType === 'erc1155' && ' (tokens)'}
+              </label>
+              <input
+                type="number"
+                className="form-control"
+                id="distribution-amount-per-token"
+                min="0"
+                step="any"
+                value={distributionAmountPerToken}
+                onChange={(e) => setDistributionAmountPerToken(e.target.value)}
+                placeholder={distributionTokenType === 'eth' ? 'e.g., 0.1' : 'Amount per governance token'}
+              />
+              <small className="form-text text-muted">
+                Each governance token holder will receive this amount multiplied by their token balance
+              </small>
+            </div>
+
+            <div className="text-center">
+              <button
+                className="btn btn-primary"
+                onClick={handleCreateDistribution}
+                disabled={isLoading || !description || !distributionAmountPerToken}
+              >
+                Create Distribution Proposal
               </button>
             </div>
           </div>

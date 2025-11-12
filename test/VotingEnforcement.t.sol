@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
+import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/Proposal.sol";
 import "../src/ProposalTypes.sol";
 
 // A simple testing mock implementation
-contract MockDAO is Test {
+contract MockDAO is TestHelper {
     mapping(address => bool) public votingAllowed;
     mapping(address => bool) public isVoteAddress;
     
@@ -50,7 +50,7 @@ contract MockDAO is Test {
 }
 
 // Simple tests for voting period enforcement using a completely isolated mock
-contract VotingEnforcementTest is Test {
+contract VotingEnforcementTest is TestHelper {
     MockDAO dao;
     address voter = address(0x1);
     address yesVoteAddr = address(0x2);

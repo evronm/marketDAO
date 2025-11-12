@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
+import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 
-contract VestingAutoCleanupTest is Test {
+contract VestingAutoCleanupTest is TestHelper {
     MarketDAO dao;
     address user1 = address(0x1);
     address user2 = address(0x2);

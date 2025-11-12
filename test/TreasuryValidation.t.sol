@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
+import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
 
-contract TreasuryValidationTest is Test {
+contract TreasuryValidationTest is TestHelper {
     MarketDAO dao;
     ProposalFactory factory;
     address proposer = address(0x1);
@@ -27,7 +27,7 @@ contract TreasuryValidationTest is Test {
             initialAmounts
         );
 
-        factory = new ProposalFactory(dao);
+        factory = deployFactory(dao);
         dao.setFactory(address(factory));
 
         // Give DAO only 1 ETH

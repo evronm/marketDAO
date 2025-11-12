@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
+import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
 
-contract FactoryValidationTest is Test {
+contract FactoryValidationTest is TestHelper {
     MarketDAO dao;
     address deployer = address(this);
     address user1 = address(0x1);
@@ -48,7 +48,7 @@ contract FactoryValidationTest is Test {
 
     function testCanSetValidContractAsFactory() public {
         // Deploy a real factory
-        ProposalFactory factory = new ProposalFactory(dao);
+        ProposalFactory factory = deployFactory(dao);
 
         // Should succeed - it's a contract
         dao.setFactory(address(factory));
@@ -59,17 +59,17 @@ contract FactoryValidationTest is Test {
 
     function testCannotSetFactoryTwice() public {
         // Deploy and set factory
-        ProposalFactory factory = new ProposalFactory(dao);
+        ProposalFactory factory = deployFactory(dao);
         dao.setFactory(address(factory));
 
         // Try to set again
-        ProposalFactory factory2 = new ProposalFactory(dao);
+        ProposalFactory factory2 = deployFactory(dao);
         vm.expectRevert("Factory already set");
         dao.setFactory(address(factory2));
     }
 
     function testOnlyDeployerCanSetFactory() public {
-        ProposalFactory factory = new ProposalFactory(dao);
+        ProposalFactory factory = deployFactory(dao);
 
         // Try to set factory as non-deployer
         vm.prank(user1);

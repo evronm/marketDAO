@@ -7,6 +7,7 @@ interface ElectionActionsProps {
   daoInfo: DAOInfo;
   onClaimVotingTokens: (address: string) => Promise<void>;
   onVote: (address: string, voteYes: boolean, amount: string) => Promise<void>;
+  onRegisterForDistribution?: (address: string) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -15,6 +16,7 @@ export const ElectionActions: React.FC<ElectionActionsProps> = ({
   daoInfo,
   onClaimVotingTokens,
   onVote,
+  onRegisterForDistribution,
   isLoading,
 }) => {
   const [voteAmount, setVoteAmount] = useState('');
@@ -29,6 +31,12 @@ export const ElectionActions: React.FC<ElectionActionsProps> = ({
     await onVote(proposal.address, voteYes, voteAmount);
     setVoteAmount('');
     setSelectedVote(null);
+  };
+
+  const handleRegisterForDistribution = async () => {
+    if (onRegisterForDistribution) {
+      await onRegisterForDistribution(proposal.address);
+    }
   };
 
   // Calculate vote percentages
@@ -156,6 +164,24 @@ export const ElectionActions: React.FC<ElectionActionsProps> = ({
                 👎 Vote No
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Distribution Registration */}
+      {proposal.type === 'distribution' && onRegisterForDistribution && (
+        <div className="mb-3">
+          <div className="alert alert-info py-2 small mb-2">
+            💰 Register for distribution to claim your share later
+          </div>
+          <div className="d-grid">
+            <button
+              className="btn btn-info"
+              onClick={handleRegisterForDistribution}
+              disabled={isLoading}
+            >
+              📝 Register for Distribution
+            </button>
           </div>
         </div>
       )}

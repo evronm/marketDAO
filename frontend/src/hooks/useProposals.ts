@@ -6,6 +6,8 @@ import {
   TREASURY_PROPOSAL_ABI,
   MINT_PROPOSAL_ABI,
   PARAMETER_PROPOSAL_ABI,
+  DISTRIBUTION_PROPOSAL_ABI,
+  DISTRIBUTION_REDEMPTION_ABI,
 } from '../types/abis';
 import { ParameterType } from '../types';
 import { retryContractCall } from '../utils/contractHelpers';
@@ -21,6 +23,8 @@ interface UseProposalsReturn {
   triggerElection: (proposalAddress: string) => Promise<void>;
   voteOnProposal: (proposalAddress: string, voteYes: boolean, amount: string) => Promise<void>;
   claimVotingTokens: (proposalAddress: string) => Promise<void>;
+  registerForDistribution: (proposalAddress: string) => Promise<void>;
+  claimDistribution: (redemptionAddress: string) => Promise<void>;
   createResolutionProposal: (description: string) => Promise<void>;
   createTreasuryProposal: (
     description: string,
@@ -31,6 +35,7 @@ interface UseProposalsReturn {
   ) => Promise<void>;
   createMintProposal: (description: string, recipient: string, amount: string) => Promise<void>;
   createParameterProposal: (description: string, parameterType: ParameterType, newValue: string) => Promise<void>;
+  createDistributionProposal: (description: string, token: string, tokenId: string, amountPerToken: string) => Promise<void>;
 }
 
 export const useProposals = (
@@ -240,7 +245,56 @@ export const useProposals = (
                 newValue: newValue.toString(),
               };
             } catch (e) {
-              // Must be a resolution proposal (already set as default)
+              try {
+                const distributionContract = new ethers.Contract(
+                  proposalAddress,
+                  DISTRIBUTION_PROPOSAL_ABI,
+                  contractRefs.signer
+                );
+                const [token, tokenId, amountPerToken, totalAmount, redemptionContract] = await Promise.all([
+                  distributionContract.token(),
+                  distributionContract.tokenId(),
+                  distributionContract.amountPerGovernanceToken(),
+                  distributionContract.totalAmount(),
+                  distributionContract.redemptionContract(),
+                ]);
+
+                // Check if user has already claimed from the redemption contract
+                let hasClaimedDistribution = false;
+                let registeredBalance = '0';
+                let isRegistered = false;
+                if (redemptionContract && redemptionContract !== ethers.constants.AddressZero) {
+                  try {
+                    const redemptionContractInstance = new ethers.Contract(
+                      redemptionContract,
+                      DISTRIBUTION_REDEMPTION_ABI,
+                      contractRefs.signer
+                    );
+                    [hasClaimedDistribution, registeredBalance] = await Promise.all([
+                      redemptionContractInstance.hasClaimed(walletAddress),
+                      redemptionContractInstance.registeredBalance(walletAddress),
+                    ]);
+                    isRegistered = !registeredBalance.isZero();
+                  } catch (e) {
+                    // If we can't check, assume false
+                    console.warn('Could not check distribution claim status:', e);
+                  }
+                }
+
+                proposalData.type = 'distribution';
+                proposalData.details = {
+                  token,
+                  tokenId: tokenId.toString(),
+                  amountPerGovernanceToken: amountPerToken.toString(),
+                  totalAmount: totalAmount.toString(),
+                  redemptionContract,
+                  hasClaimedDistribution,
+                  isRegistered,
+                  registeredBalance: registeredBalance.toString(),
+                };
+              } catch (e) {
+                // Must be a resolution proposal (already set as default)
+              }
             }
           }
         }
@@ -501,6 +555,79 @@ export const useProposals = (
     [contractRefs.factoryContract, loadAllProposals]
   );
 
+  const createDistributionProposal = useCallback(
+    async (description: string, token: string, tokenId: string, amountPerToken: string) => {
+      if (!contractRefs.factoryContract) {
+        throw new Error('Factory contract not initialized');
+      }
+
+      const tx = await contractRefs.factoryContract.createDistributionProposal(
+        description,
+        token,
+        tokenId,
+        amountPerToken
+      );
+      await tx.wait();
+      await loadAllProposals();
+    },
+    [contractRefs.factoryContract, loadAllProposals]
+  );
+
+  const registerForDistribution = useCallback(
+    async (proposalAddress: string) => {
+      if (!contractRefs.signer) {
+        throw new Error('Signer not initialized');
+      }
+
+      const proposalContract = new ethers.Contract(
+        proposalAddress,
+        DISTRIBUTION_PROPOSAL_ABI,
+        contractRefs.signer
+      );
+
+      const tx = await proposalContract.registerForDistribution();
+      await tx.wait();
+      await loadAllProposals();
+    },
+    [contractRefs.signer, loadAllProposals]
+  );
+
+  const claimDistribution = useCallback(
+    async (redemptionAddress: string) => {
+      if (!contractRefs.signer) {
+        throw new Error('Signer not initialized');
+      }
+
+      const redemptionContract = new ethers.Contract(
+        redemptionAddress,
+        DISTRIBUTION_REDEMPTION_ABI,
+        contractRefs.signer
+      );
+
+      try {
+        const tx = await redemptionContract.claim();
+        await tx.wait();
+        await loadAllProposals();
+      } catch (error: any) {
+        // Provide user-friendly error messages
+        const errorMessage = error.message || error.toString();
+
+        if (errorMessage.includes('NotRegistered')) {
+          throw new Error('You are not registered for this distribution');
+        } else if (errorMessage.includes('AlreadyClaimed')) {
+          throw new Error('You have already claimed this distribution');
+        } else if (errorMessage.includes('NothingToClaim')) {
+          throw new Error('You have nothing to claim from this distribution');
+        } else if (errorMessage.includes('InsufficientBalance')) {
+          throw new Error('The distribution contract has insufficient balance');
+        } else {
+          throw new Error('Failed to claim distribution: ' + errorMessage);
+        }
+      }
+    },
+    [contractRefs.signer, loadAllProposals]
+  );
+
   return {
     activeProposals,
     electionProposals,
@@ -512,9 +639,12 @@ export const useProposals = (
     triggerElection,
     voteOnProposal,
     claimVotingTokens,
+    registerForDistribution,
+    claimDistribution,
     createResolutionProposal,
     createTreasuryProposal,
     createMintProposal,
     createParameterProposal,
+    createDistributionProposal,
   };
 };

@@ -21,5 +21,4 @@
 - **Security**: No hardcoded secrets, validate all inputs, follow CEI pattern
 - **Tests**: Name tests with "test" prefix, group related tests in the same contract
 
-- The entire front end is in index.html in the base directory
-- For CDN, use jsdeliver
+- The front end is in frontend/

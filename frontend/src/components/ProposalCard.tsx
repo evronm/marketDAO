@@ -13,6 +13,7 @@ const BORDER_COLORS: Record<string, string> = {
   treasury: '#4caf50',
   mint: '#ff9800',
   parameter: '#2196f3',
+  distribution: '#00bcd4',
   resolution: '#9c27b0',
 };
 
@@ -121,6 +122,49 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({ proposal, children }
           ) : (
             <div>
               <strong>New Value:</strong> {formatValue(proposal.details.parameterType, proposal.details.newValue)}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (proposal.type === 'distribution') {
+      const isETH = proposal.details.token === ethers.constants.AddressZero;
+      const isERC20 = proposal.details.tokenId === '0' && !isETH;
+      const isERC1155 = proposal.details.tokenId !== '0';
+
+      const tokenTypeLabel = isETH ? 'ETH' : isERC20 ? 'ERC20' : 'ERC1155';
+
+      return (
+        <div className="bg-light p-3 rounded mb-3">
+          <div>
+            <strong>Token Type:</strong> {tokenTypeLabel}
+          </div>
+          {!isETH && (
+            <div>
+              <strong>Token Address:</strong> {truncateAddress(proposal.details.token)}
+            </div>
+          )}
+          {isERC1155 && (
+            <div>
+              <strong>Token ID:</strong> {safeValue(proposal.details.tokenId)}
+            </div>
+          )}
+          <div>
+            <strong>Amount per Governance Token:</strong>{' '}
+            {isETH
+              ? `${safeFormatEther(proposal.details.amountPerGovernanceToken)} ETH`
+              : `${safeValue(proposal.details.amountPerGovernanceToken)} tokens`}
+          </div>
+          <div>
+            <strong>Total Distribution:</strong>{' '}
+            {isETH
+              ? `${safeFormatEther(proposal.details.totalAmount)} ETH`
+              : `${safeValue(proposal.details.totalAmount)} tokens`}
+          </div>
+          {proposal.details.redemptionContract && proposal.details.redemptionContract !== ethers.constants.AddressZero && (
+            <div>
+              <strong>Redemption Contract:</strong> {truncateAddress(proposal.details.redemptionContract)}
             </div>
           )}
         </div>

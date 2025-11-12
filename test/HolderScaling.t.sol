@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "forge-std/Test.sol";
+import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
 import "../src/ProposalTypes.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 
-contract HolderScalingTest is Test, IERC1155Receiver {
+contract HolderScalingTest is TestHelper, IERC1155Receiver {
     MarketDAO dao;
     ProposalFactory factory;
 
@@ -32,7 +32,7 @@ contract HolderScalingTest is Test, IERC1155Receiver {
             initialAmounts
         );
 
-        factory = new ProposalFactory(dao);
+        factory = deployFactory(dao);
         dao.setFactory(address(factory));
     }
 
@@ -94,7 +94,7 @@ contract HolderScalingTest is Test, IERC1155Receiver {
             bootstrapAmounts
         );
 
-        factory = new ProposalFactory(dao);
+        factory = deployFactory(dao);
         dao.setFactory(address(factory));
 
         // Distribute tokens to holders - keep enough for proposer to trigger

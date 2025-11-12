@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "./Proposal.sol";
+import "./DistributionRedemption.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
@@ -230,6 +231,141 @@ contract ParameterProposal is Proposal {
         }
 
         executed = true;
+        dao.clearActiveProposal();
+    }
+}
+
+contract DistributionProposal is Proposal {
+    address public token;
+    uint256 public tokenId;
+    uint256 public amountPerGovernanceToken;
+    uint256 public totalAmount;
+    DistributionRedemption public redemptionContract;
+
+    // Events
+    event RedemptionContractDeployed(address indexed redemptionContract);
+    event UserRegisteredForDistribution(address indexed user, uint256 governanceTokenBalance);
+
+    // Errors
+    error RedemptionNotDeployed();
+    error ElectionNotTriggered();
+
+    // Override to lock funds and deploy redemption contract when election is triggered
+    function _lockFunds() internal override {
+        dao.lockFunds(token, tokenId, totalAmount);
+
+        // Deploy redemption contract
+        redemptionContract = new DistributionRedemption(
+            address(this),
+            token,
+            tokenId,
+            amountPerGovernanceToken
+        );
+
+        emit RedemptionContractDeployed(address(redemptionContract));
+    }
+
+    // Override to unlock funds when proposal fails
+    function _unlockFunds() internal override {
+        dao.unlockFunds();
+    }
+
+    function initialize(
+        MarketDAO _dao,
+        string memory _description,
+        address _proposer,
+        address _token,
+        uint256 _tokenId,
+        uint256 _amountPerToken
+    ) external {
+        __Proposal_init(_dao, _description, _proposer);
+        require(_amountPerToken > 0, "Amount per token must be positive");
+        require(dao.hasTreasury(), "DAO has no treasury");
+
+        // Calculate total amount needed: amountPerToken * total vested supply
+        uint256 vestedSupply = dao.getTotalVestedSupply();
+        require(vestedSupply > 0, "No vested governance tokens exist");
+        uint256 requiredAmount = _amountPerToken * vestedSupply;
+
+        // Validate treasury has sufficient AVAILABLE balance (total - locked)
+        if (_token == address(0)) {
+            require(dao.acceptsETH(), "ETH not accepted");
+            require(dao.getAvailableETH() >= requiredAmount, "Insufficient available ETH balance");
+        } else {
+            if (_tokenId == 0) {
+                require(dao.acceptsERC20(), "ERC20 not accepted");
+                require(
+                    dao.getAvailableERC20(_token) >= requiredAmount,
+                    "Insufficient available ERC20 balance"
+                );
+            } else {
+                // ERC721 or ERC1155 - check using ERC165
+                bytes4 ERC721_INTERFACE_ID = 0x80ac58cd;
+                bytes4 ERC1155_INTERFACE_ID = 0xd9b67a26;
+
+                if (ERC165Checker.supportsInterface(_token, ERC721_INTERFACE_ID)) {
+                    revert("Cannot distribute ERC721 tokens");
+                } else if (ERC165Checker.supportsInterface(_token, ERC1155_INTERFACE_ID)) {
+                    require(dao.acceptsERC1155(), "ERC1155 not accepted");
+                    require(
+                        dao.getAvailableERC1155(_token, _tokenId) >= requiredAmount,
+                        "Insufficient available ERC1155 balance"
+                    );
+                } else {
+                    revert("Token must support ERC721 or ERC1155 interface");
+                }
+            }
+        }
+
+        token = _token;
+        tokenId = _tokenId;
+        amountPerGovernanceToken = _amountPerToken;
+        totalAmount = requiredAmount;
+    }
+
+    /**
+     * @notice Register caller for distribution based on their current vested governance token balance
+     * @dev Can be called during or after election trigger. Users don't need to claim voting tokens.
+     */
+    function registerForDistribution() external {
+        if (!electionTriggered) revert ElectionNotTriggered();
+        if (address(redemptionContract) == address(0)) revert RedemptionNotDeployed();
+
+        uint256 vestedBal = dao.vestedBalance(msg.sender);
+        redemptionContract.registerClaimant(msg.sender, vestedBal);
+
+        emit UserRegisteredForDistribution(msg.sender, vestedBal);
+    }
+
+    function _execute() internal override {
+        super._execute();
+
+        // Transfer funds to redemption contract
+        if (token == address(0)) {
+            require(dao.acceptsETH(), "ETH not accepted");
+            dao.transferETH(payable(address(redemptionContract)), totalAmount);
+        } else {
+            if (tokenId == 0) {
+                require(dao.acceptsERC20(), "ERC20 not accepted");
+                dao.transferERC20(token, address(redemptionContract), totalAmount);
+            } else {
+                // ERC1155 (ERC721 already rejected in initialize)
+                bytes4 ERC1155_INTERFACE_ID = 0xd9b67a26;
+                require(
+                    ERC165Checker.supportsInterface(token, ERC1155_INTERFACE_ID),
+                    "Token must support ERC1155 interface"
+                );
+                require(dao.acceptsERC1155(), "ERC1155 not accepted");
+                dao.transferERC1155(token, address(redemptionContract), tokenId, totalAmount);
+            }
+        }
+
+        executed = true;
+
+        // Unlock funds (they've been transferred to redemption contract)
+        dao.unlockFunds();
+
+        // Clear the active proposal status at the very end of execution
         dao.clearActiveProposal();
     }
 }
