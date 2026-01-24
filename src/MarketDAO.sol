@@ -102,6 +102,12 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     address public activeRedemptionContract;
     // ============ END H-02 FIX ============
     
+    // ============ H-03/H-04 FIX: Governance Lock Mechanism ============
+    // Tracks governance tokens locked for proposal support and voting
+    // Cumulative across all active proposals
+    mapping(address => uint256) public governanceLock;
+    // ============ END H-03/H-04 FIX ============
+    
     constructor(
         string memory _name,
         uint256 _supportThreshold,
@@ -405,18 +411,48 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     }
     
     /**
-     * @notice Get the transferable balance (vested minus distribution-locked)
+     * @notice Get the transferable balance (vested minus all locks)
      * @param holder Address to check
      * @return The amount of tokens that can be transferred
      */
     function transferableBalance(address holder) public view returns (uint256) {
         uint256 vested = vestedBalance(holder);
-        uint256 locked = distributionLock[holder];
-        if (locked >= vested) {
+        uint256 totalLocked = distributionLock[holder] + governanceLock[holder];
+        if (totalLocked >= vested) {
             return 0;
         }
-        return vested - locked;
+        return vested - totalLocked;
     }
+    
+    // ============ H-03/H-04 FIX: Governance Lock Functions ============
+    
+    /**
+     * @notice Add to a user's governance lock (for support or voting)
+     * @dev Only callable by active proposals
+     * @param user Address to lock tokens for
+     * @param amount Amount to add to lock
+     */
+    function addGovernanceLock(address user, uint256 amount) external {
+        require(activeProposals[msg.sender], "Only active proposal");
+        governanceLock[user] += amount;
+    }
+    
+    /**
+     * @notice Remove from a user's governance lock
+     * @dev Callable by active OR resolved proposals (to allow post-resolution unlocks)
+     * @param user Address to unlock tokens for
+     * @param amount Amount to remove from lock
+     */
+    function removeGovernanceLock(address user, uint256 amount) external {
+        require(activeProposals[msg.sender] || wasActiveProposal[msg.sender], "Not authorized proposal");
+        if (governanceLock[user] >= amount) {
+            governanceLock[user] -= amount;
+        } else {
+            governanceLock[user] = 0;
+        }
+    }
+    
+    // ============ END H-03/H-04 FIX ============
     
     // ============ END H-02 FIX ============
 
@@ -431,18 +467,23 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     function registerProposal(address proposal) external {
         require(msg.sender == factory, "Only factory can register");
         activeProposals[proposal] = true;
+        wasActiveProposal[proposal] = true;  // Track for post-resolution lock management
     }
 
     // Alias for registerProposal - used by ProposalFactory
     function setActiveProposal(address proposal) external {
         require(msg.sender == factory, "Only factory can register");
         activeProposals[proposal] = true;
+        wasActiveProposal[proposal] = true;  // Track for post-resolution lock management
     }
 
     function clearActiveProposal() external {
         require(activeProposals[msg.sender], "Not an active proposal");
         activeProposals[msg.sender] = false;
     }
+    
+    // Track proposals that were ever active (for lock management after resolution)
+    mapping(address => bool) public wasActiveProposal;
 
     function registerVoteAddresses(address yesAddr, address noAddr) external {
         require(activeProposals[msg.sender], "Only active proposal can register");

@@ -29,6 +29,13 @@ abstract contract Proposal {
     // Initialization guard
     bool private _initialized;
     
+    // ============ H-03/H-04 FIX: Track locked amounts per user ============
+    // How much governance tokens we locked for each user's support
+    mapping(address => uint256) public supportLocked;
+    // How much governance tokens we locked for each user's voting claim
+    mapping(address => uint256) public votingLocked;
+    // ============ END H-03/H-04 FIX ============
+    
     modifier onlyBeforeElection() {
         require(!electionTriggered, "Election already triggered");
         _;
@@ -56,6 +63,27 @@ abstract contract Proposal {
         if (block.number < electionStart) return false;
         if (block.number >= electionStart + dao.electionDuration()) return false;
         return true;
+    }
+    
+    /**
+     * @notice Check if the proposal has been resolved (executed, failed, or expired)
+     * @return True if the proposal is no longer active
+     */
+    function isResolved() public view returns (bool) {
+        // Executed proposals are resolved
+        if (executed) return true;
+        
+        // Check if proposal expired before election
+        if (!electionTriggered && block.number >= createdAt + dao.maxProposalAge()) {
+            return true;
+        }
+        
+        // Check if election ended (whether executed or not)
+        if (electionTriggered && block.number >= electionStart + dao.electionDuration()) {
+            return true;
+        }
+        
+        return false;
     }
     
     function __Proposal_init(
@@ -92,6 +120,12 @@ abstract contract Proposal {
             "Cannot support more than vested governance tokens held"
         );
 
+        // ============ H-03 FIX: Lock governance tokens ============
+        // Lock the additional support amount
+        dao.addGovernanceLock(msg.sender, amount);
+        supportLocked[msg.sender] += amount;
+        // ============ END H-03 FIX ============
+
         support[msg.sender] += amount;
         supportTotal += amount;
 
@@ -111,6 +145,16 @@ abstract contract Proposal {
 
         support[msg.sender] -= amount;
         supportTotal -= amount;
+        
+        // ============ H-03 FIX: Unlock governance tokens ============
+        // Unlock the removed support amount
+        if (supportLocked[msg.sender] >= amount) {
+            supportLocked[msg.sender] -= amount;
+        } else {
+            supportLocked[msg.sender] = 0;
+        }
+        dao.removeGovernanceLock(msg.sender, amount);
+        // ============ END H-03 FIX ============
     }
     
     function canTriggerElection() public view returns (bool) {
@@ -190,6 +234,13 @@ abstract contract Proposal {
         require(vestedBal > 0, "No vested governance tokens to claim");
 
         hasClaimed[msg.sender] = true;
+        
+        // ============ H-04 FIX: Lock governance tokens ============
+        // Lock the tokens being used for voting to prevent double-claiming via transfer
+        dao.addGovernanceLock(msg.sender, vestedBal);
+        votingLocked[msg.sender] = vestedBal;
+        // ============ END H-04 FIX ============
+        
         dao.mintVotingTokens(msg.sender, votingTokenId, vestedBal);
     }
 
@@ -229,59 +280,98 @@ abstract contract Proposal {
         }
     }
     
-    function execute() external {
+    function execute() external virtual {
         require(electionTriggered, "Election not triggered");
         require(!executed, "Already executed");
         require(
             block.number >= electionStart + dao.electionDuration(),
-            "Election still ongoing"
+            "Election still active"
         );
 
         // Use snapshot taken at election start (gas optimization)
         uint256 totalPossibleVotes = snapshotTotalVotes;
 
-        uint256 quorum = (totalPossibleVotes * dao.quorumPercentage()) / 10000;
         uint256 yesVotes = dao.balanceOf(yesVoteAddress, votingTokenId);
         uint256 noVotes = dao.balanceOf(noVoteAddress, votingTokenId);
+        uint256 totalVotes = yesVotes + noVotes;
 
-        // Check if quorum was met and proposal passed
-        require(yesVotes + noVotes >= quorum, "Quorum not met");
+        // Check quorum
+        uint256 quorumRequired = (totalPossibleVotes * dao.quorumPercentage()) / 10000;
+        require(totalVotes >= quorumRequired, "Quorum not met");
+
+        // Check majority
         require(yesVotes > noVotes, "Proposal not passed");
 
-        // Proposal passed - execute it
         _execute();
     }
 
-    // Allow anyone to explicitly fail a proposal after election ends
-    function failProposal() external {
+    function _execute() internal virtual {
+        executed = true;
+    }
+
+    function failProposal() external virtual {
         require(electionTriggered, "Election not triggered");
         require(!executed, "Already executed");
         require(
             block.number >= electionStart + dao.electionDuration(),
-            "Election still ongoing"
+            "Election still active"
         );
 
-        // Use snapshot taken at election start (gas optimization)
         uint256 totalPossibleVotes = snapshotTotalVotes;
 
-        uint256 quorum = (totalPossibleVotes * dao.quorumPercentage()) / 10000;
         uint256 yesVotes = dao.balanceOf(yesVoteAddress, votingTokenId);
         uint256 noVotes = dao.balanceOf(noVoteAddress, votingTokenId);
+        uint256 totalVotes = yesVotes + noVotes;
 
-        // Verify proposal actually failed
-        require(
-            (yesVotes + noVotes < quorum) || (yesVotes <= noVotes),
-            "Proposal did not fail"
-        );
+        // Check if quorum was not met OR proposal was rejected
+        uint256 quorumRequired = (totalPossibleVotes * dao.quorumPercentage()) / 10000;
+        bool quorumNotMet = totalVotes < quorumRequired;
+        bool rejected = yesVotes <= noVotes;
 
-        // Mark as executed (failed) and unlock funds
+        require(quorumNotMet || rejected, "Proposal passed, cannot fail");
+
         executed = true;
         _unlockFunds();
         dao.clearActiveProposal();
     }
     
-    function _execute() internal virtual {
-        require(!executed, "Already executed");
-        // We don't set executed=true here as it's done in the derived classes
+    // ============ H-03/H-04 FIX: User-initiated lock release ============
+    
+    /**
+     * @notice Release all governance locks held by this proposal for the caller
+     * @dev Can only be called after the proposal is resolved (executed, failed, or expired)
+     *      This shifts gas cost to users who need to transfer, rather than iterating on resolution
+     */
+    function releaseProposalLocks() external {
+        require(isResolved(), "Proposal not yet resolved");
+        
+        uint256 totalToUnlock = 0;
+        
+        // Release support lock
+        if (supportLocked[msg.sender] > 0) {
+            totalToUnlock += supportLocked[msg.sender];
+            supportLocked[msg.sender] = 0;
+        }
+        
+        // Release voting lock
+        if (votingLocked[msg.sender] > 0) {
+            totalToUnlock += votingLocked[msg.sender];
+            votingLocked[msg.sender] = 0;
+        }
+        
+        require(totalToUnlock > 0, "No locks to release");
+        
+        dao.removeGovernanceLock(msg.sender, totalToUnlock);
     }
+    
+    /**
+     * @notice Get the total amount locked by this proposal for a user
+     * @param user Address to check
+     * @return Total locked amount (support + voting)
+     */
+    function getLockedAmount(address user) external view returns (uint256) {
+        return supportLocked[user] + votingLocked[user];
+    }
+    
+    // ============ END H-03/H-04 FIX ============
 }

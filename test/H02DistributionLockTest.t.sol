@@ -233,9 +233,8 @@ contract H02DistributionLockTest is Test {
         vm.prank(attacker);
         proposal.registerForDistribution();
 
-        // Verify tokens are locked
+        // Verify distribution lock is set
         assertEq(dao.distributionLock(attacker), 50);
-        assertEq(dao.transferableBalance(attacker), 0);
 
         // Complete the proposal
         vm.prank(proposer);
@@ -247,6 +246,11 @@ contract H02DistributionLockTest is Test {
         proposal.claimVotingTokens();
         vm.prank(attacker);
         dao.setApprovalForAll(address(proposal), true);
+
+        // Note: After claimVotingTokens, attacker has:
+        // - distributionLock = 50
+        // - governanceLock = 50 (from H-04 fix)
+        // So transferableBalance = 50 - 50 - 50 = 0 (capped at 0)
 
         address yesVote = proposal.yesVoteAddress();
         uint256 votingToken = proposal.votingTokenId();
@@ -261,13 +265,26 @@ contract H02DistributionLockTest is Test {
         vm.prank(proposer);
         proposal.execute();
 
-        // Claim - this should unlock tokens
+        // Claim - this should unlock distribution lock
         DistributionRedemption redemption = proposal.redemptionContract();
         vm.prank(attacker);
         redemption.claim();
 
-        // Verify tokens are now unlocked
+        // Verify distribution lock is released
         assertEq(dao.distributionLock(attacker), 0);
+        
+        // But governanceLock is still 50 from claimVotingTokens
+        assertEq(dao.governanceLock(attacker), 50);
+        
+        // So transferableBalance is still 0
+        assertEq(dao.transferableBalance(attacker), 0);
+
+        // Release proposal locks to fully unlock
+        vm.prank(attacker);
+        proposal.releaseProposalLocks();
+        
+        // Now all locks are released
+        assertEq(dao.governanceLock(attacker), 0);
         assertEq(dao.transferableBalance(attacker), 50);
 
         // Now transfer should succeed
