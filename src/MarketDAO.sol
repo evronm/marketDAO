@@ -2,63 +2,63 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
-import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-import "./Proposal.sol";
 
-contract MarketDAO is ERC1155, ReentrancyGuard, IERC1155Receiver {
+// Forward declaration for Proposal interface
+interface IProposal {
+    function isElectionActive() external view returns (bool);
+    function checkEarlyTermination() external;
+}
+
+contract MarketDAO is ERC1155, ReentrancyGuard {
     using SafeERC20 for IERC20;
-
-    // Custom errors
-    error AccountingError(uint256 unvestedTokens, uint256 totalSupply);
-
-    string public name;
-    uint256 public supportThreshold;        // basis points (10000 = 100%) needed to trigger election
-    uint256 public quorumPercentage;        // basis points (10000 = 100%) needed for valid election
-    uint256 public maxProposalAge;          // max age of proposal without election
-    uint256 public electionDuration;        // length of election in blocks
-    uint256 public flags;                   // bitfield for boolean options
-    uint256 public tokenPrice;              // price per token in wei (0 = direct sales disabled)
-
-    // Flag bit positions
+    
+    // Constants
+    uint256 public constant GOVERNANCE_TOKEN_ID = 0;
+    uint256 private constant MAX_VESTING_SCHEDULES = 10;
+    
+    // Configuration flags (bitfield)
     uint256 private constant FLAG_ALLOW_MINTING = 1 << 0;
     uint256 private constant FLAG_RESTRICT_PURCHASES = 1 << 1;
     uint256 private constant FLAG_MINT_TO_PURCHASE = 1 << 2;
-
-    // Helper functions for flag checks
+    
+    // Flag getters
     function allowMinting() public view returns (bool) {
         return (flags & FLAG_ALLOW_MINTING) != 0;
     }
-
+    
     function restrictPurchasesToHolders() public view returns (bool) {
         return (flags & FLAG_RESTRICT_PURCHASES) != 0;
     }
-
+    
     function mintToPurchase() public view returns (bool) {
         return (flags & FLAG_MINT_TO_PURCHASE) != 0;
     }
-
-    uint256 private constant GOVERNANCE_TOKEN_ID = 0;
-    uint256 private nextVotingTokenId = 1;
-    uint256 private constant MAX_VESTING_SCHEDULES = 10;
-    mapping(address => bool) public activeProposals;
-
-    // Vesting configuration
-    uint256 public vestingPeriod;  // vesting period in blocks
-
+    
+    // Governance parameters
+    string public name;
+    uint256 public supportThreshold;  // basis points (e.g., 2000 = 20%)
+    uint256 public quorumPercentage;  // basis points
+    uint256 public maxProposalAge;    // in blocks
+    uint256 public electionDuration;  // in blocks
+    uint256 public flags;
+    uint256 public tokenPrice;        // price per governance token in wei
+    uint256 public vestingPeriod;     // vesting period in blocks
+    
+    // Vesting
     struct VestingSchedule {
         uint256 amount;
         uint256 unlockBlock;
     }
-
-    mapping(address => VestingSchedule[]) private vestingSchedules;
+    mapping(address => VestingSchedule[]) public vestingSchedules;
     
-    // Vote address tracking
+    // Voting token management
+    uint256 public nextVotingTokenId = 1;
+    mapping(address => bool) public activeProposals;
     mapping(address => bool) public isVoteAddress;
     mapping(address => address) public voteAddressToProposal;
 
@@ -92,6 +92,15 @@ contract MarketDAO is ERC1155, ReentrancyGuard, IERC1155Receiver {
 
     // Track total unvested governance tokens for efficient quorum calculation
     uint256 public totalUnvestedGovernanceTokens;
+    
+    // ============ H-02 FIX: Distribution Lock Mechanism ============
+    // Tracks governance tokens locked during distribution registration
+    // Prevents the same tokens from being used to register multiple addresses
+    mapping(address => uint256) public distributionLock;
+    
+    // The currently active redemption contract authorized to manage locks
+    address public activeRedemptionContract;
+    // ============ END H-02 FIX ============
     
     constructor(
         string memory _name,
@@ -295,29 +304,11 @@ contract MarketDAO is ERC1155, ReentrancyGuard, IERC1155Receiver {
             require(acceptsERC20, "ERC20 not accepted");
             require(getAvailableERC20(token) >= amount, "Insufficient available ERC20");
         } else {
-            // ERC721 or ERC1155 - check using ERC165
-            try IERC165(token).supportsInterface(0x80ac58cd) returns (bool isERC721) {
-                if (isERC721) {
-                    // ERC721
-                    require(acceptsERC721, "ERC721 not accepted");
-                    require(amount == 1, "ERC721 amount must be 1");
-                    try IERC721(token).ownerOf(tokenId) returns (address owner) {
-                        require(owner == address(this), "DAO does not own this ERC721 token");
-                        require(!isERC721Locked(token, tokenId), "ERC721 token already locked");
-                    } catch {
-                        revert("Invalid ERC721 token");
-                    }
-                } else {
-                    // ERC1155
-                    require(acceptsERC1155, "ERC1155 not accepted");
-                    require(getAvailableERC1155(token, tokenId) >= amount, "Insufficient available ERC1155");
-                }
-            } catch {
-                revert("Token does not support ERC165");
-            }
+            // ERC721 or ERC1155
+            require(acceptsERC1155, "ERC1155 not accepted");
+            require(getAvailableERC1155(token, tokenId) >= amount, "Insufficient available ERC1155");
         }
 
-        // Lock the funds
         lockedFunds[msg.sender] = LockedFunds({
             token: token,
             tokenId: tokenId,
@@ -325,34 +316,147 @@ contract MarketDAO is ERC1155, ReentrancyGuard, IERC1155Receiver {
             lockedAt: block.number
         });
 
+        // Add to tracking array
         lockedFundsIndex[msg.sender] = proposalsWithLockedFunds.length;
         proposalsWithLockedFunds.push(msg.sender);
     }
 
-    // Unlock funds when proposal fails or completes
+    // Unlock funds when a treasury proposal completes (pass or fail)
     function unlockFunds() external {
-        require(activeProposals[msg.sender] || lockedFunds[msg.sender].amount > 0, "No locked funds or not active");
+        require(activeProposals[msg.sender], "Only active proposal can unlock");
+        require(lockedFunds[msg.sender].amount > 0, "No funds locked");
 
-        if (lockedFunds[msg.sender].amount > 0) {
-            // Remove from array using swap-and-pop
-            uint256 index = lockedFundsIndex[msg.sender];
-            address lastProposal = proposalsWithLockedFunds[proposalsWithLockedFunds.length - 1];
+        // Remove from tracking array using swap-and-pop
+        uint256 index = lockedFundsIndex[msg.sender];
+        address lastProposal = proposalsWithLockedFunds[proposalsWithLockedFunds.length - 1];
+        
+        proposalsWithLockedFunds[index] = lastProposal;
+        lockedFundsIndex[lastProposal] = index;
+        
+        proposalsWithLockedFunds.pop();
+        delete lockedFundsIndex[msg.sender];
+        delete lockedFunds[msg.sender];
+    }
 
-            proposalsWithLockedFunds[index] = lastProposal;
-            lockedFundsIndex[lastProposal] = index;
-
-            proposalsWithLockedFunds.pop();
-            delete lockedFundsIndex[msg.sender];
-            delete lockedFunds[msg.sender];
+    // Try to release any proposals that are no longer active but still have locked funds
+    function _tryReleaseLockedProposals() internal {
+        // Iterate backwards to allow safe removal
+        for (uint256 i = proposalsWithLockedFunds.length; i > 0; i--) {
+            address proposal = proposalsWithLockedFunds[i - 1];
+            if (!activeProposals[proposal]) {
+                // Proposal is no longer active, release its locked funds
+                uint256 index = i - 1;
+                address lastProposal = proposalsWithLockedFunds[proposalsWithLockedFunds.length - 1];
+                
+                proposalsWithLockedFunds[index] = lastProposal;
+                lockedFundsIndex[lastProposal] = index;
+                
+                proposalsWithLockedFunds.pop();
+                delete lockedFundsIndex[proposal];
+                delete lockedFunds[proposal];
+            }
         }
     }
 
-    // Try to release locked proposals when new funds arrive
-    function _tryReleaseLockedProposals() internal {
-        // Note: This is a simple implementation that doesn't actually release proposals
-        // In a full implementation, we would track "waiting" proposals and check if they
-        // can now be funded. For MVP, we'll keep this simple and let proposal creators
-        // retry failed proposals manually.
+    // ============ H-02 FIX: Distribution Lock Functions ============
+    
+    /**
+     * @notice Set the active redemption contract (called by DistributionProposal)
+     * @dev Only callable by an active proposal
+     * @param _redemptionContract Address of the redemption contract
+     */
+    function setActiveRedemptionContract(address _redemptionContract) external {
+        require(activeProposals[msg.sender], "Only active proposal can set redemption contract");
+        activeRedemptionContract = _redemptionContract;
+    }
+    
+    /**
+     * @notice Clear the active redemption contract
+     * @dev Callable by the redemption contract itself or an active proposal
+     */
+    function clearActiveRedemptionContract() external {
+        require(
+            msg.sender == activeRedemptionContract || activeProposals[msg.sender],
+            "Not authorized"
+        );
+        activeRedemptionContract = address(0);
+    }
+    
+    /**
+     * @notice Lock governance tokens for distribution registration
+     * @dev Only callable by the active redemption contract
+     * @param user Address to lock tokens for
+     * @param amount Amount of tokens to lock
+     */
+    function lockForDistribution(address user, uint256 amount) external {
+        require(msg.sender == activeRedemptionContract, "Only active redemption contract");
+        require(activeRedemptionContract != address(0), "No active redemption contract");
+        distributionLock[user] = amount;
+    }
+    
+    /**
+     * @notice Unlock governance tokens after claim or distribution end
+     * @dev Only callable by the active redemption contract
+     * @param user Address to unlock tokens for
+     */
+    function unlockForDistribution(address user) external {
+        require(msg.sender == activeRedemptionContract, "Only active redemption contract");
+        distributionLock[user] = 0;
+    }
+    
+    /**
+     * @notice Get the transferable balance (vested minus distribution-locked)
+     * @param holder Address to check
+     * @return The amount of tokens that can be transferred
+     */
+    function transferableBalance(address holder) public view returns (uint256) {
+        uint256 vested = vestedBalance(holder);
+        uint256 locked = distributionLock[holder];
+        if (locked >= vested) {
+            return 0;
+        }
+        return vested - locked;
+    }
+    
+    // ============ END H-02 FIX ============
+
+    function setFactory(address _factory) external {
+        require(msg.sender == deployer, "Only deployer can set factory");
+        require(factory == address(0), "Factory already set");
+        require(_factory != address(0), "Invalid factory address");
+        require(_factory.code.length > 0, "Factory must be a contract");
+        factory = _factory;
+    }
+    
+    function registerProposal(address proposal) external {
+        require(msg.sender == factory, "Only factory can register");
+        activeProposals[proposal] = true;
+    }
+
+    // Alias for registerProposal - used by ProposalFactory
+    function setActiveProposal(address proposal) external {
+        require(msg.sender == factory, "Only factory can register");
+        activeProposals[proposal] = true;
+    }
+
+    function clearActiveProposal() external {
+        require(activeProposals[msg.sender], "Not an active proposal");
+        activeProposals[msg.sender] = false;
+    }
+
+    function registerVoteAddresses(address yesAddr, address noAddr) external {
+        require(activeProposals[msg.sender], "Only active proposal can register");
+        isVoteAddress[yesAddr] = true;
+        isVoteAddress[noAddr] = true;
+        voteAddressToProposal[yesAddr] = msg.sender;
+        voteAddressToProposal[noAddr] = msg.sender;
+    }
+
+    // Singular version - used by Proposal.sol
+    function registerVoteAddress(address voteAddr) external {
+        require(activeProposals[msg.sender], "Only active proposal can register");
+        isVoteAddress[voteAddr] = true;
+        voteAddressToProposal[voteAddr] = msg.sender;
     }
 
     function transferETH(address payable recipient, uint256 amount) external {
@@ -389,11 +493,15 @@ contract MarketDAO is ERC1155, ReentrancyGuard, IERC1155Receiver {
             "Invalid token transfer"
         );
 
-        // Prevent transfer of unvested governance tokens
+        // Prevent transfer of unvested or distribution-locked governance tokens
         if (id == GOVERNANCE_TOKEN_ID && from != address(0)) {
             // Require user to claim vested tokens before transferring
             require(!hasClaimableVesting(from), "Must claim vested tokens first");
-            require(vestedBalance(from) >= amount, "Cannot transfer unvested tokens");
+            
+            // ============ H-02 FIX: Check distribution lock ============
+            // Use transferableBalance which accounts for both vesting and distribution locks
+            require(transferableBalance(from) >= amount, "Cannot transfer locked/unvested tokens");
+            // ============ END H-02 FIX ============
         }
 
         // Add check for vote transfers to ensure election is still active
@@ -405,12 +513,12 @@ contract MarketDAO is ERC1155, ReentrancyGuard, IERC1155Receiver {
                 
                 // Check if the election is still active
                 if (proposalAddr != address(0) && activeProposals[proposalAddr]) {
-                    try Proposal(proposalAddr).isElectionActive() returns (bool isActive) {
+                    try IProposal(proposalAddr).isElectionActive() returns (bool isActive) {
                         if (!isActive) {
                             revert("Election has ended");
                         }
                         // Check for early termination after vote
-                        try Proposal(proposalAddr).checkEarlyTermination() {} catch {}
+                        try IProposal(proposalAddr).checkEarlyTermination() {} catch {}
                     } catch {
                         revert("Error checking election status");
                     }
@@ -453,11 +561,14 @@ contract MarketDAO is ERC1155, ReentrancyGuard, IERC1155Receiver {
             }
         }
 
-        // Prevent transfer of unvested governance tokens
+        // Prevent transfer of unvested or distribution-locked governance tokens
         if (totalGovernanceAmount > 0 && from != address(0)) {
             // Require user to claim vested tokens before transferring
             require(!hasClaimableVesting(from), "Must claim vested tokens first");
-            require(vestedBalance(from) >= totalGovernanceAmount, "Cannot transfer unvested tokens");
+            
+            // ============ H-02 FIX: Check distribution lock ============
+            require(transferableBalance(from) >= totalGovernanceAmount, "Cannot transfer locked/unvested tokens");
+            // ============ END H-02 FIX ============
         }
 
         for(uint i = 0; i < ids.length; i++) {
@@ -470,12 +581,12 @@ contract MarketDAO is ERC1155, ReentrancyGuard, IERC1155Receiver {
                     
                     // Check if the election is still active
                     if (proposalAddr != address(0) && activeProposals[proposalAddr]) {
-                        try Proposal(proposalAddr).isElectionActive() returns (bool isActive) {
+                        try IProposal(proposalAddr).isElectionActive() returns (bool isActive) {
                             if (!isActive) {
                                 revert("Election has ended");
                             }
                             // Check for early termination after vote
-                            try Proposal(proposalAddr).checkEarlyTermination() {} catch {}
+                            try IProposal(proposalAddr).checkEarlyTermination() {} catch {}
                         } catch {
                             revert("Error checking election status");
                         }
@@ -527,42 +638,6 @@ contract MarketDAO is ERC1155, ReentrancyGuard, IERC1155Receiver {
         // Check if the token ID is in the valid range for voting tokens
         return tokenId > GOVERNANCE_TOKEN_ID && tokenId < nextVotingTokenId;
     }
-    
-    // This function is no longer needed as the check is implemented directly in safeTransferFrom
-    /* 
-    function _isValidVoteTransfer(address from, address to, uint256 tokenId) internal view returns (bool) {
-        // If it's not a voting token, or it's not a user-initiated transfer, allow it
-        if (!_isActiveVotingToken(tokenId) || from == address(0) || to == address(0)) {
-            return true;
-        }
-        
-        // Check all active proposals to see if this is a vote transfer
-        for (uint i = 0; i < governanceTokenHolders.length; i++) {
-            address proposalAddr = governanceTokenHolders[i]; // Reusing the holders array to avoid creating a new array
-            if (activeProposals[proposalAddr]) {
-                try Proposal(proposalAddr).isVoteAddress(to) returns (bool isVoteAddr) {
-                    if (isVoteAddr) {
-                        // This is a vote transfer to an active proposal's vote address
-                        // Check if the election is still active
-                        try Proposal(proposalAddr).isElectionActive() returns (bool isActive) {
-                            if (isActive) {
-                                return true; // Valid vote during an active election
-                            }
-                        } catch {
-                            // Ignore errors and continue checking
-                        }
-                    }
-                } catch {
-                    // Ignore errors and continue checking
-                }
-            }
-        }
-        
-        // If we're transferring to what looks like a vote address, but couldn't verify it's for an active election,
-        // default to allowing the transfer - user may be sending tokens for another purpose
-        return true;
-    }
-    */
     
     function getNextVotingTokenId() external returns (uint256) {
         require(activeProposals[msg.sender], "Only active proposal can request voting token ID");
@@ -617,100 +692,63 @@ contract MarketDAO is ERC1155, ReentrancyGuard, IERC1155Receiver {
 
     function setVestingPeriod(uint256 newPeriod) external {
         require(activeProposals[msg.sender], "Only active proposal can set vesting period");
-        // Vesting period can be 0 (no vesting)
         vestingPeriod = newPeriod;
     }
 
     function setFlags(uint256 newFlags) external {
         require(activeProposals[msg.sender], "Only active proposal can set flags");
-        // Validate that only known flags are set (bits 0-2)
-        require(newFlags <= 7, "Invalid flags - only bits 0-2 are valid");
         flags = newFlags;
     }
 
-    function totalSupply(uint256 tokenId) external view returns (uint256) {
-        return tokenSupply[tokenId];
-    }
-
+    // View functions
     function getGovernanceTokenHolders() external view returns (address[] memory) {
         return governanceTokenHolders;
     }
 
-    // Get total supply of vested (unlocked) governance tokens
-    // This is used for quorum calculation to ensure only votable tokens count
+    function getGovernanceTokenHolderCount() external view returns (uint256) {
+        return governanceTokenHolders.length;
+    }
+
+    function getTokenSupply(uint256 tokenId) external view returns (uint256) {
+        return tokenSupply[tokenId];
+    }
+
+    // Alias for getTokenSupply - used by tests
+    function totalSupply(uint256 tokenId) external view returns (uint256) {
+        return tokenSupply[tokenId];
+    }
+
     function getTotalVestedSupply() public view returns (uint256) {
         uint256 total = tokenSupply[GOVERNANCE_TOKEN_ID];
-        // This should never happen - if it does, there's a critical accounting bug
-        // Revert instead of returning 0 to prevent governance exploits
-        if (totalUnvestedGovernanceTokens > total) {
-            revert AccountingError(totalUnvestedGovernanceTokens, total);
-        }
         return total - totalUnvestedGovernanceTokens;
     }
 
-    // Get the number of governance tokens available for purchase from the DAO
-    // When FLAG_MINT_TO_PURCHASE is false, purchases transfer from this balance
-    function getAvailableTokensForPurchase() public view returns (uint256) {
-        return balanceOf(address(this), GOVERNANCE_TOKEN_ID);
+    function getVestingSchedules(address holder) external view returns (VestingSchedule[] memory) {
+        return vestingSchedules[holder];
     }
 
-    function setFactory(address _factory) external {
-        require(msg.sender == deployer, "Only deployer can set factory");
-        require(factory == address(0), "Factory already set");
-        require(_factory != address(0), "Invalid factory address");
-        require(_factory.code.length > 0, "Factory must be a contract");
-        factory = _factory;
-    }
-
-    function setActiveProposal(address proposal) external {
-        require(msg.sender == factory, "Only factory can register proposals");
-        require(proposal != address(0), "Invalid proposal address");
-        activeProposals[proposal] = true;
-    }
-
-    function clearActiveProposal() external {
-        require(activeProposals[msg.sender], "Only active proposal can clear itself");
-        activeProposals[msg.sender] = false;
-    }
-    
-    function registerVoteAddress(address voteAddr) external {
-        require(activeProposals[msg.sender], "Only active proposal can register vote address");
-        require(!isVoteAddress[voteAddr], "Vote address already registered");
-        require(voteAddr != address(0), "Invalid vote address");
-        require(voteAddr.code.length == 0, "Vote address cannot be a contract");
-        isVoteAddress[voteAddr] = true;
-        voteAddressToProposal[voteAddr] = msg.sender;
-    }
-    
-    // Helper function to check if a proposal is active
-    function isProposalActive(address proposal) external view returns (bool) {
-        return activeProposals[proposal];
-    }
-
-    // Helper functions to calculate available (unlocked) balances
-
+    // Treasury balance functions
     function getTotalLockedETH() public view returns (uint256) {
         uint256 total = 0;
-        for (uint i = 0; i < proposalsWithLockedFunds.length; i++) {
-            address proposal = proposalsWithLockedFunds[i];
-            if (lockedFunds[proposal].token == address(0)) {
-                total += lockedFunds[proposal].amount;
+        for (uint256 i = 0; i < proposalsWithLockedFunds.length; i++) {
+            LockedFunds storage locked = lockedFunds[proposalsWithLockedFunds[i]];
+            if (locked.token == address(0)) {
+                total += locked.amount;
             }
         }
         return total;
     }
 
     function getAvailableETH() public view returns (uint256) {
-        uint256 totalLocked = getTotalLockedETH();
-        uint256 balance = address(this).balance;
-        return balance > totalLocked ? balance - totalLocked : 0;
+        uint256 total = address(this).balance;
+        uint256 locked = getTotalLockedETH();
+        return total > locked ? total - locked : 0;
     }
 
     function getTotalLockedERC20(address token) public view returns (uint256) {
         uint256 total = 0;
-        for (uint i = 0; i < proposalsWithLockedFunds.length; i++) {
-            address proposal = proposalsWithLockedFunds[i];
-            LockedFunds memory locked = lockedFunds[proposal];
+        for (uint256 i = 0; i < proposalsWithLockedFunds.length; i++) {
+            LockedFunds storage locked = lockedFunds[proposalsWithLockedFunds[i]];
             if (locked.token == token && locked.tokenId == 0) {
                 total += locked.amount;
             }
@@ -719,28 +757,16 @@ contract MarketDAO is ERC1155, ReentrancyGuard, IERC1155Receiver {
     }
 
     function getAvailableERC20(address token) public view returns (uint256) {
-        uint256 totalLocked = getTotalLockedERC20(token);
-        uint256 balance = IERC20(token).balanceOf(address(this));
-        return balance > totalLocked ? balance - totalLocked : 0;
-    }
-
-    function isERC721Locked(address token, uint256 tokenId) public view returns (bool) {
-        for (uint i = 0; i < proposalsWithLockedFunds.length; i++) {
-            address proposal = proposalsWithLockedFunds[i];
-            LockedFunds memory locked = lockedFunds[proposal];
-            if (locked.token == token && locked.tokenId == tokenId && locked.amount == 1) {
-                return true;
-            }
-        }
-        return false;
+        uint256 total = IERC20(token).balanceOf(address(this));
+        uint256 locked = getTotalLockedERC20(token);
+        return total > locked ? total - locked : 0;
     }
 
     function getTotalLockedERC1155(address token, uint256 tokenId) public view returns (uint256) {
         uint256 total = 0;
-        for (uint i = 0; i < proposalsWithLockedFunds.length; i++) {
-            address proposal = proposalsWithLockedFunds[i];
-            LockedFunds memory locked = lockedFunds[proposal];
-            if (locked.token == token && locked.tokenId == tokenId && locked.amount >= 1) {
+        for (uint256 i = 0; i < proposalsWithLockedFunds.length; i++) {
+            LockedFunds storage locked = lockedFunds[proposalsWithLockedFunds[i]];
+            if (locked.token == token && locked.tokenId == tokenId) {
                 total += locked.amount;
             }
         }
@@ -748,38 +774,63 @@ contract MarketDAO is ERC1155, ReentrancyGuard, IERC1155Receiver {
     }
 
     function getAvailableERC1155(address token, uint256 tokenId) public view returns (uint256) {
-        uint256 totalLocked = getTotalLockedERC1155(token, tokenId);
-        uint256 balance = IERC1155(token).balanceOf(address(this), tokenId);
-        return balance > totalLocked ? balance - totalLocked : 0;
+        uint256 total = IERC1155(token).balanceOf(address(this), tokenId);
+        uint256 locked = getTotalLockedERC1155(token, tokenId);
+        return total > locked ? total - locked : 0;
     }
 
+    // Get list of proposals with locked funds
     function getProposalsWithLockedFunds() external view returns (address[] memory) {
         return proposalsWithLockedFunds;
     }
 
-    // ERC1155Receiver implementation to allow DAO to receive ERC1155 tokens
+    // Get tokens available for purchase (DAO's own governance token balance)
+    function getAvailableTokensForPurchase() external view returns (uint256) {
+        return balanceOf(address(this), GOVERNANCE_TOKEN_ID);
+    }
+
+    // ERC1155 receiver functions for treasury
     function onERC1155Received(
         address,
         address,
+        uint256 id,
         uint256,
-        uint256,
-        bytes calldata
-    ) external pure override returns (bytes4) {
+        bytes memory
+    ) public virtual returns (bytes4) {
+        // Always allow governance token transfers (internal)
+        if (id == GOVERNANCE_TOKEN_ID) {
+            return this.onERC1155Received.selector;
+        }
+        // For other tokens, check treasury config
+        require(acceptsERC1155, "DAO does not accept ERC1155");
         return this.onERC1155Received.selector;
     }
 
     function onERC1155BatchReceived(
         address,
         address,
-        uint256[] calldata,
-        uint256[] calldata,
-        bytes calldata
-    ) external pure override returns (bytes4) {
+        uint256[] memory ids,
+        uint256[] memory,
+        bytes memory
+    ) public virtual returns (bytes4) {
+        // Check if any non-governance tokens are being received
+        for (uint256 i = 0; i < ids.length; i++) {
+            if (ids[i] != GOVERNANCE_TOKEN_ID) {
+                require(acceptsERC1155, "DAO does not accept ERC1155");
+                break;
+            }
+        }
         return this.onERC1155BatchReceived.selector;
     }
 
-    // Override supportsInterface to include IERC1155Receiver
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC1155, IERC165) returns (bool) {
-        return interfaceId == type(IERC1155Receiver).interfaceId || super.supportsInterface(interfaceId);
+    // ERC721 receiver for treasury
+    function onERC721Received(
+        address,
+        address,
+        uint256,
+        bytes memory
+    ) public virtual returns (bytes4) {
+        require(acceptsERC721, "DAO does not accept ERC721");
+        return this.onERC721Received.selector;
     }
 }

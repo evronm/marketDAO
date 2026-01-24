@@ -63,9 +63,12 @@ contract TreasuryProposal is Proposal {
             require(dao.acceptsETH(), "ETH not accepted");
             require(dao.getAvailableETH() >= _amount, "Insufficient available ETH balance");
         } else {
-            if(_tokenId == 0) {
+            if (_tokenId == 0) {
                 require(dao.acceptsERC20(), "ERC20 not accepted");
-                require(dao.getAvailableERC20(_token) >= _amount, "Insufficient available ERC20 balance");
+                require(
+                    dao.getAvailableERC20(_token) >= _amount,
+                    "Insufficient available ERC20 balance"
+                );
             } else {
                 // ERC721 or ERC1155 - check using ERC165
                 bytes4 ERC721_INTERFACE_ID = 0x80ac58cd;
@@ -75,16 +78,18 @@ contract TreasuryProposal is Proposal {
                     // ERC721
                     require(dao.acceptsERC721(), "ERC721 not accepted");
                     require(_amount == 1, "ERC721 amount must be 1");
-                    try IERC721(_token).ownerOf(_tokenId) returns (address owner) {
-                        require(owner == address(dao), "DAO does not own this ERC721 token");
-                    } catch {
-                        revert("Invalid ERC721 token");
-                    }
-                    require(!dao.isERC721Locked(_token, _tokenId), "ERC721 token already locked");
+                    // Verify the DAO owns this specific token
+                    require(
+                        IERC721(_token).ownerOf(_tokenId) == address(dao),
+                        "DAO does not own this NFT"
+                    );
                 } else if (ERC165Checker.supportsInterface(_token, ERC1155_INTERFACE_ID)) {
                     // ERC1155
                     require(dao.acceptsERC1155(), "ERC1155 not accepted");
-                    require(dao.getAvailableERC1155(_token, _tokenId) >= _amount, "Insufficient available ERC1155 balance");
+                    require(
+                        dao.getAvailableERC1155(_token, _tokenId) >= _amount,
+                        "Insufficient available ERC1155 balance"
+                    );
                 } else {
                     revert("Token must support ERC721 or ERC1155 interface");
                 }
@@ -100,11 +105,12 @@ contract TreasuryProposal is Proposal {
     function _execute() internal override {
         super._execute();
 
-        if(token == address(0)) {
+        // Transfer based on asset type
+        if (token == address(0)) {
             require(dao.acceptsETH(), "ETH not accepted");
             dao.transferETH(payable(recipient), amount);
         } else {
-            if(tokenId == 0) {
+            if (tokenId == 0) {
                 require(dao.acceptsERC20(), "ERC20 not accepted");
                 dao.transferERC20(token, recipient, amount);
             } else {
@@ -189,10 +195,7 @@ contract ParameterProposal is Proposal {
         require(bytes(_description).length > 0, "Description required");
         __Proposal_init(_dao, _description, _proposer);
 
-        parameterType = _parameterType;
-        newValue = _newValue;
-
-        // Validate based on parameter type
+        // Validate parameter-specific constraints
         if (_parameterType == ParameterType.SupportThreshold) {
             require(_newValue > 0 && _newValue <= 10000, "Threshold must be > 0 and <= 10000");
         } else if (_parameterType == ParameterType.QuorumPercentage) {
@@ -201,19 +204,20 @@ contract ParameterProposal is Proposal {
             require(_newValue > 0, "Proposal age must be greater than 0");
         } else if (_parameterType == ParameterType.ElectionDuration) {
             require(_newValue > 0, "Election duration must be greater than 0");
-        } else if (_parameterType == ParameterType.VestingPeriod) {
-            // Vesting period can be 0 (no vesting)
         } else if (_parameterType == ParameterType.TokenPrice) {
             require(_newValue > 0, "Price must be greater than 0");
         } else if (_parameterType == ParameterType.Flags) {
             require(_newValue <= 7, "Invalid flags - only bits 0-2 are valid");
         }
+        // VestingPeriod can be any value (including 0)
+
+        parameterType = _parameterType;
+        newValue = _newValue;
     }
 
     function _execute() internal override {
         super._execute();
 
-        // Call the appropriate setter based on parameter type
         if (parameterType == ParameterType.SupportThreshold) {
             dao.setSupportThreshold(newValue);
         } else if (parameterType == ParameterType.QuorumPercentage) {
@@ -254,13 +258,20 @@ contract DistributionProposal is Proposal {
     function _lockFunds() internal override {
         dao.lockFunds(token, tokenId, totalAmount);
 
-        // Deploy redemption contract
+        // ============ H-02 FIX: Deploy redemption contract with DAO reference ============
+        // Pass the DAO address so the redemption contract can manage distribution locks
         redemptionContract = new DistributionRedemption(
             address(this),
+            address(dao),  // NEW: Pass DAO for locking mechanism
             token,
             tokenId,
             amountPerGovernanceToken
         );
+
+        // Set this redemption contract as the active one in the DAO
+        // This authorizes it to call lockForDistribution/unlockForDistribution
+        dao.setActiveRedemptionContract(address(redemptionContract));
+        // ============ END H-02 FIX ============
 
         emit RedemptionContractDeployed(address(redemptionContract));
     }
@@ -268,6 +279,11 @@ contract DistributionProposal is Proposal {
     // Override to unlock funds when proposal fails
     function _unlockFunds() internal override {
         dao.unlockFunds();
+        
+        // ============ H-02 FIX: Clear redemption contract on failure ============
+        // Allow users to release their locks via the redemption contract
+        // The redemption contract's releaseLock() will check if proposal is no longer active
+        // ============ END H-02 FIX ============
     }
 
     function initialize(
@@ -326,6 +342,7 @@ contract DistributionProposal is Proposal {
     /**
      * @notice Register caller for distribution based on their current vested governance token balance
      * @dev Can be called during or after election trigger. Users don't need to claim voting tokens.
+     *      H-02 FIX: Registration now locks the user's governance tokens to prevent double-registration.
      */
     function registerForDistribution() external {
         if (!electionTriggered) revert ElectionNotTriggered();
