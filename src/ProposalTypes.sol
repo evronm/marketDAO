@@ -343,6 +343,8 @@ contract DistributionProposal is Proposal {
      * @notice Register caller for distribution based on their current vested governance token balance
      * @dev Can be called during or after election trigger. Users don't need to claim voting tokens.
      *      H-02 FIX: Registration now locks the user's governance tokens to prevent double-registration.
+     *      M-01 NOTE: The amountPerGovernanceToken is a TARGET. Actual payout is pro-rata based on
+     *                 total registered shares vs actual pool balance.
      */
     function registerForDistribution() external {
         if (!electionTriggered) revert ElectionNotTriggered();
@@ -361,10 +363,15 @@ contract DistributionProposal is Proposal {
         if (token == address(0)) {
             require(dao.acceptsETH(), "ETH not accepted");
             dao.transferETH(payable(address(redemptionContract)), totalAmount);
+            // Note: ETH funding is recorded automatically in receive()
         } else {
             if (tokenId == 0) {
                 require(dao.acceptsERC20(), "ERC20 not accepted");
                 dao.transferERC20(token, address(redemptionContract), totalAmount);
+                
+                // ============ M-01 FIX: Record token funding for pro-rata calculation ============
+                redemptionContract.recordTokenFunding();
+                // ============ END M-01 FIX ============
             } else {
                 // ERC1155 (ERC721 already rejected in initialize)
                 bytes4 ERC1155_INTERFACE_ID = 0xd9b67a26;
@@ -374,6 +381,10 @@ contract DistributionProposal is Proposal {
                 );
                 require(dao.acceptsERC1155(), "ERC1155 not accepted");
                 dao.transferERC1155(token, address(redemptionContract), tokenId, totalAmount);
+                
+                // ============ M-01 FIX: Record token funding for pro-rata calculation ============
+                redemptionContract.recordTokenFunding();
+                // ============ END M-01 FIX ============
             }
         }
 

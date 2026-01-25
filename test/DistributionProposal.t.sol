@@ -244,21 +244,28 @@ contract DistributionProposalTest is TestHelper {
         proposal.registerForDistribution();
     }
 
+    // ============ M-01 FIX: Updated for Pro-Rata Distribution ============
+    // With pro-rata, when not all users register, each registrant gets MORE
+    // than the target amountPerGovernanceToken because the pool is fixed but
+    // divided among fewer shares.
+
     function testFullETHDistributionFlow() public {
         // Create proposal for 0.4 ETH per token
+        // Pool = 200 * 0.4 = 80 ETH
         vm.prank(proposer);
         DistributionProposal proposal = factory.createDistributionProposal(
             "Distribute 0.4 ETH per token",
             address(0),
             0,
-            0.4 ether // 200 * 0.4 = 80 ETH total
+            0.4 ether
         );
 
         // Trigger election
         vm.prank(proposer);
         proposal.addSupport(60);
 
-        // Register users for distribution
+        // Register users for distribution (only 3 of 4 register)
+        // proposer: 100, voter1: 50, voter2: 30 = 180 total registered
         vm.prank(proposer);
         proposal.registerForDistribution();
 
@@ -300,41 +307,51 @@ contract DistributionProposalTest is TestHelper {
         DistributionRedemption redemption = proposal.redemptionContract();
         assertEq(address(redemption).balance, 80 ether);
 
-        // Users claim their distributions
+        // M-01 FIX: Pro-rata calculation
+        // Pool = 80 ETH, registered = 180 tokens
+        // proposer: 100/180 * 80 = 44.444... ETH
+        // voter1: 50/180 * 80 = 22.222... ETH  
+        // voter2: 30/180 * 80 = 13.333... ETH
+        uint256 expectedProposer = (uint256(100) * 80 ether) / 180;
+        uint256 expectedVoter1 = (uint256(50) * 80 ether) / 180;
+        uint256 expectedVoter2 = (uint256(30) * 80 ether) / 180;
+
         uint256 proposerBalanceBefore = proposer.balance;
         vm.prank(proposer);
         redemption.claim();
-        assertEq(proposer.balance, proposerBalanceBefore + 40 ether); // 100 tokens * 0.4 ETH
+        assertEq(proposer.balance, proposerBalanceBefore + expectedProposer);
         assertTrue(redemption.hasClaimed(proposer));
 
         uint256 voter1BalanceBefore = voter1.balance;
         vm.prank(voter1);
         redemption.claim();
-        assertEq(voter1.balance, voter1BalanceBefore + 20 ether); // 50 tokens * 0.4 ETH
+        assertEq(voter1.balance, voter1BalanceBefore + expectedVoter1);
         assertTrue(redemption.hasClaimed(voter1));
 
         uint256 voter2BalanceBefore = voter2.balance;
         vm.prank(voter2);
         redemption.claim();
-        assertEq(voter2.balance, voter2BalanceBefore + 12 ether); // 30 tokens * 0.4 ETH
+        assertEq(voter2.balance, voter2BalanceBefore + expectedVoter2);
         assertTrue(redemption.hasClaimed(voter2));
     }
 
     function testFullERC20DistributionFlow() public {
         // Create proposal for 25 ERC20 per token
+        // Pool = 200 * 25 = 5000 ERC20
         vm.prank(proposer);
         DistributionProposal proposal = factory.createDistributionProposal(
             "Distribute 25 ERC20 per token",
             address(mockToken),
             0,
-            25 ether // 200 * 25 = 5000 tokens total
+            25 ether
         );
 
         // Trigger election
         vm.prank(proposer);
         proposal.addSupport(60);
 
-        // Register users
+        // Register users (only 2 of 4 register)
+        // proposer: 100, voter1: 50 = 150 total registered
         vm.prank(proposer);
         proposal.registerForDistribution();
 
@@ -369,18 +386,25 @@ contract DistributionProposalTest is TestHelper {
         DistributionRedemption redemption = proposal.redemptionContract();
         assertEq(mockToken.balanceOf(address(redemption)), 5000 ether);
 
-        // Claim
+        // M-01 FIX: Pro-rata calculation
+        // Pool = 5000 ERC20, registered = 150 tokens
+        // proposer: 100/150 * 5000 = 3333.333... ERC20
+        // voter1: 50/150 * 5000 = 1666.666... ERC20
+        uint256 expectedProposer = (uint256(100) * 5000 ether) / 150;
+        uint256 expectedVoter1 = (uint256(50) * 5000 ether) / 150;
+
         uint256 proposerBalanceBefore = mockToken.balanceOf(proposer);
         vm.prank(proposer);
         redemption.claim();
-        assertEq(mockToken.balanceOf(proposer), proposerBalanceBefore + 2500 ether); // 100 * 25
+        assertEq(mockToken.balanceOf(proposer), proposerBalanceBefore + expectedProposer);
 
         uint256 voter1BalanceBefore = mockToken.balanceOf(voter1);
         vm.prank(voter1);
         redemption.claim();
-        assertEq(mockToken.balanceOf(voter1), voter1BalanceBefore + 1250 ether); // 50 * 25
+        assertEq(mockToken.balanceOf(voter1), voter1BalanceBefore + expectedVoter1);
     }
 
+    // M-01 FIX: Updated error expectation
     function testCannotClaimBeforeExecution() public {
         vm.prank(proposer);
         DistributionProposal proposal = factory.createDistributionProposal(
@@ -398,10 +422,10 @@ contract DistributionProposalTest is TestHelper {
         vm.prank(voter1);
         proposal.registerForDistribution();
 
-        // Try to claim before execution
+        // Try to claim before execution - now returns PoolNotFunded (M-01 fix)
         DistributionRedemption redemption = proposal.redemptionContract();
         vm.prank(voter1);
-        vm.expectRevert(DistributionRedemption.InsufficientBalance.selector);
+        vm.expectRevert(DistributionRedemption.PoolNotFunded.selector);
         redemption.claim();
     }
 
@@ -505,6 +529,7 @@ contract DistributionProposalTest is TestHelper {
         redemption.claim();
     }
 
+    // M-01 FIX: Updated for pro-rata
     function testGetClaimableAmount() public {
         vm.prank(proposer);
         DistributionProposal proposal = factory.createDistributionProposal(
@@ -518,12 +543,13 @@ contract DistributionProposalTest is TestHelper {
         vm.prank(proposer);
         proposal.addSupport(60);
 
+        // Only voter1 registers (50 tokens)
         vm.prank(voter1);
         proposal.registerForDistribution();
 
         DistributionRedemption redemption = proposal.redemptionContract();
 
-        // Before execution: can calculate claimable amount
+        // Before execution: shows TARGET amount (not funded yet)
         assertEq(redemption.getClaimableAmount(voter1), 15 ether); // 50 * 0.3
 
         // Execute proposal
@@ -550,8 +576,11 @@ contract DistributionProposalTest is TestHelper {
         vm.prank(proposer);
         proposal.execute();
 
-        // After execution, before claim: still shows claimable
-        assertEq(redemption.getClaimableAmount(voter1), 15 ether);
+        // M-01 FIX: After execution, shows PRO-RATA amount
+        // Pool = 60 ETH (200 * 0.3), only 50 tokens registered
+        // voter1: 50/50 * 60 = 60 ETH (entire pool!)
+        uint256 expectedClaimable = (uint256(50) * 60 ether) / 50;
+        assertEq(redemption.getClaimableAmount(voter1), expectedClaimable);
 
         // After claim: shows zero
         vm.prank(voter1);

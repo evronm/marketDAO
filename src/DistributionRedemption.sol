@@ -24,8 +24,12 @@ interface IDistributionProposal {
  * @notice Holds distributed treasury funds and allows eligible users to claim their share
  * @dev Deployed by DistributionProposal on election trigger, receives funds on execution
  * 
- * H-02 FIX: Now locks governance tokens in MarketDAO when users register, preventing
- * the same tokens from being used to register multiple addresses for the same distribution.
+ * Security Fixes:
+ * - H-02 FIX: Locks governance tokens in MarketDAO when users register, preventing
+ *   the same tokens from being used to register multiple addresses for the same distribution.
+ * - M-01 FIX: Uses pro-rata distribution to ensure all registered users can claim.
+ *   Each user receives: (userShares / totalRegisteredShares) * actualPoolBalance
+ *   This means amountPerGovernanceToken is a TARGET, not a guarantee.
  */
 contract DistributionRedemption is ERC1155Holder, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -37,17 +41,23 @@ contract DistributionRedemption is ERC1155Holder, ReentrancyGuard {
     // Asset configuration
     address public immutable token;        // address(0) for ETH
     uint256 public immutable tokenId;      // 0 for ERC20/ETH
-    uint256 public immutable amountPerGovernanceToken;
+    uint256 public immutable amountPerGovernanceToken;  // Target amount (may differ from actual)
 
     // Claimant tracking
     mapping(address => uint256) public registeredBalance;  // Governance token balance at registration
     mapping(address => bool) public hasClaimed;
     uint256 public totalRegisteredGovernanceTokens;
 
+    // ============ M-01 FIX: Track actual pool balance for pro-rata ============
+    uint256 public totalPoolBalance;       // Actual funds received for distribution
+    bool public poolFunded;                // True once funds have been received
+    // ============ END M-01 FIX ============
+
     // Events
     event ClaimantRegistered(address indexed user, uint256 governanceTokenBalance);
     event FundsClaimed(address indexed user, uint256 amount);
     event LockReleased(address indexed user);
+    event PoolFunded(uint256 amount);  // M-01 FIX: New event
 
     // Errors
     error OnlyProposal();
@@ -58,6 +68,7 @@ contract DistributionRedemption is ERC1155Holder, ReentrancyGuard {
     error InsufficientBalance();
     error TransferFailed();
     error DistributionStillActive();
+    error PoolNotFunded();  // M-01 FIX: New error
 
     /**
      * @notice Initialize redemption contract
@@ -65,7 +76,8 @@ contract DistributionRedemption is ERC1155Holder, ReentrancyGuard {
      * @param _dao The MarketDAO contract (for locking governance tokens)
      * @param _token Token address (address(0) for ETH)
      * @param _tokenId Token ID (0 for ERC20/ETH)
-     * @param _amountPerToken Amount each governance token holder receives per token
+     * @param _amountPerToken Target amount each governance token holder receives per token
+     *        NOTE (M-01 FIX): This is now a TARGET, not a guarantee. Actual payout is pro-rata.
      */
     constructor(
         address _proposal,
@@ -107,15 +119,27 @@ contract DistributionRedemption is ERC1155Holder, ReentrancyGuard {
     /**
      * @notice Claim distributed funds based on registered governance token balance
      * @dev Can only claim once, must be registered first. Unlocks governance tokens.
+     *      M-01 FIX: Payout is calculated pro-rata based on actual pool balance.
      */
     function claim() external nonReentrant {
         if (registeredBalance[msg.sender] == 0) revert NotRegistered();
         if (hasClaimed[msg.sender]) revert AlreadyClaimed();
+        
+        // ============ M-01 FIX: Require pool to be funded ============
+        if (!poolFunded) revert PoolNotFunded();
+        // ============ END M-01 FIX ============
 
-        uint256 claimAmount = registeredBalance[msg.sender] * amountPerGovernanceToken;
+        // ============ M-01 FIX: Calculate pro-rata claim amount ============
+        // Instead of: claimAmount = registeredBalance[msg.sender] * amountPerGovernanceToken
+        // We use:     claimAmount = (userShares / totalShares) * actualPoolBalance
+        // This ensures the pool can never be over-claimed regardless of registration timing
+        uint256 userShares = registeredBalance[msg.sender];
+        uint256 claimAmount = (userShares * totalPoolBalance) / totalRegisteredGovernanceTokens;
+        // ============ END M-01 FIX ============
+        
         if (claimAmount == 0) revert NothingToClaim();
 
-        // Check contract has sufficient balance
+        // Check contract has sufficient balance (should always pass with pro-rata)
         uint256 contractBalance;
         if (token == address(0)) {
             contractBalance = address(this).balance;
@@ -178,14 +202,26 @@ contract DistributionRedemption is ERC1155Holder, ReentrancyGuard {
 
     /**
      * @notice Get the claimable amount for a user
+     * @dev M-01 FIX: Returns pro-rata amount based on actual pool balance
      * @param user Address to check
-     * @return The amount the user can claim
+     * @return The amount the user can claim (0 if pool not funded yet or already claimed)
      */
     function getClaimableAmount(address user) external view returns (uint256) {
         if (hasClaimed[user] || registeredBalance[user] == 0) {
             return 0;
         }
-        return registeredBalance[user] * amountPerGovernanceToken;
+        
+        // ============ M-01 FIX: Return pro-rata amount ============
+        // Before pool is funded, return the target amount (for UI display)
+        // After pool is funded, return the actual pro-rata amount
+        if (!poolFunded || totalRegisteredGovernanceTokens == 0) {
+            // Pool not funded yet - return target amount
+            return registeredBalance[user] * amountPerGovernanceToken;
+        }
+        
+        // Pool funded - return actual pro-rata amount
+        return (registeredBalance[user] * totalPoolBalance) / totalRegisteredGovernanceTokens;
+        // ============ END M-01 FIX ============
     }
 
     /**
@@ -206,8 +242,59 @@ contract DistributionRedemption is ERC1155Holder, ReentrancyGuard {
                !dao.activeProposals(proposal);
     }
 
+    // ============ M-01 FIX: Functions to record pool funding ============
+    
     /**
-     * @notice Receive ETH
+     * @notice Record that ETH funds have been received
+     * @dev Called automatically via receive() or can be called manually to snapshot balance
      */
-    receive() external payable {}
+    function recordETHFunding() external {
+        if (token != address(0)) return;  // Only for ETH distributions
+        if (poolFunded) return;  // Already funded
+        
+        uint256 balance = address(this).balance;
+        if (balance > 0) {
+            totalPoolBalance = balance;
+            poolFunded = true;
+            emit PoolFunded(balance);
+        }
+    }
+    
+    /**
+     * @notice Record that ERC20/ERC1155 funds have been received
+     * @dev Should be called after funds are transferred to snapshot the balance
+     */
+    function recordTokenFunding() external {
+        if (token == address(0)) return;  // Only for token distributions
+        if (poolFunded) return;  // Already funded
+        
+        uint256 balance;
+        if (tokenId == 0) {
+            balance = IERC20(token).balanceOf(address(this));
+        } else {
+            balance = IERC1155(token).balanceOf(address(this), tokenId);
+        }
+        
+        if (balance > 0) {
+            totalPoolBalance = balance;
+            poolFunded = true;
+            emit PoolFunded(balance);
+        }
+    }
+    
+    // ============ END M-01 FIX ============
+
+    /**
+     * @notice Receive ETH and record funding
+     * @dev M-01 FIX: Automatically records pool balance when ETH is received
+     */
+    receive() external payable {
+        // ============ M-01 FIX: Record funding when ETH received ============
+        if (token == address(0) && !poolFunded && msg.value > 0) {
+            totalPoolBalance = address(this).balance;
+            poolFunded = true;
+            emit PoolFunded(totalPoolBalance);
+        }
+        // ============ END M-01 FIX ============
+    }
 }

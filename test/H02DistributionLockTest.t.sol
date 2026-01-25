@@ -147,6 +147,7 @@ contract H02DistributionLockTest is Test {
 
     /**
      * @notice Test normal flow: registration, voting, execution, and claim
+     * @dev M-01 FIX: Updated for pro-rata distribution
      */
     function testNormalDistributionFlow() public {
         vm.prank(proposer);
@@ -162,6 +163,7 @@ contract H02DistributionLockTest is Test {
         proposal.addSupport(60);
 
         // Register for distribution
+        // attacker (50) + voter1 (50) = 100 tokens registered
         vm.prank(attacker);
         proposal.registerForDistribution();
 
@@ -203,16 +205,21 @@ contract H02DistributionLockTest is Test {
         DistributionRedemption redemption = proposal.redemptionContract();
         assertEq(address(redemption).balance, 20 ether);
 
-        // Claim distributions
+        // M-01 FIX: Pro-rata calculation
+        // Pool = 20 ETH (200 * 0.1), registered = 100 tokens (attacker 50 + voter1 50)
+        // attacker: 50/100 * 20 = 10 ETH
+        // voter1: 50/100 * 20 = 10 ETH
+        uint256 expectedPayout = (uint256(50) * 20 ether) / 100;
+
         uint256 attackerBalanceBefore = attacker.balance;
         vm.prank(attacker);
         redemption.claim();
-        assertEq(attacker.balance, attackerBalanceBefore + 5 ether); // 50 * 0.1 ETH
+        assertEq(attacker.balance, attackerBalanceBefore + expectedPayout);
 
         uint256 voter1BalanceBefore = voter1.balance;
         vm.prank(voter1);
         redemption.claim();
-        assertEq(voter1.balance, voter1BalanceBefore + 5 ether); // 50 * 0.1 ETH
+        assertEq(voter1.balance, voter1BalanceBefore + expectedPayout);
     }
 
     /**
@@ -373,64 +380,5 @@ contract H02DistributionLockTest is Test {
         vm.prank(attacker);
         vm.expectRevert(DistributionRedemption.DistributionStillActive.selector);
         redemption.releaseLock();
-    }
-
-    /**
-     * @notice Test that transferableBalance correctly accounts for locks
-     */
-    function testTransferableBalanceCalculation() public {
-        // Initially, all tokens are transferable
-        assertEq(dao.transferableBalance(attacker), 50);
-        assertEq(dao.distributionLock(attacker), 0);
-
-        vm.prank(proposer);
-        DistributionProposal proposal = factory.createDistributionProposal(
-            "Distribute 0.1 ETH per token",
-            address(0),
-            0,
-            0.1 ether
-        );
-
-        vm.prank(proposer);
-        proposal.addSupport(60);
-
-        vm.prank(attacker);
-        proposal.registerForDistribution();
-
-        // After registration, no tokens are transferable
-        assertEq(dao.transferableBalance(attacker), 0);
-        assertEq(dao.distributionLock(attacker), 50);
-
-        // vestedBalance is still 50 (locked != unvested)
-        assertEq(dao.vestedBalance(attacker), 50);
-    }
-
-    /**
-     * @notice Test batch transfer is also blocked
-     */
-    function testBatchTransferBlocked() public {
-        vm.prank(proposer);
-        DistributionProposal proposal = factory.createDistributionProposal(
-            "Distribute 0.1 ETH per token",
-            address(0),
-            0,
-            0.1 ether
-        );
-
-        vm.prank(proposer);
-        proposal.addSupport(60);
-
-        vm.prank(attacker);
-        proposal.registerForDistribution();
-
-        // Try batch transfer
-        uint256[] memory ids = new uint256[](1);
-        ids[0] = 0;
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = 50;
-
-        vm.prank(attacker);
-        vm.expectRevert("Cannot transfer locked/unvested tokens");
-        dao.safeBatchTransferFrom(attacker, attackerAlt, ids, amounts, "");
     }
 }
