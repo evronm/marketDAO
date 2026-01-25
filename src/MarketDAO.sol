@@ -545,8 +545,9 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
             // ============ END H-02 FIX ============
         }
 
-        // Add check for vote transfers to ensure election is still active
-        if (_isActiveVotingToken(id) && msg.sender == from) {
+        // ============ H-05 FIX: Check ALL vote transfers, not just direct ones ============
+        // Previously had "&& msg.sender == from" which allowed operators to vote after deadline
+        if (_isActiveVotingToken(id)) {
             // Check if destination is a registered vote address
             if (isVoteAddress[to]) {
                 // Get the associated proposal
@@ -566,6 +567,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
                 }
             }
         }
+        // ============ END H-05 FIX ============
         
         uint256 fromBalanceBefore = balanceOf(from, GOVERNANCE_TOKEN_ID);
         uint256 toBalanceBefore = balanceOf(to, GOVERNANCE_TOKEN_ID);
@@ -612,9 +614,10 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
             // ============ END H-02 FIX ============
         }
 
+        // ============ H-05 FIX: Check ALL vote transfers, not just direct ones ============
         for(uint i = 0; i < ids.length; i++) {
-            // Add check for vote transfers to ensure election is still active
-            if (_isActiveVotingToken(ids[i]) && msg.sender == from) {
+            // Previously had "&& msg.sender == from" which allowed operators to vote after deadline
+            if (_isActiveVotingToken(ids[i])) {
                 // Check if destination is a registered vote address
                 if (isVoteAddress[to]) {
                     // Get the associated proposal
@@ -635,6 +638,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
                 }
             }
         }
+        // ============ END H-05 FIX ============
         
         uint256 fromBalanceBefore = balanceOf(from, GOVERNANCE_TOKEN_ID);
         uint256 toBalanceBefore = balanceOf(to, GOVERNANCE_TOKEN_ID);
