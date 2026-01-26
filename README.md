@@ -1,435 +1,320 @@
-# MarketDAO
+# SwapEscrow
 
-MarketDAO is a governance framework that brings market forces to bear on group decisions. The key innovation is a system where voting rights can be freely bought and sold during elections, allowing market forces to influence governance outcomes.
-
-## Core Concept
-
-Unlike traditional DAOs where voting power is static, MarketDAO introduces tradable voting tokens for each election. This creates a dynamic where voters can:
-- Buy more voting power if they feel strongly about an issue
-- Sell their voting power if others value it more
-- Speculate on election outcomes through voting token markets
+A minimal, gas-optimized escrow system for trustless atomic swaps on Ethereum. Built with Solidity ^0.8.20 and Foundry.
 
 ## Features
 
-- **ERC1155-based governance tokens** for proposal creation and voting rights
-- **Saleable voting rights** through transferable voting tokens
-- **Lazy token distribution** for gas-efficient voting token claiming
-- **Token vesting mechanism** to prevent governance attacks from new token purchases
-- **Purchase restrictions** to limit token purchases to existing holders (optional)
-- **Join request system** allowing non-holders to request membership via proposals
-- **Snapshot-based voting power** for unlimited scalability (no holder count limits)
-- **Automatic vesting schedule management** with cleanup and consolidation
-- **Proposal lifecycle** with support thresholds and voting periods
-- **Multiple proposal types**:
-  - Resolution proposals (text-only governance decisions)
-  - Treasury transfers (ETH, ERC20, ERC721, ERC1155)
-  - Governance token minting (including join requests)
-  - Parameter changes (modify any DAO configuration through governance)
-  - Distribution proposals (proportional distributions to all token holders)
-- **Early election termination** when clear majority is reached (works even after election ends)
-- **Configurable parameters** for tailoring governance to specific needs
-- **Security-hardened** with factory-based proposal registration and bounded gas costs
+- ✅ **Multi-Token Support** - Native ETH, ERC20, ERC721, and ERC1155 tokens
+- ✅ **Automatic Detection** - Just transfer tokens/ETH to the contract
+- ✅ **Time-Locked Swaps** - First deposit starts timer, expiry returns assets
+- ✅ **Multiple Assets** - Lock multiple NFTs/tokens in a single escrow
+- ✅ **DAO Compatible** - Works with simple send/receive operations
+- ✅ **Gas Optimized** - EIP-1167 minimal proxy pattern (~90% gas savings)
+- ✅ **Reentrancy Protected** - OpenZeppelin ReentrancyGuard + CEI pattern
+- ✅ **Fully Tested** - Comprehensive test coverage
 
-## Implementation Details
+## How It Works
 
-- The DAO inherits from OpenZeppelin's ERC1155 implementation
-- Token ID 0 is reserved for governance tokens
-- Each election creates unique voting tokens that can be claimed by governance token holders
-- Voting is done by transferring voting tokens to YES/NO addresses
-- Treasury functions support multiple asset types (ETH, ERC20, ERC721, ERC1155)
+1. **Deploy** - Use `EscrowFactory` to create a new escrow with payment parameters
+2. **Deposit** - Seller transfers assets to the escrow (NFTs/tokens)
+3. **Pay** - Buyer transfers payment to the escrow
+4. **Swap** - Assets automatically exchanged when payment matches parameters
+5. **Expiry** - If no payment, assets return to seller after time lock
 
-### Lazy Token Distribution
+## Quick Start
 
-To minimize gas costs when elections are triggered, voting tokens use a "lazy minting" approach:
+### Installation
 
-- **On-demand claiming**: Voting tokens are not automatically distributed when an election starts
-- **Gas efficiency**: The proposer who triggers the election doesn't pay gas fees to mint tokens for all holders
-- **User-initiated**: Each governance token holder claims their voting tokens when they're ready to participate
-- **One-time claim**: Each address can claim once per election, receiving voting tokens equal to their vested governance token balance
-- **Flexible participation**: Holders can claim and vote at any point during the election period
+```bash
+forge install
+```
 
-### Early Election Termination
+### Build
 
-To allow proposals with overwhelming support to execute quickly without waiting for the full election period:
+```bash
+forge build
+```
 
-- **Automatic termination**: When YES or NO votes reach a strict majority (>50% of total possible votes), the proposal can terminate early
-- **Post-election calling**: `checkEarlyTermination()` can be called even after the election period formally ends
-- **Multiple attempts**: MarketDAO automatically attempts early termination on each vote transfer
-- **Manual fallback**: Anyone can manually call `checkEarlyTermination()` at any time during or after the election
-- **Graceful failure**: If automatic early termination fails (e.g., called after election ends), it's silently caught and execution can be triggered later
-- **Gas efficiency**: Allows winning proposals to execute immediately without waiting for the full voting period
+### Test
 
-**Why Post-Election Support Matters:**
-- If the last vote to reach majority is cast near the end of the election, the automatic early termination might fail due to timing
-- Previously, this would prevent the proposal from ever executing via early termination
-- Now, `checkEarlyTermination()` can be called after the election ends, ensuring proposals with majority support always execute
-- This provides a robust fallback mechanism for edge cases
+```bash
+forge test
+```
 
-**Example Scenario:**
-1. Election ends at block 1000
-2. At block 999, votes reach 51% YES (clear majority)
-3. Automatic early termination is attempted but fails due to timing
-4. At block 1001, anyone can call `checkEarlyTermination()` to execute the proposal
-5. Proposal executes immediately based on the majority, no need to wait or call regular `execute()`
+### Deploy
 
-### Parameter Proposals (Governance Configuration)
+```solidity
+// Deploy the factory
+EscrowFactory factory = new EscrowFactory();
 
-All DAO configuration parameters can be modified through democratic governance via Parameter Proposals:
+// AssetType enum: NATIVE = 0, ERC20 = 1, ERC721 = 2, ERC1155 = 3
 
-- **Flexible governance**: Any configuration parameter set at deployment can be changed through voting
-- **7 parameter types**:
-  - **Support Threshold**: Percentage of vested tokens needed to trigger elections (basis points)
-  - **Quorum Percentage**: Participation required for valid elections (basis points, minimum 1%)
-  - **Max Proposal Age**: Block limit before proposals expire (must be > 0)
-  - **Election Duration**: Voting period length in blocks (must be > 0)
-  - **Vesting Period**: Token unlock time in blocks (0 = no vesting)
-  - **Token Price**: Cost per governance token in wei (must be > 0)
-  - **Flags**: Boolean configuration bitfield (0-7, controls minting/purchasing options)
-- **Built-in validation**: Each parameter type has appropriate constraints to prevent invalid configurations
-- **Democratic changes**: All parameter changes require the standard proposal lifecycle (support → election → execution)
-- **No special privileges**: Parameter changes use the same voting thresholds as other proposals
+// Create an escrow: 1 day duration, expecting 100 USDC
+address escrowAddr = factory.createEscrow(
+    1 days,                     // Duration (must be > 0)
+    Escrow.AssetType.ERC20,     // Payment type (1)
+    address(usdcToken),         // Payment token (non-zero for ERC20)
+    0,                          // Token ID (for ERC721/1155)
+    100 * 10**6                 // Payment amount (must be > 0)
+);
+```
 
-**Example Use Cases:**
-- Lower support threshold to make it easier to trigger elections
-- Increase quorum to require broader participation for important decisions
-- Adjust token price based on market conditions or treasury needs
-- Modify vesting period to balance security with accessibility
-- Change election duration to allow more time for deliberation
+## Usage Examples
 
-### Distribution Proposals (Proportional Distributions)
+### Example 1: NFT for ERC20
 
-Distribution Proposals enable fair, proportional distributions of assets (ETH, ERC20, ERC1155) to all token holders based on their governance token holdings:
+```solidity
+// Seller deposits NFT
+nft.safeTransferFrom(seller, escrowAddr, tokenId);
 
-- **Proportional distribution**: Each holder receives an amount based on their registered token balance
-- **Registration system**: Token holders must register before the election to receive distributions
-- **Redemption contract**: Approved distributions transfer funds to a separate redemption contract where users claim individually
-- **Claimable by holders**: Each registered holder claims their share when ready (no batch distribution gas costs)
-- **Asset support**: Works with ETH, ERC20, and ERC1155 tokens
-- **Flexible timing**: Users can claim at any time after proposal execution
+// Buyer pays with ERC20 (requires approval first)
+usdc.approve(escrowAddr, 100 * 10**6);
+escrow.depositERC20(address(usdc), 100 * 10**6);
 
-**How It Works:**
-1. **Create proposal**: Specify the asset type, amount per governance token, and description
-2. **Registration phase**: Token holders register during the support/election phases to be included
-3. **Voting**: Standard election process with support threshold and voting
-4. **Execution**: On approval, funds transfer to a DistributionRedemption contract
-5. **Claiming**: Registered holders claim their proportional share from the redemption contract
+// Swap complete! Buyer receives NFT, seller receives USDC
+```
 
-**Example Use Cases:**
-- **Revenue sharing**: Distribute profits or royalties proportionally to all token holders
-- **Dividend payments**: Regular distributions based on treasury performance
-- **Airdrops**: Distribute ERC20 tokens or NFTs proportionally
-- **Liquidation**: Fair distribution when winding down a DAO
+### Example 2: Multiple NFTs for ERC20
 
-**Frontend Features:**
-- Registration button during election phase
-- Claim button in History tab after execution
-- Status indicators: "Not Registered", "Already Claimed", or "Claim Available"
-- Clear error messages for all edge cases
+```solidity
+// Seller deposits multiple NFTs (same seller only)
+nft.safeTransferFrom(seller, escrowAddr, tokenId1);
+nft.safeTransferFrom(seller, escrowAddr, tokenId2);
+nft.safeTransferFrom(seller, escrowAddr, tokenId3);
 
-**Gas Efficiency:**
-- No upfront distribution to all holders (would be prohibitively expensive)
-- Each holder claims individually, paying their own gas
-- Scales to unlimited holders without gas limit concerns
+// Buyer pays once
+usdc.approve(escrowAddr, 500 * 10**6);
+escrow.depositERC20(address(usdc), 500 * 10**6);
 
-### Token Vesting System
+// Buyer receives all 3 NFTs!
+```
 
-To prevent governance attacks where an actor purchases enough tokens to immediately control the DAO, purchased tokens are subject to a vesting period:
+### Example 3: NFT for Native ETH
 
-- **Vested tokens**: Available for governance (creating/supporting proposals, receiving voting tokens)
-- **Unvested tokens**: Locked for governance and not transferable (prevents circumventing vesting)
-- **Automatic cleanup**: Expired vesting schedules are automatically removed when transferring governance tokens
-- **Accurate accounting**: Automatic cleanup maintains accurate `totalUnvestedGovernanceTokens` counter for quorum calculations
-- **Schedule consolidation**: Multiple purchases with the same unlock time are automatically merged
-- **Schedule limit**: Maximum 10 active vesting schedules per address (prevents DoS attacks)
-- **Manual cleanup**: Users can call `cleanupMyVestingSchedules()` to remove expired schedules anytime
-- **Frontend display**: Dashboard shows total, vested, and unvested balances separately
+```solidity
+// Create escrow expecting 1 ETH as payment
+address escrowAddr = factory.createEscrow(
+    1 days,
+    Escrow.AssetType.NATIVE,        // Native ETH (0)
+    address(0),                      // Use address(0) for ETH
+    0,
+    1 ether                          // Payment amount
+);
 
-Initial token holders (from constructor) are not subject to vesting restrictions.
+// Seller deposits NFT
+nft.safeTransferFrom(seller, escrowAddr, tokenId);
 
-### Purchase Restrictions (Optional)
+// Buyer sends ETH (automatically processed via receive hook)
+payable(escrowAddr).call{value: 1 ether}("");
 
-To prevent governance attacks where outsiders buy enough tokens to control the DAO, the purchase restriction feature can be enabled at deployment:
+// Swap complete! Buyer receives NFT, seller receives ETH
+```
 
-- **Open mode (default)**: Anyone can purchase governance tokens directly
-- **Restricted mode**: Only existing token holders can purchase additional tokens
-- **Voting in new members**: When restricted, new members must be approved via mint proposals
-- **Attack prevention**: Prevents hostile takeovers by requiring community approval for all new members
-- **Configuration option**: Set `RESTRICT_PURCHASES = true` in the deployment script
+### Example 4: NFT for NFT
 
-**Use Cases:**
-- **Investment clubs**: Members vote on admitting new partners
-- **Private DAOs**: Closed membership with proposal-based expansion
-- **Security-focused**: Extra protection against governance attacks
+```solidity
+// Create escrow expecting NFT #42 as payment
+address escrowAddr = factory.createEscrow(
+    1 days,
+    Escrow.AssetType.ERC721,
+    address(bayc),
+    42,  // Token ID
+    0
+);
 
-**Note**: Restriction check is based on current token balance (> 0), not historical holder status. If a holder transfers all tokens, they lose purchase privileges until they receive tokens again.
+// Seller deposits their NFT
+coolCats.safeTransferFrom(seller, escrowAddr, 123);
 
-### Join Request System
+// Buyer sends their NFT as payment
+bayc.safeTransferFrom(buyer, escrowAddr, 42);
 
-To enable controlled membership growth while maintaining accessibility, non-token holders can request to join the DAO:
+// Swap complete!
+```
 
-- **Open to all**: Anyone without governance tokens can submit a join request
-- **Proposal-based**: Join requests are mint proposals for exactly 1 governance token to the requester's address
-- **Community voting**: Existing token holders vote on whether to admit new members
-- **Self-introduction**: Requesters provide a description explaining who they are and why they want to join
-- **One request per address**: Non-holders can only submit one join request (tracked via frontend localStorage)
-- **Standard proposal flow**: Join requests follow the normal proposal lifecycle (support → election → execution)
-- **Automatic restrictions**: Non-holders cannot create any other proposal types (resolution, treasury, token price)
+### Example 5: DAO Purchase
 
-**How It Works:**
-1. Non-holder connects wallet and is presented with a "Request to Join DAO" interface
-2. They submit a description introducing themselves
-3. The system creates a mint proposal for 1 token to their address
-4. Existing members see the request in the Proposals tab and can add support
-5. Once support threshold is met, an election begins
-6. Members vote YES or NO on admitting the new member
-7. If approved, the new member receives 1 governance token and full DAO access
-8. If rejected, they remain a non-holder but cannot submit another request
+This escrow is specifically designed for DAOs that can send and receive tokens but cannot call arbitrary external functions.
 
-**Benefits:**
-- **Controlled growth**: Community decides who joins
-- **Prevents spam**: One request per address limits abuse
-- **Transparency**: All join decisions are on-chain and voted on
-- **Flexibility**: Works with both open and restricted purchase modes
+```solidity
+// DAO creates escrow for an NFT purchase
+address escrowAddr = factory.createEscrow(
+    7 days,
+    Escrow.AssetType.ERC20,
+    address(daoToken),
+    0,
+    1000 ether
+);
 
-**Note**: Token holders can still create mint proposals for any amount to any address. The 1-token restriction only applies to non-holders creating proposals for themselves.
+// Seller deposits NFT
+nft.safeTransferFrom(seller, escrowAddr, tokenId);
 
-### Snapshot-Based Voting Power
+// DAO votes and executes treasury proposal that:
+// 1. Approves tokens: daoToken.approve(escrowAddr, 1000 ether)
+// 2. Calls: escrow.depositERC20(address(daoToken), 1000 ether)
 
-To enable unlimited scalability without gas limit concerns:
+// DAO receives the NFT automatically!
+```
 
-- **O(1) snapshot creation**: Uses total vested supply instead of looping through all holders
-- **Truly unlimited holders**: Tested with 10,000+ holders with constant gas costs
-- **Accurate quorum**: Quorum calculated from vested supply only (unvested tokens cannot vote)
-- **Fair voting**: Voting power frozen at election start, preventing mid-election manipulation
-- **No gas limit concerns**: Election triggering cannot fail due to too many holders
+### Example 6: Expired Escrow
 
-## Security & Scalability
+```solidity
+// Seller deposits NFT
+nft.safeTransferFrom(seller, escrowAddr, tokenId);
 
-MarketDAO has been audited and hardened against common vulnerabilities:
+// Time passes... buyer never pays
+// After expiry, anyone can trigger withdrawal
+
+escrow.withdrawExpired();
+
+// NFT returned to seller
+```
+
+## Contract Architecture
+
+### Escrow.sol
+
+Single-use escrow contract for atomic swaps. Supports:
+- Native ETH, ERC20, ERC721, and ERC1155 tokens
+- Multiple asset deposits (from the same seller)
+- Automatic payment detection via receiver hooks
+- Time-locked expiry
+
+**Key Functions:**
+- `receive()` - Auto-process native ETH deposits/payments
+- `depositERC20(token, amount)` - Deposit or pay with ERC20 tokens (pull-based)
+- `withdrawExpired()` - Return assets after expiry
+- `onERC721Received()` / `onERC1155Received()` - Auto-handle NFTs
+
+**Events:**
+- `Deposited(depositor, assetType, token, tokenId, amount)` - Asset deposited
+- `SwapExecuted(payer, seller, paymentAssetType, paymentToken, paymentTokenId, paymentAmount, depositCount)` - Swap completed
+- `ExpiredWithdrawal(caller, depositCount)` - Expired assets returned
+
+### EscrowFactory.sol
+
+Factory for deploying minimal proxy clones of escrow contracts.
+
+**Key Functions:**
+- `createEscrow(duration, paymentAssetType, paymentToken, paymentTokenId, paymentAmount)` - Deploy new escrow
+- `getEscrow(escrowId)` - Look up escrow by ID
+
+## Important Design Decisions
+
+### Single Depositor Only
+
+Only the first depositor (seller) can add assets to an escrow. This prevents funds from being lost if multiple parties deposit before reading each other's transactions. The same seller can deposit multiple assets (e.g., bundle sales).
+
+### Push-Based Settlement (By Design)
+
+The escrow uses push-based settlement (automatically sends funds on completion) rather than pull-based (requiring claim transactions). This is intentional:
+
+- **DAO Compatibility**: DAOs can typically send/receive tokens but cannot call arbitrary external functions without custom proposal types
+- **Simplicity**: No additional claim transaction required
+- **Trade-off**: Sellers should use EOA addresses or contracts that can receive ETH
+
+### ERC20 Deposits are Pull-Based
+
+For ERC20 tokens, depositors must:
+1. First call `token.approve(escrowAddress, amount)`
+2. Then call `escrow.depositERC20(token, amount)`
+
+This prevents front-running attacks where an attacker could claim credit for someone else's deposit.
+
+## Security
+
+### Audit Status
+
+Audited by **Hashlock Pty Ltd** (January 2026). Remediation complete, pending final review.
 
 ### Security Features
-- ✅ **Reentrancy protection**: Transfer functions (`safeTransferFrom`, `safeBatchTransferFrom`) use ReentrancyGuard to prevent reentrancy during vote transfers and early termination
-- ✅ **Factory-only proposal registration**: Only the official ProposalFactory can register proposals
-- ✅ **Token holder restrictions**: Only addresses with vested governance tokens can create proposals (except join requests)
-- ✅ **Join request validation**: Non-holders can only create mint proposals for exactly 1 token to their own address
-- ✅ **Safe token transfers**: Uses OpenZeppelin's SafeERC20 and safeTransferFrom for all token operations
-- ✅ **Basis points precision**: Thresholds use basis points (10000 = 100%) for 0.01% precision
-- ✅ **Bounded gas costs**: All operations have predictable, capped gas costs
 
-### Scalability Guarantees
-- ✅ **Unlimited governance token holders**: O(1) snapshot using total supply enables 10,000+ participants
-- ✅ **O(1) election triggering**: Constant 280K gas cost regardless of holder count
-- ✅ **Automatic vesting cleanup**: Prevents unbounded array growth in vesting schedules
-- ✅ **O(1) proposal execution**: Constant-time execution regardless of holder count
-- ✅ **No gas limit concerns**: Election triggering cannot fail due to blockchain gas limits
+- ✅ **ReentrancyGuard** - OpenZeppelin ReentrancyGuard on state-changing functions
+- ✅ **SafeERC20** - OpenZeppelin SafeERC20 for non-standard token compatibility
+- ✅ **CEI Pattern** - Checks-Effects-Interactions throughout
+- ✅ **Input Validation** - Duration, payment token, and amount validation
+- ✅ **Single Depositor** - Prevents fund loss from multi-depositor confusion
+- ✅ **Pull-Based ERC20** - Prevents front-running on ERC20 deposits
+- ✅ **No Admin Keys** - Fully trustless, no owner privileges
+- ✅ **Comprehensive Events** - Full off-chain observability
 
-### DoS Protection
-- ✅ **No holder count limits**: O(1) snapshot prevents DoS from too many token holders
-- ✅ **Vesting schedule limits**: Max 10 active schedules per address with auto-cleanup
-- ✅ **Consolidation**: Automatic merging of schedules with same unlock time
-- ✅ **Gas-bounded operations**: Election triggering uses constant gas regardless of holder count
-- ✅ **Join request spam prevention**: Non-holders limited to one join request per address (frontend enforced)
+### Known Limitations (By Design)
 
-## Known Limitations & Design Decisions
+- **Push-based ETH/token settlement**: If the seller's address cannot receive ETH (e.g., contract without receive function), the swap will fail. Sellers should use EOA addresses or properly configured contracts.
+- **Single depositor**: Only the first depositor can add assets. Other addresses attempting to deposit will have their transaction reverted (funds protected).
 
-These are intentional design choices that should be understood before deployment:
+## Gas Costs
 
-### Immutable vs. Changeable Parameters
+- Factory deployment: ~500k gas
+- Escrow creation: ~150k gas (90% cheaper than direct deployment)
+- Swap execution: ~200k-300k gas depending on token types
 
-**Immutable (Set at Deployment)**:
-- **DAO Name**: Cannot be changed after deployment
-- **Treasury Configuration**: Which asset types (ETH, ERC20, ERC721, ERC1155) the DAO accepts
+## Development
 
-**Changeable via Parameter Proposals**:
-- Support Threshold
-- Quorum Percentage
-- Max Proposal Age
-- Election Duration
-- Vesting Period
-- Token Price
-- Flags (Allow Minting, Restrict Purchases, Mint to Purchase)
+### Project Structure
 
-**Rationale**: Immutable parameters ensure trust and predictability. Members joining a DAO know that fundamental characteristics (name, treasury capabilities) cannot be changed without redeploying. All governance-related parameters can be modified democratically as the DAO evolves.
+```
+swapEscrow/
+├── src/
+│   ├── Escrow.sol          # Main escrow contract
+│   └── EscrowFactory.sol   # Factory for deploying escrows
+├── script/
+│   └── Deploy.s.sol        # Deployment script
+├── test/
+│   ├── Escrow.t.sol        # Core escrow tests
+│   ├── EscrowFactory.t.sol # Factory tests
+│   └── M03SingleDepositorTest.t.sol  # Single depositor tests
+├── deployments/            # Deployment addresses by chain ID
+├── index.html              # Web frontend
+├── lib/                    # Dependencies (forge-std, OpenZeppelin)
+└── foundry.toml            # Foundry config
+```
 
-**Important Note on Purchase Restrictions**: The "Restrict Purchases" flag can be enabled or disabled through Parameter Proposals (democratic voting). This allows DAOs to evolve their membership model:
-- **Open mode**: Anyone can purchase governance tokens directly
-- **Restricted mode**: Only existing token holders can purchase additional tokens
-
-While this flag is changeable, it affects the fundamental nature of DAO membership and should only be modified with broad consensus.
-
-### Treasury Proposal Competition
-
-**Behavior**: Multiple treasury proposals can be created requesting the same funds. Funds are only locked when a proposal reaches the support threshold and triggers an election. If proposal A locks the funds first, proposal B will fail when trying to start its election.
-
-**Rationale**: Locking funds at proposal creation would enable trivial DoS attacks (spam proposals locking all treasury). Current design ensures only proposals with real community support (20%+ backing) can lock funds.
-
-**Mitigation**: Community should coordinate on competing proposals. Frontend should display when multiple proposals request overlapping funds.
-
-### Support Tracking After Token Transfers
-
-**Behavior**: Support amounts are recorded when added but not automatically adjusted if users transfer their governance tokens afterward. Support only triggers elections - it does not affect voting outcomes.
-
-**Why Not Critical**: Even if support is artificially inflated, winning an election still requires:
-- 51% quorum participation from real token holders
-- Majority YES votes based on actual token holdings at election start
-- Attack cost (gas + token ownership) exceeds any benefit
-
-**Mitigation**: Monitor for unusual support patterns. Set appropriate support thresholds to make attacks expensive.
-
-### Fund Locking Gas Costs
-
-**Behavior**: Functions that calculate available treasury balances (`getAvailableETH`, `getAvailableERC20`, etc.) iterate through all proposals with locked funds. Gas costs scale linearly with the number of concurrent treasury proposals in their election phase.
-
-**Impact**: With many concurrent treasury proposals (50+), creating new treasury proposals or triggering elections could become expensive or potentially hit gas limits.
-
-**Likelihood**: Low - Most DAOs will have fewer than 10 concurrent treasury elections at any time since elections are typically short (50 blocks).
-
-**Mitigation**: If your DAO expects high concurrent treasury activity, consider shorter election durations or implementing a proposal limit.
-
-## Installation & Development
+### Running Tests
 
 ```bash
-# Clone the repository
-git clone https://github.com/evronm/marketDAO
-cd marketDAO
-
-# Install dependencies
-forge install
-
-# Build contracts
-forge build
-
-# Run tests
+# Run all tests
 forge test
 
-# Format code
-forge fmt
+# Run specific test
+forge test --match-test testERC721ForERC20Swap
 
-# Start local Anvil node
-anvil
+# Run with gas reporting
+forge test --gas-report
 
-# Deploy locally (in another terminal)
-forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast
+# Run with verbosity
+forge test -vvv
 ```
 
-## Frontend Development
-
-The project includes a React/TypeScript frontend for interacting with the DAO:
+### Code Coverage
 
 ```bash
-# Navigate to frontend directory
-cd frontend
-
-# Install dependencies
-npm install
-
-# Update contract addresses in src/contexts/DAOContext.tsx with deployed addresses
-
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
+forge coverage
 ```
 
-The frontend provides a complete interface for:
-- Connecting wallet and viewing DAO information
-- Purchasing governance tokens
-- Creating proposals (Resolution, Treasury, Mint, Parameter, Distribution)
-- Supporting proposals and triggering elections
-- Registering for distribution proposals during elections
-- Claiming voting tokens and casting votes
-- Claiming distributions from approved proposals
-- Viewing proposal history and results with context-aware actions
-- Seeing all DAO members and their token balances
+## Use Cases
 
-**Parameter Proposal UI Features:**
-- Dropdown selection for all 7 parameter types
-- Contextual input fields with appropriate units (ETH, %, blocks, bitfield)
-- Automatic value conversion (percentages → basis points, ETH → wei)
-- Inline hints and validation for each parameter type
-- Clear display of current vs. proposed values
+- 🏛️ **DAO Purchases** - Safe asset purchases through governance (primary use case)
+- 🎨 **NFT Marketplaces** - P2P NFT sales with escrow protection
+- 💱 **Token Swaps** - OTC trades with time-locked security
+- 🎮 **Gaming Assets** - In-game item trading
+- 🖼️ **Art Deals** - Multi-asset bundle trades
 
-**Distribution Proposal UI Features:**
-- Asset type selection (ETH, ERC20, ERC1155)
-- Amount per governance token configuration
-- Registration button during active elections
-- Smart claim button in History tab:
-  - Shows "Claim Distribution" button if registered and not claimed
-  - Shows "Already Claimed" success message if claimed
-  - Shows "Not Registered" info message if user didn't register
-- Automatic calculation of claimable amounts
-- User-friendly error messages for all claim scenarios
+## Local Development
 
-## Configuration Parameters
-
-When creating a new DAO, you can configure:
-- **Name** of the DAO (permanent, cannot be changed)
-- **Support threshold** (in basis points, e.g., 2000 = 20% of tokens needed to trigger an election) *[changeable via Parameter Proposal]*
-- **Quorum percentage** (in basis points, e.g., 5100 = 51% of tokens needed for valid election) *[changeable via Parameter Proposal]*
-- **Maximum proposal age** before expiration (in blocks) *[changeable via Parameter Proposal]*
-- **Election duration** (in blocks) *[changeable via Parameter Proposal]*
-- **Flags** (bitfield for boolean options) *[changeable via Parameter Proposal]*:
-  - **Allow minting** (bit 0): Whether new governance tokens can be minted via proposals
-  - **Restrict purchases** (bit 1): Whether token purchases are limited to existing holders
-  - **Mint to purchase** (bit 2): Whether purchases transfer from DAO treasury or mint new tokens
-- **Initial token price** (in wei, 0 = direct sales disabled) *[changeable via Parameter Proposal]*
-- **Vesting period** (in blocks, 0 = no vesting) *[changeable via Parameter Proposal]*
-- **Treasury configuration** (ETH, ERC20, ERC721, ERC1155) (permanent, cannot be changed)
-- **Initial token distribution** (addresses and amounts)
-
-**Note on Basis Points**: All percentage parameters use basis points for precision:
-- 10000 = 100%
-- 5100 = 51%
-- 2000 = 20%
-- 250 = 2.5%
-
-This allows for fractional percentages with 0.01% precision.
-
-**Configuring Flags**: The deployment script (`script/Deploy.s.sol`) provides boolean configuration options that are automatically converted to the flags bitfield:
-```solidity
-bool constant ALLOW_MINTING = true;            // Enable governance token minting
-bool constant RESTRICT_PURCHASES = false;      // Allow anyone to purchase tokens
-```
-
-The `buildFlags()` function handles the conversion automatically.
-
-## Usage Flow
-
-### For New Members (Join Request):
-1. **Connect Wallet**: Non-holder connects their wallet to the DAO interface
-2. **Submit Join Request**: Provide a description introducing yourself and why you want to join
-3. **Wait for Support**: Existing members review your request and add support
-4. **Election**: Once support threshold is met, members vote on your admission
-5. **Admission**: If approved, you receive 1 governance token and full DAO access
-
-### For Token Holders (Standard Proposals):
-1. **Create a Proposal**: Governance token holders can submit proposals (Resolution, Treasury, Mint, Parameter, or Distribution)
-2. **Support Phase**: Proposals need to reach support threshold to trigger an election
-3. **Election Triggered**: When the threshold is reached, an election period begins
-4. **Claim Voting Tokens**: Governance token holders claim their voting tokens (1:1 with vested governance tokens)
-5. **Trading Period**: During elections, voting tokens can be freely bought and sold
-6. **Voting**: Cast votes by sending voting tokens to YES/NO addresses
-7. **Execution**: Successful proposals are executed automatically
-
-### For Distribution Proposals (Additional Steps):
-1. **Create Distribution Proposal**: Specify asset type (ETH/ERC20/ERC1155) and amount per governance token
-2. **Registration Phase**: Token holders who want to receive the distribution must register during support/election phases
-3. **Standard Voting**: Proposal follows normal support → election → voting flow
-4. **Execution**: If approved, funds transfer to a DistributionRedemption contract
-5. **Claiming**: Registered holders claim their proportional share from the History tab at any time
-6. **Status Tracking**: UI shows whether you're registered, already claimed, or eligible to claim
-
-## Future Possibilities
-
-- Resolution enhancements: Expiring resolutions, cancellation proposals
-- Multiple choice proposals beyond binary YES/NO
-- Delegation mechanisms for voting power
-- Staking mechanisms for proposal prioritization
-- Quadratic voting options
-- Time-weighted voting power
-- Proposal templates and batch operations
+1. Start a local Ethereum node: `anvil`
+2. Deploy the factory: `forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast`
+3. Open `index.html` in a browser
+4. Connect MetaMask to your local network
+5. Create escrows and copy addresses to share with trading partners
 
 ## License
 
 MIT
+
+## Contributing
+
+Contributions welcome! Please open an issue or PR.
+
+## Contact
+
+Built for the MarketDAO ecosystem and beyond.
