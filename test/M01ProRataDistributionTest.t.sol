@@ -423,9 +423,9 @@ contract M01ProRataDistributionTest is Test {
     }
 
     /**
-     * @notice Test that recordTokenFunding is called correctly for ERC20
+     * @notice Test that markPoolFunded is called correctly for ERC20
      */
-    function testRecordTokenFundingCalledOnERC20Execute() public {
+    function testMarkPoolFundedCalledOnERC20Execute() public {
         vm.prank(proposer);
         DistributionProposal proposal = factory.createDistributionProposal(
             "Distribute 10 ERC20 per token",
@@ -450,6 +450,90 @@ contract M01ProRataDistributionTest is Test {
         // After execution: funded
         assertTrue(redemption.poolFunded());
         assertEq(redemption.totalPoolBalance(), 2000 ether); // 200 * 10
+    }
+
+    /**
+     * @notice Test that dust griefing attack is prevented
+     * @dev Before the fix, an attacker could send 1 wei to snapshot a tiny balance
+     *      before the real funds arrived, freezing most of the pool.
+     *      With the fix, only the proposal can mark the pool as funded.
+     */
+    function testDustGriefingPrevented() public {
+        vm.prank(proposer);
+        DistributionProposal proposal = factory.createDistributionProposal(
+            "Distribute 0.5 ETH per token",
+            address(0),
+            0,
+            0.5 ether
+        );
+
+        vm.prank(proposer);
+        proposal.addSupport(60);
+
+        vm.prank(proposer);
+        proposal.registerForDistribution();
+
+        DistributionRedemption redemption = proposal.redemptionContract();
+
+        // Attacker tries to grief by sending 1 wei before proposal executes
+        address attacker = address(0xBAD);
+        vm.deal(attacker, 1 ether);
+        vm.prank(attacker);
+        (bool success,) = address(redemption).call{value: 1 wei}("");
+        assertTrue(success, "ETH transfer should succeed");
+
+        // Pool should NOT be marked as funded yet (only proposal can do that)
+        assertFalse(redemption.poolFunded());
+        assertEq(redemption.totalPoolBalance(), 0);
+
+        // Execute proposal - sends real 100 ETH
+        executeProposal(proposal);
+
+        // Now pool is funded with correct amount (100 ETH + 1 wei dust)
+        assertTrue(redemption.poolFunded());
+        assertEq(redemption.totalPoolBalance(), 100 ether + 1 wei);
+
+        // Proposer can claim their full pro-rata share
+        uint256 proposerBalanceBefore = proposer.balance;
+        vm.prank(proposer);
+        redemption.claim();
+        
+        // 100/100 * (100 ether + 1 wei) = 100 ether + 1 wei
+        assertEq(proposer.balance, proposerBalanceBefore + 100 ether + 1 wei);
+    }
+
+    /**
+     * @notice Test that non-proposal cannot call markPoolFunded
+     */
+    function testOnlyProposalCanMarkPoolFunded() public {
+        vm.prank(proposer);
+        DistributionProposal proposal = factory.createDistributionProposal(
+            "Distribute 0.5 ETH per token",
+            address(0),
+            0,
+            0.5 ether
+        );
+
+        vm.prank(proposer);
+        proposal.addSupport(60);
+
+        vm.prank(proposer);
+        proposal.registerForDistribution();
+
+        DistributionRedemption redemption = proposal.redemptionContract();
+
+        // Send some ETH to the redemption contract
+        vm.deal(address(this), 1 ether);
+        (bool success,) = address(redemption).call{value: 1 ether}("");
+        assertTrue(success);
+
+        // Random address tries to call markPoolFunded - should fail
+        vm.prank(address(0xBAD));
+        vm.expectRevert(DistributionRedemption.OnlyProposal.selector);
+        redemption.markPoolFunded();
+
+        // Pool should still not be funded
+        assertFalse(redemption.poolFunded());
     }
 
     /**

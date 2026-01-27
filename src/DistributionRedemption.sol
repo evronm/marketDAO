@@ -30,6 +30,8 @@ interface IDistributionProposal {
  * - M-01 FIX: Uses pro-rata distribution to ensure all registered users can claim.
  *   Each user receives: (userShares / totalRegisteredShares) * actualPoolBalance
  *   This means amountPerGovernanceToken is a TARGET, not a guarantee.
+ * - M-01 FIX (Part 2): Only the proposal can mark the pool as funded via markPoolFunded().
+ *   This prevents griefing attacks where attackers send dust to snapshot a tiny balance.
  */
 contract DistributionRedemption is ERC1155Holder, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -242,34 +244,23 @@ contract DistributionRedemption is ERC1155Holder, ReentrancyGuard {
                !dao.activeProposals(proposal);
     }
 
-    // ============ M-01 FIX: Functions to record pool funding ============
+    // ============ M-01 FIX: Function to record pool funding ============
+    // Only the proposal can mark the pool as funded to prevent griefing attacks
+    // where an attacker sends dust to snapshot a tiny balance before real funds arrive
     
     /**
-     * @notice Record that ETH funds have been received
-     * @dev Called automatically via receive() or can be called manually to snapshot balance
+     * @notice Mark the pool as funded and snapshot the current balance
+     * @dev Only callable by the proposal contract. Must be called AFTER funds are transferred.
+     *      This prevents griefing attacks where attackers send dust to freeze the pool.
      */
-    function recordETHFunding() external {
-        if (token != address(0)) return;  // Only for ETH distributions
-        if (poolFunded) return;  // Already funded
-        
-        uint256 balance = address(this).balance;
-        if (balance > 0) {
-            totalPoolBalance = balance;
-            poolFunded = true;
-            emit PoolFunded(balance);
-        }
-    }
-    
-    /**
-     * @notice Record that ERC20/ERC1155 funds have been received
-     * @dev Should be called after funds are transferred to snapshot the balance
-     */
-    function recordTokenFunding() external {
-        if (token == address(0)) return;  // Only for token distributions
-        if (poolFunded) return;  // Already funded
+    function markPoolFunded() external {
+        if (msg.sender != proposal) revert OnlyProposal();
+        if (poolFunded) return;  // Already funded, no-op
         
         uint256 balance;
-        if (tokenId == 0) {
+        if (token == address(0)) {
+            balance = address(this).balance;
+        } else if (tokenId == 0) {
             balance = IERC20(token).balanceOf(address(this));
         } else {
             balance = IERC1155(token).balanceOf(address(this), tokenId);
@@ -285,16 +276,11 @@ contract DistributionRedemption is ERC1155Holder, ReentrancyGuard {
     // ============ END M-01 FIX ============
 
     /**
-     * @notice Receive ETH and record funding
-     * @dev M-01 FIX: Automatically records pool balance when ETH is received
+     * @notice Receive ETH
+     * @dev Does NOT auto-mark funding to prevent griefing attacks.
+     *      The proposal must call markPoolFunded() after sending funds.
      */
     receive() external payable {
-        // ============ M-01 FIX: Record funding when ETH received ============
-        if (token == address(0) && !poolFunded && msg.value > 0) {
-            totalPoolBalance = address(this).balance;
-            poolFunded = true;
-            emit PoolFunded(totalPoolBalance);
-        }
-        // ============ END M-01 FIX ============
+        // Accept ETH but don't auto-snapshot - proposal must call markPoolFunded()
     }
 }
