@@ -110,7 +110,7 @@ Distribution Proposals enable fair, proportional distributions of assets (ETH, E
 
 ## Security & Scalability
 
-MarketDAO has been audited by **Hashlock Pty Ltd** (January 2026). All HIGH severity issues have been resolved.
+MarketDAO has been audited by **Hashlock Pty Ltd** (January 2026). **The audit has been completed and all findings have been addressed.**
 
 ### Security Features
 
