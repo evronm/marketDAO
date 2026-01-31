@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
-import "../src/ProposalTypes.sol";
+import "../src/GenericProposal.sol";
 
 contract CanTriggerElectionExpirationTest is TestHelper {
     MarketDAO dao;
@@ -46,7 +46,7 @@ contract CanTriggerElectionExpirationTest is TestHelper {
         // Create proposal at block 1
         vm.roll(1);
         vm.prank(proposer1);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test Proposal");
+        GenericProposal proposal = factory.createProposal("Test Proposal", address(dao), 0, "");
 
         // Add support just below threshold (need 40, add 39)
         vm.startPrank(proposer1);
@@ -79,7 +79,7 @@ contract CanTriggerElectionExpirationTest is TestHelper {
         // Create proposal at block 1
         vm.roll(1);
         vm.prank(proposer1);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test Proposal");
+        GenericProposal proposal = factory.createProposal("Test Proposal", address(dao), 0, "");
 
         // Add support just below threshold at block 50 (still within expiration)
         vm.roll(50);
@@ -106,7 +106,7 @@ contract CanTriggerElectionExpirationTest is TestHelper {
         // Create proposal at block 1
         vm.roll(1);
         vm.prank(proposer1);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test Proposal");
+        GenericProposal proposal = factory.createProposal("Test Proposal", address(dao), 0, "");
 
         // Add enough support to trigger
         vm.startPrank(proposer1);
@@ -129,7 +129,7 @@ contract CanTriggerElectionExpirationTest is TestHelper {
         // Create proposal at block 0
         vm.roll(0);
         vm.prank(proposer1);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test Proposal");
+        GenericProposal proposal = factory.createProposal("Test Proposal", address(dao), 0, "");
 
         // Add support just below threshold
         vm.startPrank(proposer1);
@@ -155,7 +155,7 @@ contract CanTriggerElectionExpirationTest is TestHelper {
         // Create proposal at block 0
         vm.roll(0);
         vm.prank(proposer1);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test Proposal");
+        GenericProposal proposal = factory.createProposal("Test Proposal", address(dao), 0, "");
 
         // Add support just below threshold
         vm.startPrank(proposer1);
@@ -182,7 +182,7 @@ contract CanTriggerElectionExpirationTest is TestHelper {
         // Create proposal at block 1
         vm.roll(1);
         vm.prank(proposer1);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test Proposal");
+        GenericProposal proposal = factory.createProposal("Test Proposal", address(dao), 0, "");
 
         // Add support to exactly reach threshold
         vm.startPrank(proposer1);
@@ -196,7 +196,7 @@ contract CanTriggerElectionExpirationTest is TestHelper {
         // Now create another proposal
         vm.roll(1);
         vm.prank(proposer1);
-        ResolutionProposal proposal2 = factory.createResolutionProposal("Test Proposal 2");
+        GenericProposal proposal2 = factory.createProposal("Test Proposal 2", address(dao), 0, "");
 
         // Add 40 tokens but over multiple transactions
         vm.startPrank(proposer1);

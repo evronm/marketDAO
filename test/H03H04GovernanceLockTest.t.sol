@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
-import "../src/ProposalTypes.sol";
+import "../src/GenericProposal.sol";
 
 /**
  * @title H03H04GovernanceLockTest
@@ -48,18 +48,12 @@ contract H03H04GovernanceLockTest is Test {
         );
 
         // Deploy implementation contracts
-        ResolutionProposal resolutionImpl = new ResolutionProposal();
-        TreasuryProposal treasuryImpl = new TreasuryProposal();
-        MintProposal mintImpl = new MintProposal();
-        ParameterProposal parameterImpl = new ParameterProposal();
+        GenericProposal genericImpl = new GenericProposal();
         DistributionProposal distributionImpl = new DistributionProposal();
 
         factory = new ProposalFactory(
             dao,
-            address(resolutionImpl),
-            address(treasuryImpl),
-            address(mintImpl),
-            address(parameterImpl),
+            address(genericImpl),
             address(distributionImpl)
         );
 
@@ -73,7 +67,7 @@ contract H03H04GovernanceLockTest is Test {
      */
     function testH03SupportLocksPreventsDoubleCount() public {
         vm.prank(proposer);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test proposal");
+        GenericProposal proposal = factory.createProposal("Test proposal", address(dao), 0, "");
 
         // Attacker adds support with 30 tokens (15% - below 20% threshold)
         vm.prank(attacker);
@@ -109,7 +103,7 @@ contract H03H04GovernanceLockTest is Test {
      */
     function testH03PartialSupportLock() public {
         vm.prank(proposer);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test proposal");
+        GenericProposal proposal = factory.createProposal("Test proposal", address(dao), 0, "");
 
         // Attacker adds support with only 30 of their 50 tokens
         vm.prank(attacker);
@@ -134,7 +128,7 @@ contract H03H04GovernanceLockTest is Test {
      */
     function testRemoveSupportUnlocks() public {
         vm.prank(proposer);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test proposal");
+        GenericProposal proposal = factory.createProposal("Test proposal", address(dao), 0, "");
 
         // Add support (below threshold to not trigger election)
         vm.prank(attacker);
@@ -159,7 +153,7 @@ contract H03H04GovernanceLockTest is Test {
      */
     function testH04VotingLockPreventsDoubleVote() public {
         vm.prank(proposer);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test proposal");
+        GenericProposal proposal = factory.createProposal("Test proposal", address(dao), 0, "");
 
         // Trigger election
         vm.prank(proposer);
@@ -194,7 +188,7 @@ contract H03H04GovernanceLockTest is Test {
      */
     function testCumulativeLocks() public {
         vm.prank(proposer);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test proposal");
+        GenericProposal proposal = factory.createProposal("Test proposal", address(dao), 0, "");
 
         // Attacker adds support with 30 tokens (below threshold)
         vm.prank(attacker);
@@ -223,7 +217,7 @@ contract H03H04GovernanceLockTest is Test {
      */
     function testReleaseLockAfterExecution() public {
         vm.prank(proposer);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test proposal");
+        GenericProposal proposal = factory.createProposal("Test proposal", address(dao), 0, "");
 
         // Attacker supports (below threshold)
         vm.prank(attacker);
@@ -288,7 +282,7 @@ contract H03H04GovernanceLockTest is Test {
      */
     function testReleaseLockAfterExpiration() public {
         vm.prank(proposer);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test proposal");
+        GenericProposal proposal = factory.createProposal("Test proposal", address(dao), 0, "");
 
         // Attacker supports with some tokens
         vm.prank(attacker);
@@ -314,7 +308,7 @@ contract H03H04GovernanceLockTest is Test {
      */
     function testCannotReleaseLockWhileActive() public {
         vm.prank(proposer);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test proposal");
+        GenericProposal proposal = factory.createProposal("Test proposal", address(dao), 0, "");
 
         vm.prank(attacker);
         proposal.addSupport(50);
@@ -330,10 +324,10 @@ contract H03H04GovernanceLockTest is Test {
      */
     function testMultipleProposalLocks() public {
         vm.prank(proposer);
-        ResolutionProposal proposal1 = factory.createResolutionProposal("Proposal 1");
+        GenericProposal proposal1 = factory.createProposal("Proposal 1", address(dao), 0, "");
         
         vm.prank(proposer);
-        ResolutionProposal proposal2 = factory.createResolutionProposal("Proposal 2");
+        GenericProposal proposal2 = factory.createProposal("Proposal 2", address(dao), 0, "");
 
         // Attacker supports both proposals with 25 tokens each
         vm.prank(attacker);
@@ -370,7 +364,7 @@ contract H03H04GovernanceLockTest is Test {
      */
     function testNormalVotingFlowWorks() public {
         vm.prank(proposer);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test proposal");
+        GenericProposal proposal = factory.createProposal("Test proposal", address(dao), 0, "");
 
         // Trigger election
         vm.prank(proposer);

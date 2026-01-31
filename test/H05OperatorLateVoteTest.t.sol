@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
-import "../src/ProposalTypes.sol";
+import "../src/GenericProposal.sol";
 
 /**
  * @title H05OperatorLateVoteTest
@@ -48,18 +48,12 @@ contract H05OperatorLateVoteTest is Test {
         );
 
         // Deploy implementation contracts
-        ResolutionProposal resolutionImpl = new ResolutionProposal();
-        TreasuryProposal treasuryImpl = new TreasuryProposal();
-        MintProposal mintImpl = new MintProposal();
-        ParameterProposal parameterImpl = new ParameterProposal();
+        GenericProposal genericImpl = new GenericProposal();
         DistributionProposal distributionImpl = new DistributionProposal();
 
         factory = new ProposalFactory(
             dao,
-            address(resolutionImpl),
-            address(treasuryImpl),
-            address(mintImpl),
-            address(parameterImpl),
+            address(genericImpl),
             address(distributionImpl)
         );
 
@@ -72,7 +66,7 @@ contract H05OperatorLateVoteTest is Test {
     function testH05OperatorCannotVoteAfterElectionEnds() public {
         // Create and trigger election
         vm.prank(proposer);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test proposal");
+        GenericProposal proposal = factory.createProposal("Test proposal", address(dao), 0, "");
 
         vm.prank(proposer);
         proposal.addSupport(40);
@@ -103,7 +97,7 @@ contract H05OperatorLateVoteTest is Test {
     function testOperatorCanVoteDuringActiveElection() public {
         // Create and trigger election
         vm.prank(proposer);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test proposal");
+        GenericProposal proposal = factory.createProposal("Test proposal", address(dao), 0, "");
 
         vm.prank(proposer);
         proposal.addSupport(40);
@@ -132,7 +126,7 @@ contract H05OperatorLateVoteTest is Test {
     function testDirectVoteAfterElectionFails() public {
         // Create and trigger election
         vm.prank(proposer);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test proposal");
+        GenericProposal proposal = factory.createProposal("Test proposal", address(dao), 0, "");
 
         vm.prank(proposer);
         proposal.addSupport(40);
@@ -162,7 +156,7 @@ contract H05OperatorLateVoteTest is Test {
     function testH05OperatorBatchTransferAfterElectionFails() public {
         // Create and trigger election
         vm.prank(proposer);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test proposal");
+        GenericProposal proposal = factory.createProposal("Test proposal", address(dao), 0, "");
 
         vm.prank(proposer);
         proposal.addSupport(40);
@@ -199,7 +193,7 @@ contract H05OperatorLateVoteTest is Test {
     function testH05FullAttackScenarioPrevented() public {
         // Create and trigger election
         vm.prank(proposer);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test proposal");
+        GenericProposal proposal = factory.createProposal("Test proposal", address(dao), 0, "");
 
         vm.prank(proposer);
         proposal.addSupport(40);

@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
-import "../src/ProposalTypes.sol";
+import "../src/GenericProposal.sol";
 
 contract VestedSupplyTrackingTest is TestHelper {
     MarketDAO dao;
@@ -130,7 +130,7 @@ contract VestedSupplyTrackingTest is TestHelper {
 
         // Create proposal and trigger election
         vm.prank(user1);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test");
+        GenericProposal proposal = factory.createProposal("Test", address(dao), 0, "");
 
         vm.startPrank(user1);
         dao.setApprovalForAll(address(proposal), true);
@@ -228,7 +228,7 @@ contract VestedSupplyTrackingTest is TestHelper {
 
         // Create proposal
         vm.prank(user1);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test");
+        GenericProposal proposal = factory.createProposal("Test", address(dao), 0, "");
 
         // User2 tries to add support with unvested tokens - should fail
         vm.startPrank(user2);

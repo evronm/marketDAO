@@ -5,7 +5,7 @@ import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/Proposal.sol";
 import "../src/ProposalFactory.sol";
-import "../src/ProposalTypes.sol";
+import "../src/GenericProposal.sol";
 
 // Test contract for early termination functionality
 contract EarlyTerminationTest is TestHelper {
@@ -63,7 +63,7 @@ contract EarlyTerminationTest is TestHelper {
         vm.startPrank(alice);
         
         // Create a resolution proposal
-        ResolutionProposal proposal = factory.createResolutionProposal("Test Early Termination");
+        GenericProposal proposal = factory.createProposal("Test Early Termination", address(dao), 0, "");
         
         // Add support to trigger election
         proposal.addSupport(60); // Alice supports with 60 tokens (30% of total)
@@ -134,7 +134,7 @@ contract EarlyTerminationTest is TestHelper {
         vm.startPrank(alice);
         
         // Create a resolution proposal
-        ResolutionProposal proposal = factory.createResolutionProposal("Test Early Termination - No Vote");
+        GenericProposal proposal = factory.createProposal("Test Early Termination - No Vote", address(dao), 0, "");
         
         // Add support to trigger election
         proposal.addSupport(60); // Alice supports with 60 tokens (30% of total)
@@ -188,7 +188,7 @@ contract EarlyTerminationTest is TestHelper {
         vm.startPrank(alice);
         
         // Create a resolution proposal
-        ResolutionProposal proposal = factory.createResolutionProposal("Test Batch Transfer Early Termination");
+        GenericProposal proposal = factory.createProposal("Test Batch Transfer Early Termination", address(dao), 0, "");
         
         // Add support to trigger election
         proposal.addSupport(60); // Alice supports with 60 tokens (30% of total)

@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
-import "../src/ProposalTypes.sol";
+import "../src/GenericProposal.sol";
 
 contract MultipleProposalTest is TestHelper {
     MarketDAO dao;
@@ -52,19 +52,13 @@ contract MultipleProposalTest is TestHelper {
         vm.startPrank(proposer);
 
         // Create first proposal
-        ResolutionProposal proposal1 = factory.createResolutionProposal("First Resolution");
+        GenericProposal proposal1 = factory.createProposal("First Resolution", address(dao), 0, "");
 
         // Verify first proposal is registered
         assertTrue(dao.activeProposals(address(proposal1)), "First proposal not registered as active");
 
         // Create second proposal - this should not revert now with our changes
-        TreasuryProposal proposal2 = factory.createTreasuryProposal(
-            "Second Proposal",
-            address(0x2),
-            1 ether,
-            address(0),
-            0
-        );
+        GenericProposal proposal2 = factory.createProposal("Second Proposal", address(dao), 0, abi.encodeWithSelector(dao.transferETH.selector, payable(address(0x2)), 1 ether));
         
         // Verify second proposal is registered
         assertTrue(dao.activeProposals(address(proposal2)), "Second proposal not registered as active");
@@ -100,13 +94,7 @@ contract MultipleProposalTest is TestHelper {
         vm.startPrank(proposer);
         
         // Create a single proposal to test the basic functionality
-        TreasuryProposal treasuryProposal = factory.createTreasuryProposal(
-            "Fund Development",
-            voter1,
-            1 ether,
-            address(0),
-            0
-        );
+        GenericProposal treasuryProposal = factory.createProposal("Fund Development", address(dao), 0, abi.encodeWithSelector(dao.transferETH.selector, payable(voter1), 1 ether));
         
         // Verify proposal is registered in factory
         assertEq(factory.proposalCount(), 1);
@@ -167,11 +155,7 @@ contract MultipleProposalTest is TestHelper {
         
         // Create a second proposal to make sure the DAO can still accept new proposals
         vm.prank(proposer);
-        ParameterProposal priceProposal = factory.createParameterProposal(
-            "Increase Token Price",
-            ParameterProposal.ParameterType.TokenPrice,
-            0.2 ether
-        );
+        GenericProposal priceProposal = factory.createProposal("Increase Token Price", address(dao), 0, abi.encodeWithSelector(dao.setTokenPrice.selector, 0.2 ether));
         
         assertEq(factory.proposalCount(), 2);
         assertEq(factory.getProposal(1), address(priceProposal));

@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
-import "../src/ProposalTypes.sol";
+import "../src/GenericProposal.sol";
 
 /**
  * @title EarlyTerminationAfterElectionEndTest
@@ -165,8 +165,11 @@ contract EarlyTerminationAfterElectionEndTest is TestHelper {
     function testEarlyTerminationWithNoVotesMajority() public {
         // Test that early termination also works for NO votes reaching majority
         vm.prank(alice);
-        ResolutionProposal proposal = factory.createResolutionProposal(
-            "Test proposal for NO vote termination"
+        GenericProposal proposal = factory.createProposal(
+            "Test proposal for NO vote termination",
+            address(dao),
+            0,
+            ""
         );
 
         // Support to trigger

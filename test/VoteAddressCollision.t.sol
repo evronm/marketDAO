@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
-import "../src/ProposalTypes.sol";
+import "../src/GenericProposal.sol";
 
 contract VoteAddressCollisionTest is TestHelper {
     MarketDAO dao;
@@ -45,10 +45,10 @@ contract VoteAddressCollisionTest is TestHelper {
     function testVoteAddressesAreUnique() public {
         // Create two proposals with same description
         vm.prank(proposer1);
-        ResolutionProposal proposal1 = factory.createResolutionProposal("Same description");
+        GenericProposal proposal1 = factory.createProposal("Same description", address(dao), 0, "");
 
         vm.prank(proposer2);
-        ResolutionProposal proposal2 = factory.createResolutionProposal("Same description");
+        GenericProposal proposal2 = factory.createProposal("Same description", address(dao), 0, "");
 
         // Trigger elections
         vm.startPrank(proposer1);
@@ -79,7 +79,7 @@ contract VoteAddressCollisionTest is TestHelper {
     function testVoteAddressesChangeWithTime() public {
         // Create proposal but don't trigger
         vm.prank(proposer1);
-        ResolutionProposal proposal1 = factory.createResolutionProposal("Test");
+        GenericProposal proposal1 = factory.createProposal("Test", address(dao), 0, "");
 
         // Trigger election at block 1
         vm.roll(1);
@@ -92,7 +92,7 @@ contract VoteAddressCollisionTest is TestHelper {
 
         // Create another proposal with same description
         vm.prank(proposer1);
-        ResolutionProposal proposal2 = factory.createResolutionProposal("Test");
+        GenericProposal proposal2 = factory.createProposal("Test", address(dao), 0, "");
 
         // Trigger election at block 100
         vm.roll(100);
@@ -110,7 +110,7 @@ contract VoteAddressCollisionTest is TestHelper {
     function testVoteAddressesChangedWithTimestamp() public {
         // Create proposal
         vm.prank(proposer1);
-        ResolutionProposal proposal1 = factory.createResolutionProposal("Test");
+        GenericProposal proposal1 = factory.createProposal("Test", address(dao), 0, "");
 
         // Trigger at timestamp 1000
         vm.warp(1000);
@@ -123,7 +123,7 @@ contract VoteAddressCollisionTest is TestHelper {
 
         // Create another proposal
         vm.prank(proposer1);
-        ResolutionProposal proposal2 = factory.createResolutionProposal("Test");
+        GenericProposal proposal2 = factory.createProposal("Test", address(dao), 0, "");
 
         // Trigger at timestamp 2000
         vm.warp(2000);
@@ -140,7 +140,7 @@ contract VoteAddressCollisionTest is TestHelper {
 
     function testVoteAddressNotZero() public {
         vm.prank(proposer1);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test");
+        GenericProposal proposal = factory.createProposal("Test", address(dao), 0, "");
 
         vm.startPrank(proposer1);
         dao.setApprovalForAll(address(proposal), true);
@@ -154,7 +154,7 @@ contract VoteAddressCollisionTest is TestHelper {
 
     function testVoteAddressNotContract() public {
         vm.prank(proposer1);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test");
+        GenericProposal proposal = factory.createProposal("Test", address(dao), 0, "");
 
         vm.startPrank(proposer1);
         dao.setApprovalForAll(address(proposal), true);
@@ -171,7 +171,7 @@ contract VoteAddressCollisionTest is TestHelper {
 
     function testVoteAddressRegisteredInDAO() public {
         vm.prank(proposer1);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test");
+        GenericProposal proposal = factory.createProposal("Test", address(dao), 0, "");
 
         vm.startPrank(proposer1);
         dao.setApprovalForAll(address(proposal), true);
@@ -197,8 +197,11 @@ contract VoteAddressCollisionTest is TestHelper {
         // Create 10 proposals and trigger elections
         for (uint i = 0; i < 10; i++) {
             vm.prank(proposer1);
-            ResolutionProposal proposal = factory.createResolutionProposal(
-                string(abi.encodePacked("Proposal ", vm.toString(i)))
+            GenericProposal proposal = factory.createProposal(
+                string(abi.encodePacked("Proposal ", vm.toString(i))),
+                address(dao),
+                0,
+                ""
             );
 
             vm.startPrank(proposer1);

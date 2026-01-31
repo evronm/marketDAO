@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
-import "../src/ProposalTypes.sol";
+import "../src/GenericProposal.sol";
 
 contract ProposalExpirationTest is TestHelper {
     MarketDAO dao;
@@ -46,7 +46,7 @@ contract ProposalExpirationTest is TestHelper {
 
     function testProposalCanBeSupportedBeforeExpiration() public {
         vm.startPrank(alice);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test Proposal");
+        GenericProposal proposal = factory.createProposal("Test Proposal", address(dao), 0, "");
 
         // Add support before expiration
         dao.setApprovalForAll(address(proposal), true);
@@ -58,7 +58,7 @@ contract ProposalExpirationTest is TestHelper {
 
     function testFailProposalCannotBeSupportedAfterExpiration() public {
         vm.startPrank(alice);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test Proposal");
+        GenericProposal proposal = factory.createProposal("Test Proposal", address(dao), 0, "");
 
         // Move past expiration
         vm.roll(block.number + MAX_PROPOSAL_AGE);
@@ -71,7 +71,7 @@ contract ProposalExpirationTest is TestHelper {
 
     function testFailSupportCannotBeRemovedAfterExpiration() public {
         vm.startPrank(alice);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test Proposal");
+        GenericProposal proposal = factory.createProposal("Test Proposal", address(dao), 0, "");
 
         // Add support before expiration
         dao.setApprovalForAll(address(proposal), true);
@@ -87,7 +87,7 @@ contract ProposalExpirationTest is TestHelper {
 
     function testProposalCanStillBeTriggeredBeforeExpiration() public {
         vm.startPrank(alice);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test Proposal");
+        GenericProposal proposal = factory.createProposal("Test Proposal", address(dao), 0, "");
 
         // Add enough support to trigger election (need 20% of 150 = 30)
         dao.setApprovalForAll(address(proposal), true);
@@ -100,7 +100,7 @@ contract ProposalExpirationTest is TestHelper {
 
     function testProposalAtExactExpirationBlock() public {
         vm.startPrank(alice);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test Proposal");
+        GenericProposal proposal = factory.createProposal("Test Proposal", address(dao), 0, "");
         uint256 creationBlock = block.number;
 
         // Move to exact expiration block

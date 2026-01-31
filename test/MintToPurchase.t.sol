@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
-import "../src/ProposalTypes.sol";
+import "../src/GenericProposal.sol";
 
 contract MintToPurchaseTest is TestHelper {
     MarketDAO public daoMintToPurchase;     // FLAG_MINT_TO_PURCHASE = true (default behavior)
@@ -109,11 +109,7 @@ contract MintToPurchaseTest is TestHelper {
     function testTransferToPurchaseAfterMintingToDAO() public {
         // First, mint tokens to the DAO via proposal
         vm.prank(alice);
-        MintProposal mintProposal = factory.createMintProposal(
-            "Mint tokens to DAO treasury for sale",
-            address(daoTransferToPurchase),
-            100
-        );
+        GenericProposal mintProposal = factory.createProposal("Mint tokens to DAO treasury for sale", address(daoTransferToPurchase), 0, abi.encodeWithSelector(daoTransferToPurchase.mintGovernanceTokens.selector, address(daoTransferToPurchase), 100));
 
         // Support the proposal (need 20% of 150 = 30)
         vm.prank(alice);
@@ -167,11 +163,7 @@ contract MintToPurchaseTest is TestHelper {
     function testTransferToPurchaseBlocksWhenInsufficientTokens() public {
         // Mint 5 tokens to DAO
         vm.prank(alice);
-        MintProposal mintProposal = factory.createMintProposal(
-            "Mint 5 tokens to DAO",
-            address(daoTransferToPurchase),
-            5
-        );
+        GenericProposal mintProposal = factory.createProposal("Mint 5 tokens to DAO", address(daoTransferToPurchase), 0, abi.encodeWithSelector(daoTransferToPurchase.mintGovernanceTokens.selector, address(daoTransferToPurchase), 5));
 
         vm.prank(alice);
         mintProposal.addSupport(30);
@@ -207,11 +199,7 @@ contract MintToPurchaseTest is TestHelper {
     function testMultiplePurchasesDepletesDAOInventory() public {
         // Mint 20 tokens to DAO
         vm.prank(alice);
-        MintProposal mintProposal = factory.createMintProposal(
-            "Mint 20 tokens to DAO",
-            address(daoTransferToPurchase),
-            20
-        );
+        GenericProposal mintProposal = factory.createProposal("Mint 20 tokens to DAO", address(daoTransferToPurchase), 0, abi.encodeWithSelector(daoTransferToPurchase.mintGovernanceTokens.selector, address(daoTransferToPurchase), 20));
 
         vm.prank(alice);
         mintProposal.addSupport(30);
@@ -250,11 +238,7 @@ contract MintToPurchaseTest is TestHelper {
     function testSupplyConsistencyWithTransferToPurchase() public {
         // Mint 50 tokens to DAO
         vm.prank(alice);
-        MintProposal mintProposal = factory.createMintProposal(
-            "Mint 50 tokens to DAO",
-            address(daoTransferToPurchase),
-            50
-        );
+        GenericProposal mintProposal = factory.createProposal("Mint 50 tokens to DAO", address(daoTransferToPurchase), 0, abi.encodeWithSelector(daoTransferToPurchase.mintGovernanceTokens.selector, address(daoTransferToPurchase), 50));
 
         vm.prank(alice);
         mintProposal.addSupport(30);

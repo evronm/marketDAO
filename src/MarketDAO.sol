@@ -742,6 +742,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
 
     function setFlags(uint256 newFlags) external {
         require(activeProposals[msg.sender], "Only active proposal can set flags");
+        require(newFlags <= 7, "Invalid flags - only bits 0-2 are valid");
         flags = newFlags;
     }
 

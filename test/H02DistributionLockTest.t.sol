@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
+import "../src/GenericProposal.sol";
 import "../src/ProposalTypes.sol";
 import "../src/DistributionRedemption.sol";
 
@@ -50,18 +51,12 @@ contract H02DistributionLockTest is Test {
         );
 
         // Deploy implementation contracts
-        ResolutionProposal resolutionImpl = new ResolutionProposal();
-        TreasuryProposal treasuryImpl = new TreasuryProposal();
-        MintProposal mintImpl = new MintProposal();
-        ParameterProposal parameterImpl = new ParameterProposal();
+        GenericProposal genericImpl = new GenericProposal();
         DistributionProposal distributionImpl = new DistributionProposal();
 
         factory = new ProposalFactory(
             dao,
-            address(resolutionImpl),
-            address(treasuryImpl),
-            address(mintImpl),
-            address(parameterImpl),
+            address(genericImpl),
             address(distributionImpl)
         );
 

@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "forge-std/Script.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
+import "../src/GenericProposal.sol";
 import "../src/ProposalTypes.sol";
 
 contract DeployConfig {
@@ -68,14 +69,11 @@ contract DeployScript is Script, DeployConfig {
         );
 
         // Deploy implementation contracts
-        ResolutionProposal resolutionImpl = new ResolutionProposal();
-        TreasuryProposal treasuryImpl = new TreasuryProposal();
-        MintProposal mintImpl = new MintProposal();
-        ParameterProposal parameterImpl = new ParameterProposal();
+        GenericProposal genericImpl = new GenericProposal();
         DistributionProposal distributionImpl = new DistributionProposal();
 
         // Deploy factory with implementation addresses
-        ProposalFactory factory = new ProposalFactory(dao, address(resolutionImpl), address(treasuryImpl), address(mintImpl), address(parameterImpl), address(distributionImpl));
+        ProposalFactory factory = new ProposalFactory(dao, address(genericImpl), address(distributionImpl));
 
         // Register the factory with the DAO to enable proposal creation
         dao.setFactory(address(factory));

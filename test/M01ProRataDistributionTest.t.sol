@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
+import "../src/GenericProposal.sol";
 import "../src/ProposalTypes.sol";
 import "../src/DistributionRedemption.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -38,18 +39,12 @@ contract M01ProRataDistributionTest is Test {
 
     // Helper to deploy the factory with all proposal implementations
     function deployFactory(MarketDAO _dao) internal returns (ProposalFactory) {
-        ResolutionProposal resImpl = new ResolutionProposal();
-        TreasuryProposal treasuryImpl = new TreasuryProposal();
-        MintProposal mintImpl = new MintProposal();
-        ParameterProposal paramImpl = new ParameterProposal();
+        GenericProposal genericImpl = new GenericProposal();
         DistributionProposal distImpl = new DistributionProposal();
 
         return new ProposalFactory(
             _dao,
-            address(resImpl),
-            address(treasuryImpl),
-            address(mintImpl),
-            address(paramImpl),
+            address(genericImpl),
             address(distImpl)
         );
     }

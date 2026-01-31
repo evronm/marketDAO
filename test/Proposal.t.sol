@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/Proposal.sol";
-import "../src/ProposalTypes.sol";
+import "../src/GenericProposal.sol";
 import "../src/ProposalFactory.sol";
 
 contract ProposalTest is TestHelper {
@@ -51,7 +51,7 @@ contract ProposalTest is TestHelper {
 
     function testResolutionProposal() public {
         vm.startPrank(proposer);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test Resolution");
+        GenericProposal proposal = factory.createProposal("Test Resolution", address(dao), 0, "");
         dao.setApprovalForAll(address(proposal), true);
 
         console.log("Adding support to proposal");
@@ -103,12 +103,11 @@ contract ProposalTest is TestHelper {
         vm.deal(address(dao), 100 ether);
 
         vm.startPrank(proposer);
-        TreasuryProposal proposal = factory.createTreasuryProposal(
+        GenericProposal proposal = factory.createProposal(
             "Send ETH",
-            voter1,
-            1 ether,
-            address(0),
-            0
+            address(dao),
+            0,
+            abi.encodeWithSelector(dao.transferETH.selector, payable(voter1), 1 ether)
         );
         dao.setApprovalForAll(address(proposal), true);
 
@@ -137,10 +136,11 @@ contract ProposalTest is TestHelper {
 
     function testMintProposal() public {
         vm.startPrank(proposer);
-        MintProposal proposal = factory.createMintProposal(
+        GenericProposal proposal = factory.createProposal(
             "Mint tokens",
-            voter1,
-            100
+            address(dao),
+            0,
+            abi.encodeWithSelector(dao.mintGovernanceTokens.selector, voter1, 100)
         );
         dao.setApprovalForAll(address(proposal), true);
 
@@ -169,18 +169,18 @@ contract ProposalTest is TestHelper {
 
     function testFailInsufficientSupport() public {
         vm.prank(voter1);  // Only has 50 tokens
-        ResolutionProposal proposal = factory.createResolutionProposal("Test Resolution");
+        GenericProposal proposal = factory.createProposal("Test Resolution", address(dao), 0, "");
         proposal.addSupport(39);  // Not enough for 20% threshold
         assertTrue(!proposal.electionTriggered());
     }
 
     function testRemoveSupport() public {
         vm.startPrank(proposer);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test Resolution");
-        
+        GenericProposal proposal = factory.createProposal("Test Resolution", address(dao), 0, "");
+
         proposal.addSupport(40);
         assertTrue(proposal.electionTriggered());
-        
+
         vm.expectRevert("Election already triggered");
         proposal.removeSupport(10);
         vm.stopPrank();

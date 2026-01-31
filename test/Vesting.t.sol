@@ -141,13 +141,7 @@ contract VestingTest is TestHelper {
 
         // Setup: Alice creates a proposal
         vm.prank(alice);
-        TreasuryProposal proposal = factory.createTreasuryProposal(
-            "Transfer 1 ETH",
-            bob,
-            1 ether,
-            address(0), // ETH transfer
-            0
-        );
+        GenericProposal proposal = factory.createProposal("Transfer 1 ETH", address(dao), 0, abi.encodeWithSelector(dao.transferETH.selector, payable(bob), 1 ether));
 
         // Attacker buys tokens
         vm.deal(attacker, 1 ether);
@@ -172,13 +166,7 @@ contract VestingTest is TestHelper {
 
         // Alice creates a proposal
         vm.prank(alice);
-        TreasuryProposal proposal = factory.createTreasuryProposal(
-            "Transfer 1 ETH",
-            bob,
-            1 ether,
-            address(0), // ETH transfer
-            0
-        );
+        GenericProposal proposal = factory.createProposal("Transfer 1 ETH", address(dao), 0, abi.encodeWithSelector(dao.transferETH.selector, payable(bob), 1 ether));
 
         // Alice and Bob support to trigger election
         // Total supply is 160 (100 + 50 + 10 attacker's locked), need 20% = 32 for election
@@ -217,13 +205,7 @@ contract VestingTest is TestHelper {
 
         // Create and trigger election for second proposal AFTER vesting completes
         vm.prank(alice);
-        TreasuryProposal proposal2 = factory.createTreasuryProposal(
-            "Transfer 2 ETH",
-            bob,
-            2 ether,
-            address(0), // ETH transfer
-            0
-        );
+        GenericProposal proposal2 = factory.createProposal("Transfer 2 ETH", address(dao), 0, abi.encodeWithSelector(dao.transferETH.selector, payable(bob), 2 ether));
 
         // Trigger election - Total vested supply is now 160 (100 + 50 + 10), need 20% = 32
         vm.prank(alice);

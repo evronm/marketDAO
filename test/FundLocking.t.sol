@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
-import "../src/ProposalTypes.sol";
+import "../src/GenericProposal.sol";
 
 contract FundLockingTest is TestHelper {
     MarketDAO dao;
@@ -55,23 +55,11 @@ contract FundLockingTest is TestHelper {
     function testFundLockingPreventsDoubleSpend() public {
         // Create first proposal for 10 ETH
         vm.prank(proposer1);
-        TreasuryProposal proposal1 = factory.createTreasuryProposal(
-            "Send 10 ETH - Proposal 1",
-            address(0x999),
-            10 ether,
-            address(0),
-            0
-        );
+        GenericProposal proposal1 = factory.createProposal("Send 10 ETH - Proposal 1", address(dao), 0, abi.encodeWithSelector(dao.transferETH.selector, payable(address(0x999)), 10 ether));
 
         // Can still create second proposal at creation time (funds not locked yet)
         vm.prank(proposer2);
-        TreasuryProposal proposal2 = factory.createTreasuryProposal(
-            "Send 10 ETH - Proposal 2",
-            address(0x998),
-            10 ether,
-            address(0),
-            0
-        );
+        GenericProposal proposal2 = factory.createProposal("Send 10 ETH - Proposal 2", address(dao), 0, abi.encodeWithSelector(dao.transferETH.selector, payable(address(0x998)), 10 ether));
 
         // Trigger first election - this locks the funds
         vm.prank(proposer1);
@@ -90,13 +78,7 @@ contract FundLockingTest is TestHelper {
     function testFundsLockedAtElectionTrigger() public {
         // Create proposal for 5 ETH
         vm.prank(proposer1);
-        TreasuryProposal proposal = factory.createTreasuryProposal(
-            "Send 5 ETH",
-            address(0x999),
-            5 ether,
-            address(0),
-            0
-        );
+        GenericProposal proposal = factory.createProposal("Send 5 ETH", address(dao), 0, abi.encodeWithSelector(dao.transferETH.selector, payable(address(0x999)), 5 ether));
 
         // Initially, funds are NOT locked yet (election not triggered)
         assertEq(dao.getTotalLockedETH(), 0);
@@ -113,13 +95,7 @@ contract FundLockingTest is TestHelper {
 
         // Can create another proposal for remaining 5 ETH
         vm.prank(proposer2);
-        TreasuryProposal proposal2 = factory.createTreasuryProposal(
-            "Send remaining 5 ETH",
-            address(0x998),
-            5 ether,
-            address(0),
-            0
-        );
+        GenericProposal proposal2 = factory.createProposal("Send remaining 5 ETH", address(dao), 0, abi.encodeWithSelector(dao.transferETH.selector, payable(address(0x998)), 5 ether));
 
         // Can also trigger this one
         vm.prank(proposer2);
@@ -132,25 +108,13 @@ contract FundLockingTest is TestHelper {
         // Cannot create a third proposal - no funds available
         vm.prank(proposer1);
         vm.expectRevert("Insufficient available ETH balance");
-        factory.createTreasuryProposal(
-            "Send 1 more ETH - should fail",
-            address(0x997),
-            1 ether,
-            address(0),
-            0
-        );
+        factory.createProposal("Send 1 more ETH - should fail", address(dao), 0, abi.encodeWithSelector(dao.transferETH.selector, payable(address(0x997)), 1 ether));
     }
 
     function testFundsUnlockedWhenProposalFails() public {
         // Create proposal
         vm.prank(proposer1);
-        TreasuryProposal proposal = factory.createTreasuryProposal(
-            "Send 5 ETH",
-            address(0x999),
-            5 ether,
-            address(0),
-            0
-        );
+        GenericProposal proposal = factory.createProposal("Send 5 ETH", address(dao), 0, abi.encodeWithSelector(dao.transferETH.selector, payable(address(0x999)), 5 ether));
 
         // Trigger election
         vm.startPrank(proposer1);
@@ -194,13 +158,7 @@ contract FundLockingTest is TestHelper {
     function testFundsUnlockedWhenQuorumNotMet() public {
         // Create proposal
         vm.prank(proposer1);
-        TreasuryProposal proposal = factory.createTreasuryProposal(
-            "Send 5 ETH",
-            address(0x999),
-            5 ether,
-            address(0),
-            0
-        );
+        GenericProposal proposal = factory.createProposal("Send 5 ETH", address(dao), 0, abi.encodeWithSelector(dao.transferETH.selector, payable(address(0x999)), 5 ether));
 
         // Trigger election
         vm.prank(proposer1);
@@ -228,13 +186,7 @@ contract FundLockingTest is TestHelper {
 
         // Create proposal
         vm.prank(proposer1);
-        TreasuryProposal proposal = factory.createTreasuryProposal(
-            "Send 5 ETH",
-            recipient,
-            5 ether,
-            address(0),
-            0
-        );
+        GenericProposal proposal = factory.createProposal("Send 5 ETH", address(dao), 0, abi.encodeWithSelector(dao.transferETH.selector, payable(recipient), 5 ether));
 
         // Trigger election
         vm.startPrank(proposer1);
@@ -277,31 +229,13 @@ contract FundLockingTest is TestHelper {
     function testMultipleProposalsLockTracking() public {
         // Create 3 proposals for 3 ETH each
         vm.prank(proposer1);
-        TreasuryProposal proposal1 = factory.createTreasuryProposal(
-            "Proposal 1",
-            address(0x991),
-            3 ether,
-            address(0),
-            0
-        );
+        GenericProposal proposal1 = factory.createProposal("Proposal 1", address(dao), 0, abi.encodeWithSelector(dao.transferETH.selector, payable(address(0x991)), 3 ether));
 
         vm.prank(proposer1);
-        TreasuryProposal proposal2 = factory.createTreasuryProposal(
-            "Proposal 2",
-            address(0x992),
-            3 ether,
-            address(0),
-            0
-        );
+        GenericProposal proposal2 = factory.createProposal("Proposal 2", address(dao), 0, abi.encodeWithSelector(dao.transferETH.selector, payable(address(0x992)), 3 ether));
 
         vm.prank(proposer1);
-        TreasuryProposal proposal3 = factory.createTreasuryProposal(
-            "Proposal 3",
-            address(0x993),
-            3 ether,
-            address(0),
-            0
-        );
+        GenericProposal proposal3 = factory.createProposal("Proposal 3", address(dao), 0, abi.encodeWithSelector(dao.transferETH.selector, payable(address(0x993)), 3 ether));
 
         // Trigger all elections
         vm.startPrank(proposer1);
@@ -323,13 +257,7 @@ contract FundLockingTest is TestHelper {
         // Create proposal for 15 ETH (more than available)
         vm.prank(proposer1);
         vm.expectRevert("Insufficient available ETH balance");
-        factory.createTreasuryProposal(
-            "Send 15 ETH",
-            address(0x999),
-            15 ether,
-            address(0),
-            0
-        );
+        factory.createProposal("Send 15 ETH", address(dao), 0, abi.encodeWithSelector(dao.transferETH.selector, payable(address(0x999)), 15 ether));
 
         // Send 5 more ETH to DAO
         vm.deal(address(this), 5 ether);
@@ -338,15 +266,10 @@ contract FundLockingTest is TestHelper {
 
         // Now we should be able to create the proposal
         vm.prank(proposer1);
-        TreasuryProposal proposal = factory.createTreasuryProposal(
-            "Send 15 ETH",
-            address(0x999),
-            15 ether,
-            address(0),
-            0
-        );
+        GenericProposal proposal = factory.createProposal("Send 15 ETH", address(dao), 0, abi.encodeWithSelector(dao.transferETH.selector, payable(address(0x999)), 15 ether));
 
         // Verify it was created successfully
-        assertEq(proposal.amount(), 15 ether);
+        assertEq(proposal.target(), address(dao));
+        assertEq(proposal.proposer(), proposer1);
     }
 }

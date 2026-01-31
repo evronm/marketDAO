@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
-import "../src/ProposalTypes.sol";
+import "../src/GenericProposal.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 
 contract HolderScalingTest is TestHelper, IERC1155Receiver {
@@ -118,7 +118,7 @@ contract HolderScalingTest is TestHelper, IERC1155Receiver {
         vm.startPrank(proposer);
         dao.setApprovalForAll(address(factory), true);
 
-        ResolutionProposal proposal = factory.createResolutionProposal("Test proposal");
+        GenericProposal proposal = factory.createProposal("Test proposal", address(dao), 0, "");
         dao.setApprovalForAll(address(proposal), true);
 
         console.log("Total supply:", dao.totalSupply(0));

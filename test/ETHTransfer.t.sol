@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
-import "../src/ProposalTypes.sol";
+import "../src/GenericProposal.sol";
 
 // Smart contract that can receive ETH
 contract ETHReceiver {
@@ -23,7 +23,7 @@ contract ETHReceiver {
 contract ReentrantAttacker {
     MarketDAO public dao;
     ProposalFactory public factory;
-    TreasuryProposal public attackProposal;
+    GenericProposal public attackProposal;
     bool public attacked;
 
     constructor(MarketDAO _dao, ProposalFactory _factory) {
@@ -33,12 +33,11 @@ contract ReentrantAttacker {
 
     function setupAttack() external {
         // Create a proposal to send ETH to this contract
-        attackProposal = factory.createTreasuryProposal(
+        attackProposal = factory.createProposal(
             "Attack proposal",
-            address(this),
-            1 ether,
-            address(0),
-            0
+            address(dao),
+            0,
+            abi.encodeWithSelector(dao.transferETH.selector, payable(address(this)), 1 ether)
         );
     }
 
@@ -127,12 +126,11 @@ contract ETHTransferTest is TestHelper {
         ETHReceiver receiver = new ETHReceiver();
 
         vm.startPrank(proposer);
-        TreasuryProposal proposal = factory.createTreasuryProposal(
+        GenericProposal proposal = factory.createProposal(
             "Send ETH to contract",
-            address(receiver),
-            5 ether,
-            address(0),
-            0
+            address(dao),
+            0,
+            abi.encodeWithSelector(dao.transferETH.selector, payable(address(receiver)), 5 ether)
         );
 
         dao.setApprovalForAll(address(proposal), true);
@@ -187,7 +185,7 @@ contract ETHTransferTest is TestHelper {
         vm.stopPrank();
 
         vm.startPrank(proposer);
-        TreasuryProposal proposal = attacker.attackProposal();
+        GenericProposal proposal = attacker.attackProposal();
 
         dao.setApprovalForAll(address(proposal), true);
         proposal.addSupport(40);
@@ -230,12 +228,11 @@ contract ETHTransferTest is TestHelper {
         ETHRejecter rejecter = new ETHRejecter();
 
         vm.startPrank(proposer);
-        TreasuryProposal proposal = factory.createTreasuryProposal(
+        GenericProposal proposal = factory.createProposal(
             "Send ETH to rejecter",
-            address(rejecter),
-            1 ether,
-            address(0),
-            0
+            address(dao),
+            0,
+            abi.encodeWithSelector(dao.transferETH.selector, payable(address(rejecter)), 1 ether)
         );
 
         dao.setApprovalForAll(address(proposal), true);
@@ -263,12 +260,11 @@ contract ETHTransferTest is TestHelper {
         address payable recipient = payable(address(0x999));
 
         vm.startPrank(proposer);
-        TreasuryProposal proposal = factory.createTreasuryProposal(
+        GenericProposal proposal = factory.createProposal(
             "Send ETH to EOA",
-            recipient,
-            10 ether,
-            address(0),
-            0
+            address(dao),
+            0,
+            abi.encodeWithSelector(dao.transferETH.selector, recipient, 10 ether)
         );
 
         dao.setApprovalForAll(address(proposal), true);

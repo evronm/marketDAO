@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
-import "../src/ProposalTypes.sol";
+import "../src/GenericProposal.sol";
 
 contract JoinRequestTest is TestHelper {
     MarketDAO public dao;
@@ -52,51 +52,35 @@ contract JoinRequestTest is TestHelper {
 
         // Charlie creates a join request
         vm.prank(charlie);
-        MintProposal proposal = factory.createMintProposal(
-            "Hi, I'm Charlie and I'd like to join the DAO",
-            charlie,
-            1
-        );
+        GenericProposal proposal = factory.createProposal("Hi, I'm Charlie and I'd like to join the DAO", address(dao), 0, abi.encodeWithSelector(dao.mintGovernanceTokens.selector, charlie, 1));
 
         // Verify proposal was created
         assertEq(address(proposal), address(factory.proposals(0)));
-        assertEq(proposal.recipient(), charlie);
-        assertEq(proposal.amount(), 1);
+        assertEq(proposal.proposer(), charlie);
+        assertEq(proposal.target(), address(dao));
     }
 
     function testNonHolderCannotRequestMoreThanOneToken() public {
         // Charlie tries to request 10 tokens
         vm.prank(charlie);
         vm.expectRevert("Non-holders can only request 1 token");
-        factory.createMintProposal(
-            "I want 10 tokens",
-            charlie,
-            10
-        );
+        factory.createProposal("I want 10 tokens", address(dao), 0, abi.encodeWithSelector(dao.mintGovernanceTokens.selector, charlie, 10));
     }
 
     function testNonHolderCannotRequestTokensForOthers() public {
         // Charlie tries to create a mint proposal for Alice
         vm.prank(charlie);
         vm.expectRevert("Non-holders can only request tokens for themselves");
-        factory.createMintProposal(
-            "I want to mint tokens for Alice",
-            alice,
-            1
-        );
+        factory.createProposal("I want to mint tokens for Alice", address(dao), 0, abi.encodeWithSelector(dao.mintGovernanceTokens.selector, alice, 1));
     }
 
     function testTokenHolderCanStillCreateAnyMintProposal() public {
         // Alice can create a mint proposal for any amount to any address
         vm.prank(alice);
-        MintProposal proposal = factory.createMintProposal(
-            "Mint 100 tokens for Bob",
-            bob,
-            100
-        );
+        GenericProposal proposal = factory.createProposal("Mint 100 tokens for Bob", address(dao), 0, abi.encodeWithSelector(dao.mintGovernanceTokens.selector, bob, 100));
 
-        assertEq(proposal.recipient(), bob);
-        assertEq(proposal.amount(), 100);
+        assertEq(proposal.proposer(), alice);
+        assertEq(proposal.target(), address(dao));
     }
 
     function testCompleteJoinRequestWorkflow() public {
@@ -105,11 +89,7 @@ contract JoinRequestTest is TestHelper {
 
         // Charlie creates a join request
         vm.prank(charlie);
-        MintProposal proposal = factory.createMintProposal(
-            "Hi, I'm Charlie. I'm a blockchain developer and would like to join the DAO.",
-            charlie,
-            1
-        );
+        GenericProposal proposal = factory.createProposal("Hi, I'm Charlie. I'm a blockchain developer and would like to join the DAO.", address(dao), 0, abi.encodeWithSelector(dao.mintGovernanceTokens.selector, charlie, 1));
 
         // Alice supports the proposal (need 20% of 150 = 30)
         vm.prank(alice);
@@ -139,9 +119,7 @@ contract JoinRequestTest is TestHelper {
 
         // Verify Charlie can now create other types of proposals
         vm.prank(charlie);
-        ResolutionProposal resProposal = factory.createResolutionProposal(
-            "Now that I'm a member, here's my first resolution"
-        );
+        GenericProposal resProposal = factory.createProposal("Now that I'm a member, here's my first resolution", address(dao), 0, "");
 
         // Verify the resolution proposal was created
         assertTrue(address(resProposal) != address(0));
@@ -150,11 +128,7 @@ contract JoinRequestTest is TestHelper {
     function testJoinRequestRejected() public {
         // Charlie creates a join request
         vm.prank(charlie);
-        MintProposal proposal = factory.createMintProposal(
-            "I'd like to join",
-            charlie,
-            1
-        );
+        GenericProposal proposal = factory.createProposal("I'd like to join", address(dao), 0, abi.encodeWithSelector(dao.mintGovernanceTokens.selector, charlie, 1));
 
         // Alice supports to trigger election
         vm.prank(alice);
@@ -189,18 +163,10 @@ contract JoinRequestTest is TestHelper {
 
         // Charlie and Dave both create join requests
         vm.prank(charlie);
-        MintProposal charlieProposal = factory.createMintProposal(
-            "Charlie wants to join",
-            charlie,
-            1
-        );
+        GenericProposal charlieProposal = factory.createProposal("Charlie wants to join", address(dao), 0, abi.encodeWithSelector(dao.mintGovernanceTokens.selector, charlie, 1));
 
         vm.prank(dave);
-        MintProposal daveProposal = factory.createMintProposal(
-            "Dave wants to join",
-            dave,
-            1
-        );
+        GenericProposal daveProposal = factory.createProposal("Dave wants to join", address(dao), 0, abi.encodeWithSelector(dao.mintGovernanceTokens.selector, dave, 1));
 
         // Both proposals exist
         assertEq(address(charlieProposal), factory.proposals(0));
@@ -212,22 +178,16 @@ contract JoinRequestTest is TestHelper {
         // Charlie cannot create a resolution proposal
         vm.prank(charlie);
         vm.expectRevert("Must hold vested governance tokens");
-        factory.createResolutionProposal("This should fail");
+        factory.createProposal("This should fail", address(dao), 0, "");
 
         // Charlie cannot create a treasury proposal
         vm.prank(charlie);
         vm.expectRevert("Must hold vested governance tokens");
-        factory.createTreasuryProposal(
-            "Send me money",
-            charlie,
-            1 ether,
-            address(0),
-            0
-        );
+        factory.createProposal("Send me money", address(dao), 0, abi.encodeWithSelector(dao.transferETH.selector, payable(charlie), 1 ether));
 
         // Charlie cannot create a parameter proposal
         vm.prank(charlie);
         vm.expectRevert("Must hold vested governance tokens");
-        factory.createParameterProposal("Change price", ParameterProposal.ParameterType.TokenPrice, 0.5 ether);
+        factory.createProposal("Change price", address(dao), 0, abi.encodeWithSelector(dao.setTokenPrice.selector, 0.5 ether));
     }
 }

@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "./TestHelper.sol";
 import "../src/ProposalFactory.sol";
+import "../src/GenericProposal.sol";
 
 contract ProposalFactoryTest is TestHelper {
     MarketDAO dao;
@@ -38,46 +39,42 @@ contract ProposalFactoryTest is TestHelper {
     
     function testCreateResolutionProposal() public {
         vm.startPrank(proposer);
-        ResolutionProposal proposal = factory.createResolutionProposal("Test Resolution");
-        
+        GenericProposal proposal = factory.createProposal("Test Resolution", address(dao), 0, "");
+
         assertEq(factory.proposalCount(), 1);
         assertEq(factory.getProposal(0), address(proposal));
         assertEq(proposal.description(), "Test Resolution");
     }
-    
+
     function testCreateTreasuryProposal() public {
         // Fund the DAO treasury first
         vm.deal(address(dao), 10 ether);
 
         vm.startPrank(proposer);
-        TreasuryProposal proposal = factory.createTreasuryProposal(
+        GenericProposal proposal = factory.createProposal(
             "Test Treasury",
-            address(0x2),
-            1 ether,
-            address(0),
-            0
+            address(dao),
+            0,
+            abi.encodeWithSelector(dao.transferETH.selector, payable(address(0x2)), 1 ether)
         );
 
         assertEq(factory.proposalCount(), 1);
         assertEq(factory.getProposal(0), address(proposal));
         assertEq(proposal.description(), "Test Treasury");
-        assertEq(proposal.recipient(), address(0x2));
-        assertEq(proposal.amount(), 1 ether);
     }
-    
+
     function testCreateMintProposal() public {
         vm.startPrank(proposer);
-        MintProposal proposal = factory.createMintProposal(
+        GenericProposal proposal = factory.createProposal(
             "Test Mint",
-            address(0x2),
-            100
+            address(dao),
+            0,
+            abi.encodeWithSelector(dao.mintGovernanceTokens.selector, address(0x2), 100)
         );
-        
+
         assertEq(factory.proposalCount(), 1);
         assertEq(factory.getProposal(0), address(proposal));
         assertEq(proposal.description(), "Test Mint");
-        assertEq(proposal.recipient(), address(0x2));
-        assertEq(proposal.amount(), 100);
     }
     
     function testFailInvalidProposalIndex() public view {

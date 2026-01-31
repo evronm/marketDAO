@@ -38,24 +38,22 @@ contract TreasuryValidationTest is TestHelper {
         vm.prank(proposer);
         // Try to create proposal for 10 ETH when DAO only has 1 ETH
         // Should revert with "Insufficient ETH balance"
-        factory.createTreasuryProposal(
+        factory.createProposal(
             "Send too much ETH",
-            address(0x999),
-            10 ether,
-            address(0),
-            0
+            address(dao),
+            0,
+            abi.encodeWithSelector(dao.transferETH.selector, payable(address(0x999)), 10 ether)
         );
     }
 
     function testCreateProposalWithSufficientBalance() public {
         vm.prank(proposer);
         // This should succeed - DAO has 1 ETH, proposal for 0.5 ETH
-        factory.createTreasuryProposal(
+        factory.createProposal(
             "Send valid amount",
-            address(0x999),
-            0.5 ether,
-            address(0),
-            0
+            address(dao),
+            0,
+            abi.encodeWithSelector(dao.transferETH.selector, payable(address(0x999)), 0.5 ether)
         );
     }
 }

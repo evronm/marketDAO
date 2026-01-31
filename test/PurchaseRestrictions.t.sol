@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "./TestHelper.sol";
 import "../src/MarketDAO.sol";
 import "../src/ProposalFactory.sol";
-import "../src/ProposalTypes.sol";
+import "../src/GenericProposal.sol";
 
 contract PurchaseRestrictionsTest is TestHelper {
     MarketDAO public daoOpen;           // No purchase restrictions
@@ -112,13 +112,9 @@ contract PurchaseRestrictionsTest is TestHelper {
         // Charlie has no tokens initially
         assertEq(daoRestricted.balanceOf(charlie, 0), 0);
 
-        // Create and pass a mint proposal to give Charlie tokens
+        // Create and pass a mint proposal to give Charlie tokens (Mint 10 tokens)
         vm.prank(alice);
-        MintProposal mintProposal = factory.createMintProposal(
-            "Mint tokens for Charlie",
-            charlie,
-            10  // Mint 10 tokens
-        );
+        GenericProposal mintProposal = factory.createProposal("Mint tokens for Charlie", address(daoRestricted), 0, abi.encodeWithSelector(daoRestricted.mintGovernanceTokens.selector, charlie, 10));
 
         // Support the proposal (need 20% of 150 = 30)
         vm.prank(alice);
