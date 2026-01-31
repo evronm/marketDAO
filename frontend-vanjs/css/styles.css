@@ -1,0 +1,151 @@
+/* MarketDAO Custom Styles */
+
+:root {
+  --color-primary: #2196f3;
+  --color-success: #4caf50;
+  --color-warning: #ff9800;
+  --color-danger: #f44336;
+  --color-info: #00bcd4;
+}
+
+body {
+  background-color: #f5f5f5;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+/* Main container */
+.app-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Header */
+.app-header {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.app-title {
+  margin: 0;
+  color: var(--color-primary);
+}
+
+/* Wallet info */
+.wallet-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wallet-address {
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  padding: 5px 10px;
+  background: #f0f0f0;
+  border-radius: 4px;
+}
+
+/* Navigation tabs */
+.nav-tabs {
+  margin-bottom: 20px;
+}
+
+/* Cards */
+.card {
+  border: none;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 20px;
+}
+
+.card-header {
+  background-color: white;
+  border-bottom: 2px solid #f0f0f0;
+  font-weight: 600;
+}
+
+/* Proposal cards */
+.proposal-card {
+  border-left: 4px solid var(--color-primary);
+}
+
+.proposal-card.type-treasury {
+  border-left-color: var(--color-success);
+}
+
+.proposal-card.type-mint {
+  border-left-color: var(--color-warning);
+}
+
+.proposal-card.type-parameter {
+  border-left-color: var(--color-info);
+}
+
+.proposal-card.type-distribution {
+  border-left-color: #9c27b0;
+}
+
+/* Progress bars */
+.progress {
+  height: 24px;
+  border-radius: 4px;
+}
+
+.progress-bar {
+  font-size: 14px;
+  line-height: 24px;
+}
+
+/* Loading overlay */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.loading-spinner {
+  background: white;
+  padding: 30px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+/* Notifications */
+.notification-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10000;
+  max-width: 400px;
+}
+
+/* Utility classes */
+.text-monospace {
+  font-family: 'Courier New', monospace;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .app-container {
+    padding: 10px;
+  }
+
+  .wallet-info {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
