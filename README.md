@@ -20,12 +20,14 @@ Unlike traditional DAOs where voting power is static, MarketDAO introduces trada
 - **Snapshot-based voting power** for unlimited scalability (no holder count limits)
 - **Automatic vesting schedule management** with cleanup and consolidation
 - **Proposal lifecycle** with support thresholds and voting periods
-- **Multiple proposal types**:
-  - Resolution proposals (text-only governance decisions)
-  - Treasury transfers (ETH, ERC20, ERC721, ERC1155)
-  - Governance token minting (including join requests)
-  - Parameter changes (modify any DAO configuration through governance)
-  - Distribution proposals (proportional distributions to all token holders)
+- **Unified proposal execution model**:
+  - **GenericProposal**: Flexible execution of arbitrary calls to any contract
+    - Resolution proposals (empty calldata = symbolic vote)
+    - Treasury transfers (ETH, ERC20, ERC721, ERC1155)
+    - Governance token minting (including join requests)
+    - Parameter changes (modify any DAO configuration)
+    - External protocol interactions (DeFi, other DAOs, smart contracts)
+  - **DistributionProposal**: Specialized proportional distribution system
 - **Early election termination** when clear majority is reached (works even after election ends)
 - **Configurable parameters** for tailoring governance to specific needs
 - **Security-hardened** with factory-based proposal registration and bounded gas costs
@@ -37,6 +39,35 @@ Unlike traditional DAOs where voting power is static, MarketDAO introduces trada
 - Each election creates unique voting tokens that can be claimed by governance token holders
 - Voting is done by transferring voting tokens to YES/NO addresses
 - Treasury functions support multiple asset types (ETH, ERC20, ERC721, ERC1155)
+
+### Architecture (Simplified January 2026)
+
+MarketDAO uses a **unified proposal execution model** for maximum flexibility:
+
+- **2 proposal types** (down from 5): GenericProposal + DistributionProposal
+- **GenericProposal** handles all standard operations via arbitrary call execution
+- **No target restrictions** - proposals can interact with any blockchain contract
+- **Automatic fund detection** - treasury operations automatically trigger fund locking
+- **Frontend builds calldata** - UI constructs the appropriate encoded function calls
+- **Security through voting** - community approval is the safeguard for all operations
+
+**Migration from old proposal types:**
+```solidity
+// OLD: factory.createResolutionProposal("Description")
+// NEW: factory.createProposal("Description", address(dao), 0, "")
+
+// OLD: factory.createTreasuryProposal("Send ETH", recipient, 1 ether, address(0), 0)
+// NEW: factory.createProposal("Send ETH", address(dao), 0,
+//        abi.encodeWithSelector(dao.transferETH.selector, payable(recipient), 1 ether))
+
+// OLD: factory.createMintProposal("Mint tokens", recipient, 100)
+// NEW: factory.createProposal("Mint tokens", address(dao), 0,
+//        abi.encodeWithSelector(dao.mintGovernanceTokens.selector, recipient, 100))
+
+// OLD: factory.createParameterProposal("Change price", ParameterType.TokenPrice, 2 ether)
+// NEW: factory.createProposal("Change price", address(dao), 0,
+//        abi.encodeWithSelector(dao.setTokenPrice.selector, 2 ether))
+```
 
 ### Lazy Token Distribution
 
@@ -63,13 +94,15 @@ To allow proposals with overwhelming support to execute quickly without waiting 
 
 Non-token holders can request to join the DAO through a special mint proposal:
 
-1. Non-holder submits a join request (creates a MintProposal for 1 token to themselves)
+1. Non-holder submits a join request (creates a GenericProposal to mint 1 token to themselves)
 2. The proposal enters the standard support phase
 3. Existing members add support if they approve
 4. If support threshold is reached, an election is triggered
 5. Members vote on the join request
 6. If approved, the new member receives 1 governance token and full DAO access
 7. If rejected, they remain a non-holder
+
+**Example**: `factory.createProposal("Join request", address(dao), 0, abi.encodeWithSelector(dao.mintGovernanceTokens.selector, requester, 1))`
 
 ### Snapshot-Based Voting Power
 
@@ -81,20 +114,32 @@ To enable unlimited scalability without gas limit concerns:
 - **Fair voting**: Voting power frozen at election start, preventing mid-election manipulation
 - **No gas limit concerns**: Election triggering cannot fail due to too many holders
 
-### Parameter Proposals (Governance Configuration)
+### GenericProposal (Unified Execution Model)
 
-All DAO configuration parameters can be modified through democratic governance via Parameter Proposals:
+GenericProposal is the core execution primitive that enables flexible, arbitrary contract interactions:
 
-- **7 parameter types**:
-  - **Support Threshold**: Percentage of vested tokens needed to trigger elections (basis points)
-  - **Quorum Percentage**: Participation required for valid elections (basis points, minimum 1%)
-  - **Max Proposal Age**: Block limit before proposals expire (must be > 0)
-  - **Election Duration**: Voting period length in blocks (must be > 0)
-  - **Vesting Period**: Token unlock time in blocks (0 = no vesting)
-  - **Token Price**: Cost per governance token in wei (must be > 0)
-  - **Flags**: Boolean configuration bitfield (0-7, controls minting/purchasing options)
-- **Built-in validation**: Each parameter type has appropriate constraints to prevent invalid configurations
-- **Democratic changes**: All parameter changes require the standard proposal lifecycle
+- **Single call execution**: Each proposal executes one call with `target`, `value`, and `data`
+- **No target restrictions**: Can call any contract on the blockchain (DAO functions, DeFi protocols, other DAOs)
+- **Automatic fund locking**: Detects DAO treasury operations and reserves funds at election trigger
+- **Security model**: Community voting is the safeguard - malicious proposals must convince majority
+
+**Common use cases**:
+- **Resolution**: `createProposal("Description", address(dao), 0, "")` - Symbolic vote with empty calldata
+- **ETH Transfer**: `createProposal("Send ETH", address(dao), 0, abi.encodeWithSelector(dao.transferETH.selector, recipient, amount))`
+- **Mint Tokens**: `createProposal("Mint tokens", address(dao), 0, abi.encodeWithSelector(dao.mintGovernanceTokens.selector, recipient, amount))`
+- **Change Parameters**: `createProposal("Change quorum", address(dao), 0, abi.encodeWithSelector(dao.setQuorumPercentage.selector, 6000))`
+- **External Protocol**: `createProposal("Vote in Uniswap", uniswapGovernor, 0, abi.encodeWithSelector(governor.castVote.selector, proposalId, true))`
+
+**Parameter changes** through GenericProposal support:
+- **Support Threshold**: `dao.setSupportThreshold(newValue)` - basis points, must be > 0 and <= 10000
+- **Quorum Percentage**: `dao.setQuorumPercentage(newValue)` - basis points, must be >= 100 and <= 10000
+- **Max Proposal Age**: `dao.setMaxProposalAge(newValue)` - blocks, must be > 0
+- **Election Duration**: `dao.setElectionDuration(newValue)` - blocks, must be > 0
+- **Vesting Period**: `dao.setVestingPeriod(newValue)` - blocks, no restrictions
+- **Token Price**: `dao.setTokenPrice(newValue)` - wei, must be > 0
+- **Flags**: `dao.setFlags(newValue)` - bitfield, must be 0-7
+
+All parameter changes validate at execution time and require the standard proposal lifecycle.
 
 ### Distribution Proposals (Proportional Distributions)
 
@@ -161,12 +206,15 @@ Common configurations:
 5. If approved, receive 1 governance token
 
 ### For Token Holders (Standard Proposals):
-1. Create a proposal (Resolution, Treasury, Mint, Parameter, or Distribution)
+1. Create a proposal using `factory.createProposal(description, target, value, data)`
+   - **Resolution**: `target = address(dao), value = 0, data = ""`
+   - **Treasury/Mint/Parameters**: `target = address(dao), value = 0, data = abi.encodeWithSelector(...)`
+   - **External calls**: `target = externalContract, value = ethAmount, data = encodedCall`
 2. Proposals need to reach support threshold to trigger an election
 3. When threshold is reached, an election period begins
 4. Claim voting tokens (1:1 with vested governance tokens)
 5. Cast votes by sending voting tokens to YES/NO addresses
-6. Successful proposals are executed automatically
+6. Successful proposals execute their call automatically
 
 ### For Distribution Proposals:
 1. Create distribution proposal specifying asset type and amount per token
@@ -203,30 +251,35 @@ forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast
 ```
 marketDAO/
 ├── src/
-│   ├── MarketDAO.sol           # Core DAO contract (ERC1155-based)
-│   ├── Proposal.sol            # Abstract proposal base class
-│   ├── ProposalTypes.sol       # Concrete proposal implementations
-│   ├── ProposalFactory.sol     # Factory for creating proposals
-│   └── DistributionRedemption.sol  # Handles distribution claims
+│   ├── MarketDAO.sol              # Core DAO contract (ERC1155-based)
+│   ├── Proposal.sol               # Abstract proposal base class
+│   ├── GenericProposal.sol        # Unified proposal execution (most use cases)
+│   ├── ProposalTypes.sol          # DistributionProposal + deprecated types
+│   ├── ProposalFactory.sol        # Factory for creating proposals
+│   └── DistributionRedemption.sol # Handles distribution claims
 ├── script/
-│   ├── Deploy.s.sol            # Default deployment
-│   ├── Deploy.controlled.s.sol # Controlled supply deployment
-│   └── Deploy.private.s.sol    # Restricted purchases deployment
-├── test/                       # Comprehensive test suite
-├── frontend/                   # React frontend application
-├── foundry.toml               # Foundry configuration
-└── CLAUDE.md                  # Development guide
+│   ├── Deploy.s.sol               # Default deployment
+│   ├── Deploy.controlled.s.sol    # Controlled supply deployment
+│   └── Deploy.private.s.sol       # Restricted purchases deployment
+├── test/                          # Comprehensive test suite (193 tests)
+├── frontend/                      # React frontend application
+├── foundry.toml                   # Foundry configuration
+└── CLAUDE.md                      # Development guide
 ```
 
 ## Future Possibilities
 
-- Resolution enhancements: Expiring resolutions, cancellation proposals
-- Multiple choice proposals beyond binary YES/NO
-- Delegation mechanisms for voting power
-- Staking mechanisms for proposal prioritization
-- Quadratic voting options
-- Time-weighted voting power
-- Proposal templates and batch operations
+The GenericProposal architecture enables unlimited extensibility through external contracts:
+
+- **DeFi Integration**: Participate in Uniswap governance, manage Aave positions, stake in protocols
+- **Cross-DAO Collaboration**: Vote in other DAOs, delegate voting power externally
+- **Advanced Execution**: Multi-call proposals via custom executor contracts
+- **NFT Management**: Bulk NFT operations, marketplace interactions, collection management
+- **Custom Governance**: Quadratic voting, delegation, time-weighted power via external modules
+- **Proposal Templates**: Frontend-provided templates for common operations
+- **Batch Operations**: Execute multiple related actions through external batch executor
+
+The architecture is designed to support any future governance innovation without protocol changes.
 
 ## License
 
