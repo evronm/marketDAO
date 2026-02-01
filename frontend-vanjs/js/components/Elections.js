@@ -126,6 +126,11 @@ const ElectionCard = ({ proposal }) => {
 
     isVoting.val = true
     try {
+      console.log('Voting with proposal:', proposal)
+      console.log('Vote YES?', voteYes)
+      console.log('Yes address:', proposal.yesVoteAddress)
+      console.log('No address:', proposal.noVoteAddress)
+
       const votingTokenId = proposal.votingTokenId || await (new ethers.Contract(
         proposal.address,
         PROPOSAL_ABI,
@@ -144,6 +149,7 @@ const ElectionCard = ({ proposal }) => {
 
       // Transfer voting tokens to yes or no address
       const targetAddress = voteYes ? proposal.yesVoteAddress : proposal.noVoteAddress
+      console.log('Target address for vote:', targetAddress)
 
       console.log(`Voting ${voteYes ? 'YES' : 'NO'} with ${balance.toString()} tokens`)
 

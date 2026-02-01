@@ -66,6 +66,13 @@ window.loadAllProposals = async () => {
     const history = []
 
     for (const p of proposals) {
+      console.log(`Categorizing proposal ${p.address}:`, {
+        executed: p.executed,
+        electionTriggered: p.electionTriggered,
+        electionStatus: p.electionStatus,
+        isExpired: p.isExpired
+      })
+
       if (p.executed || p.electionStatus === 'Ended') {
         history.push(p)
       } else if (p.electionTriggered) {
@@ -186,11 +193,16 @@ async function fetchProposalDetails(address, provider, daoContract) {
  * Load voting details for a proposal in election
  */
 async function loadVotingDetails(proposal, proposalContract, daoContract, provider, currentBlock) {
-  const [votingTokenId, yesVoteAddress, noVoteAddress] = await Promise.all([
-    proposalContract.votingTokenId(),
-    proposalContract.yesVoteAddress(),
-    proposalContract.noVoteAddress()
+  const votingTokenId = await proposalContract.votingTokenId()
+  const yesVoteAddressFn = proposalContract.getFunction('yesVoteAddress')
+  const noVoteAddressFn = proposalContract.getFunction('noVoteAddress')
+
+  const [yesVoteAddress, noVoteAddress] = await Promise.all([
+    yesVoteAddressFn(),
+    noVoteAddressFn()
   ])
+
+  console.log('Vote addresses:', { yesVoteAddress, noVoteAddress, votingTokenId: votingTokenId.toString() })
 
   const [yesVotes, noVotes, totalVotes, claimableAmount, hasClaimed] = await Promise.all([
     daoContract.balanceOf(yesVoteAddress, votingTokenId),
@@ -199,6 +211,11 @@ async function loadVotingDetails(proposal, proposalContract, daoContract, provid
     proposalContract.getClaimableAmount(walletState.walletAddress.val),
     proposalContract.hasClaimed(walletState.walletAddress.val)
   ])
+
+  // Set vote addresses on proposal object
+  proposal.yesVoteAddress = yesVoteAddress
+  proposal.noVoteAddress = noVoteAddress
+  proposal.votingTokenId = votingTokenId.toString()
 
   proposal.votes = {
     yes: yesVotes.toString(),

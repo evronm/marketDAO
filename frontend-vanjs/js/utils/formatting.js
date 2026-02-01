@@ -66,3 +66,26 @@ window.calculatePercentage = (part, total) => {
   if (totalNum === 0) return 0
   return Math.round((partNum / totalNum) * 100)
 }
+
+/**
+ * Format a token amount (just the number, not wei conversion)
+ */
+window.formatAmount = (amount) => {
+  if (!amount) return '0'
+  const num = typeof amount === 'bigint' ? amount : BigInt(amount)
+  return num.toLocaleString()
+}
+
+/**
+ * Format basis points to percentage (e.g., 5100 -> "51%")
+ */
+window.formatBasisPoints = (basisPoints) => {
+  return basisPointsToPercent(basisPoints) + '%'
+}
+
+/**
+ * Format ether value with units
+ */
+window.formatEther = (wei) => {
+  return safeFormatEther(wei)
+}
