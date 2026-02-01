@@ -159,10 +159,7 @@
         case 'proposals':
           return ProposalsView()
         case 'elections':
-          return div(
-            { class: 'card' },
-            div({ class: 'card-body' }, 'Elections view coming soon...')
-          )
+          return Elections()
         case 'history':
           return div(
             { class: 'card' },

@@ -12,6 +12,7 @@ window.DAO_ABI = [
   "function purchaseTokens() payable",
   "function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes data)",
   "function getGovernanceTokenHolders() view returns (address[])",
+  "function GOVERNANCE_TOKEN_ID() view returns (uint256)",
 
   // Parameters (read)
   "function tokenPrice() view returns (uint256)",
@@ -24,9 +25,6 @@ window.DAO_ABI = [
   "function allowMinting() view returns (bool)",
   "function mintToPurchase() view returns (bool)",
   "function getAvailableTokensForPurchase() view returns (uint256)",
-
-  // Execution (called by proposals)
-  "function executeCall(address target, uint256 value, bytes calldata data) returns (bytes)",
 
   // Parameter setters (for calldata encoding)
   "function setSupportThreshold(uint256 newThreshold)",
@@ -43,6 +41,6 @@ window.DAO_ABI = [
   "function transferERC721(address token, address recipient, uint256 tokenId)",
   "function transferERC1155(address token, address recipient, uint256 tokenId, uint256 amount)",
 
-  // Minting (for calldata encoding)
-  "function mint(address recipient, uint256 amount)"
+  // Minting (for calldata encoding) - NOTE: mintGovernanceTokens, not mint!
+  "function mintGovernanceTokens(address to, uint256 amount)"
 ]

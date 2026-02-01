@@ -130,17 +130,29 @@ async function fetchProposalDetails(address, provider, daoContract) {
   const isExpired = BigInt(currentBlock) >= expirationBlock && !electionTriggered
 
   // Get action to determine type (single action, not array)
+  // Note: "target" conflicts with Proxy.target, so we use getFunction
   let proposalType = 'resolution'
   let details = {}
   try {
-    const target = await proposalContract.target()
-    const value = await proposalContract.value()
-    const data = await proposalContract.data()
+    console.log('Fetching proposal action for:', address)
+    const targetFn = proposalContract.getFunction('target')
+    const valueFn = proposalContract.getFunction('value')
+    const dataFn = proposalContract.getFunction('data')
+
+    const target = await targetFn()
+    console.log('Target:', target)
+    const value = await valueFn()
+    console.log('Value:', value.toString())
+    const data = await dataFn()
+    console.log('Data:', data)
+
     const decoded = decodeProposalAction(target, value, data)
     proposalType = decoded.type
     details = decoded.details
+    console.log('Decoded type:', proposalType, 'details:', details)
   } catch (err) {
-    console.warn('Could not decode action:', err)
+    console.error('❌ Could not decode action:', err)
+    console.error('Error details:', err.message, err.stack)
   }
 
   // Build proposal data
@@ -227,6 +239,8 @@ async function loadVotingDetails(proposal, proposalContract, daoContract, provid
  * Decode proposal action to determine type (single action)
  */
 function decodeProposalAction(target, value, data) {
+  console.log('Decoding proposal action:', { target, value: value.toString(), data, dataLength: data.length })
+
   // Empty data and DAO target = resolution
   if (data === '0x' || data.length === 0 || data === '0x00') {
     return { type: 'resolution', details: {} }
@@ -249,7 +263,7 @@ function decodeProposalAction(target, value, data) {
             token: ethers.ZeroAddress
           }
         }
-      } else if (parsed.name === 'mint') {
+      } else if (parsed.name === 'mintGovernanceTokens') {
         return {
           type: 'mint',
           details: {
@@ -379,7 +393,7 @@ window.createProposal = async (type, description, params) => {
 
     const daoIface = new ethers.Interface(DAO_ABI)
     const amount = BigInt(params.mintAmount)
-    data = daoIface.encodeFunctionData('mint', [params.mintRecipient, amount])
+    data = daoIface.encodeFunctionData('mintGovernanceTokens', [params.mintRecipient, amount])
 
     target = daoAddress
     value = 0n
