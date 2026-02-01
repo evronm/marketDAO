@@ -21,6 +21,7 @@
   const Notification = () => {
     return () => {
       const notif = notification.val
+      console.log('🔔 Notification render check:', notif)
       if (!notif.show) return null
 
       return div(
@@ -87,41 +88,6 @@
   }
 
   /**
-   * Navigation Tabs Component
-   */
-  const Navigation = () => {
-    const tabs = [
-      { id: 'dashboard', label: 'Dashboard' },
-      { id: 'proposals', label: 'Proposals' },
-      { id: 'elections', label: 'Elections' },
-      { id: 'history', label: 'History' },
-      { id: 'members', label: 'Members' }
-    ]
-
-    return nav(
-      ul(
-        { class: 'nav nav-tabs' },
-        tabs.map(tab =>
-          li(
-            { class: 'nav-item' },
-            a(
-              {
-                class: () => `nav-link ${activeTab.val === tab.id ? 'active' : ''}`,
-                href: '#',
-                onclick: (e) => {
-                  e.preventDefault()
-                  activeTab.val = tab.id
-                }
-              },
-              tab.label
-            )
-          )
-        )
-      )
-    )
-  }
-
-  /**
    * Connect Wallet View (shown before wallet connection)
    */
   const ConnectWalletView = () => {
@@ -167,22 +133,12 @@
   }
 
   /**
-   * Proposals View (placeholder)
+   * Proposals View
    */
   const ProposalsView = () => {
     return div(
-      div(
-        { class: 'card' },
-        div(
-          { class: 'card-header' },
-          'Active Proposals'
-        ),
-        div(
-          { class: 'card-body' },
-          p('Proposals list coming soon...'),
-          p({ class: 'text-muted' }, 'This will show all active proposals that need support.')
-        )
-      )
+      CreateProposal(),
+      ProposalList()
     )
   }
 
@@ -229,9 +185,66 @@
   const App = () => {
     return div(
       { class: 'app-container' },
-      Notification(),
+      // Wrap notification in a container for reactive rendering
+      div(
+        { class: 'notification-wrapper' },
+        () => {
+          const notif = notification.val
+          console.log('🔔 Notification render check:', notif)
+          if (!notif.show) return null
+
+          return div(
+            { class: 'notification-container' },
+            div(
+              { class: `alert alert-${notif.type} alert-dismissible fade show`, role: 'alert' },
+              notif.message,
+              button(
+                {
+                  type: 'button',
+                  class: 'btn-close',
+                  onclick: () => notification.val = { show: false, message: '', type: 'info' }
+                }
+              )
+            )
+          )
+        }
+      ),
       Header(),
-      () => walletState.isConnected.val ? Navigation() : null,
+      // Navigation tabs (always shown)
+      (() => {
+        const tabs = [
+          { id: 'dashboard', label: 'Dashboard' },
+          { id: 'proposals', label: 'Proposals' },
+          { id: 'elections', label: 'Elections' },
+          { id: 'history', label: 'History' },
+          { id: 'members', label: 'Members' }
+        ]
+
+        return div(
+          { class: 'mb-3' },
+          nav(
+            ul(
+              { class: 'nav nav-tabs' },
+              tabs.map(tab =>
+                li(
+                  { class: 'nav-item' },
+                  a(
+                    {
+                      class: () => `nav-link ${activeTab.val === tab.id ? 'active' : ''}`,
+                      href: '#',
+                      onclick: (e) => {
+                        e.preventDefault()
+                        activeTab.val = tab.id
+                      }
+                    },
+                    tab.label
+                  )
+                )
+              )
+            )
+          )
+        )
+      })(),
       MainContent()
     )
   }
@@ -249,11 +262,26 @@
     // Initialize DAO state
     initDAOState(van)
 
-    // Load DAO info when wallet connects
+    // Initialize proposals state
+    initProposalsState(van)
+
+    // Track if we've loaded proposals to avoid polling
+    let proposalsLoadAttempted = false
+
+    // Load data when wallet connects (one-time)
     van.derive(() => {
-      if (walletState.isConnected.val && daoState.info.val.name === 'Loading...') {
-        console.log('Wallet connected, loading DAO info...')
-        loadDAOInfo()
+      if (walletState.isConnected.val) {
+        // Load DAO info once
+        if (daoState.info.val.name === 'Loading...') {
+          console.log('Wallet connected, loading DAO info...')
+          loadDAOInfo()
+        }
+        // Load proposals once after DAO info is loaded
+        if (daoState.info.val.name !== 'Loading...' && !proposalsLoadAttempted) {
+          console.log('Loading proposals...')
+          proposalsLoadAttempted = true
+          loadAllProposals()
+        }
       }
     })
 

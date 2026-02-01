@@ -32,7 +32,9 @@ window.showNotificationWithTimeout = (
   type = 'info',
   duration = CONFIG.ui.notificationDuration
 ) => {
+  console.log('📢 Showing notification:', { message, type })
   notificationState.val = createNotification(message, type)
+  console.log('📢 Notification state updated:', notificationState.val)
 
   setTimeout(() => {
     notificationState.val = hideNotification()

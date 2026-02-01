@@ -16,11 +16,10 @@ window.PROPOSAL_ABI = [
   "function canTriggerElection() view returns (bool)",
   "function dao() view returns (address)",
 
-  // New: arbitrary execution
-  "function targets(uint256 index) view returns (address)",
-  "function values(uint256 index) view returns (uint256)",
-  "function calldatas(uint256 index) view returns (bytes)",
-  "function getActions() view returns (address[] targets, uint256[] values, bytes[] calldatas)",
+  // GenericProposal: single action (not arrays)
+  "function target() view returns (address)",
+  "function value() view returns (uint256)",
+  "function data() view returns (bytes)",
 
   // Voting
   "function getClaimableAmount(address holder) view returns (uint256)",
