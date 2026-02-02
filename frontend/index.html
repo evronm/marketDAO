@@ -2,52 +2,48 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Market DAO</title>
-  <!-- Bootstrap CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    .spinner {
-      width: 50px;
-      height: 50px;
-      border: 5px solid #f3f3f3;
-      border-top: 5px solid #3498db;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-    .proposal-card {
-      border-left-width: 4px !important;
-    }
-    .badge-resolution {
-      background-color: #f3e5f5;
-      color: #4a148c;
-    }
-    .badge-treasury {
-      background-color: #e8f5e9;
-      color: #2e7d32;
-    }
-    .badge-mint {
-      background-color: #fff3e0;
-      color: #e65100;
-    }
-    .badge-parameter {
-      background-color: #e3f2fd;
-      color: #0d47a1;
-    }
-    .badge-distribution {
-      background-color: #e0f7fa;
-      color: #006064;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MarketDAO</title>
+
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <div id="root"></div>
-  <!-- Bootstrap JS Bundle with Popper -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script type="module" src="/src/main.tsx"></script>
+  <div id="app"></div>
+
+  <!-- Bootstrap 5 JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- VanJS CDN (nomodule version for browser) -->
+  <script src="https://vanjs.org/code/van-1.5.2.nomodule.min.js"></script>
+
+  <!-- Ethers.js v6 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.10.0/dist/ethers.umd.min.js"></script>
+
+  <!-- App files (load in order, no modules) -->
+  <script src="js/config.js"></script>
+  <script src="js/abis/MarketDAO.js"></script>
+  <script src="js/abis/Proposal.js"></script>
+  <script src="js/abis/ProposalFactory.js"></script>
+  <script src="js/utils/formatting.js"></script>
+  <script src="js/utils/validation-v2.js"></script>
+  <script src="js/utils/errorParser.js"></script>
+  <script src="js/utils/contractHelpers.js"></script>
+  <script src="js/utils/simpleNotification.js"></script>
+  <script src="js/services/wallet.js"></script>
+  <script src="js/services/dao.js"></script>
+  <script src="js/services/proposals.js"></script>
+  <script src="js/services/events.js"></script>
+  <script src="js/components/Dashboard.js"></script>
+  <script src="js/components/ProposalCard.js"></script>
+  <script src="js/components/ProposalList.js"></script>
+  <script src="js/components/CreateProposal.js"></script>
+  <script src="js/components/Elections.js"></script>
+  <script src="js/components/History.js"></script>
+  <script src="js/components/Members.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>

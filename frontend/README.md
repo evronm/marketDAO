@@ -1,86 +1,153 @@
-# MarketDAO Frontend
+# MarketDAO VanJS Frontend
 
-A clean, modular, maintainable frontend for the MarketDAO project, refactored from a 2,559-line monolithic HTML file.
+A lightweight frontend for MarketDAO built with VanJS - no build step required!
 
-## Architecture
+## Tech Stack
 
-### Structure
-```
-frontend/
-├── src/
-│   ├── types/          # TypeScript interfaces and ABIs
-│   ├── utils/          # Pure utility functions
-│   ├── hooks/          # Custom React hooks
-│   ├── components/     # Reusable UI components
-│   ├── App.tsx         # Main application
-│   └── main.tsx        # Entry point
-├── index.html          # Clean HTML shell
-└── package.json        # Minimal dependencies
-```
+- **VanJS** (~1KB reactive UI library)
+- **Ethers.js v6** (Web3 interactions)
+- **Bootstrap 5** (Styling)
+- **No bundler/build tools** - runs directly in browser via CDN imports
 
-### Key Improvements
-- **Modular Code**: Separated concerns into hooks, components, and utilities
-- **Type Safety**: Full TypeScript coverage with proper interfaces
-- **Testable**: Pure functions and isolated hooks can be unit tested
-- **Maintainable**: Each file has a single responsibility
-- **Minimal Dependencies**: Only React, ReactDOM, Ethers.js, and Vite
+## Quick Start
 
-### Dependencies
-- `react` + `react-dom` - UI framework
-- `ethers` - Blockchain interaction
-- `vite` - Build tool and dev server (dev dependency only)
-- `typescript` - Type safety (dev dependency only)
-
-## Development
+### 1. Start a local web server
 
 ```bash
-# Install dependencies
-npm install
+# Option 1: Python
+python -m http.server 8080
 
-# Start dev server
-npm run dev
+# Option 2: Node.js
+npx serve . -p 8080
 
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
+# Option 3: Live reload (optional)
+npx live-server --port=8080
 ```
 
-## Key Files
+### 2. Open in browser
 
-### Hooks
-- `useWallet.ts` - Wallet connection and MetaMask integration
-- `useDAO.ts` - DAO information loading and token operations
-- `useProposals.ts` - Proposal loading, voting, and management
+Navigate to http://localhost:8080
 
-### Components
-- `Dashboard.tsx` - DAO info and token purchase interface
-- `ProposalList.tsx` - Reusable proposal list component
-- `ProposalCard.tsx` - Individual proposal card display
-- `LoadingSpinner.tsx` - Loading overlay
-- `Notification.tsx` - Toast notifications
+### 3. Connect MetaMask
 
-### Utilities
-- `formatting.ts` - Safe value formatting (ETH, BigNumber, addresses)
-- `contractHelpers.ts` - Contract interaction utilities
-- `notification.ts` - Notification state management
+Make sure MetaMask is:
+- Installed
+- Connected to the correct network (default: Localhost 8545, Chain ID 31337)
+- Has an account with test ETH
 
 ## Configuration
 
-Contract addresses are configured in `src/types/constants.ts`:
-```typescript
-export const DAO_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
-export const FACTORY_ADDRESS = '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512';
+Edit `js/config.js` to change network and contract addresses:
+
+```javascript
+const CONFIG = {
+  network: {
+    chainId: 31337,  // Change for different networks
+    name: 'Localhost',
+    rpcUrl: 'http://localhost:8545'
+  },
+  contracts: {
+    dao: '0x5fbdb2315678afecb367f032d93f642f64180aa3',
+    factory: '0x0165878a594ca255338adfa4d48449f69242eb8f'
+  }
+}
 ```
 
-Update these for different networks or deployments.
+Quick network switch using predefined configs:
 
-## Build Output
+```javascript
+// Uncomment in config.js to switch networks
+const NETWORKS = {
+  anvil: { ... },
+  sepolia: { ... },
+  mainnet: { ... }
+}
+```
 
-The production build outputs to `dist/`:
-- Optimized, minified JavaScript bundle
-- Production React build (smaller, faster)
-- Static HTML with asset references
+## Project Structure
 
-Deploy the `dist/` folder to any static hosting service.
+```
+frontend-vanjs/
+├── index.html          # Entry point
+├── css/
+│   └── styles.css      # Custom styles
+├── js/
+│   ├── app.js          # Main app & routing
+│   ├── config.js       # Configuration
+│   ├── components/     # UI components (coming soon)
+│   ├── services/
+│   │   └── wallet.js   # Wallet connection
+│   ├── utils/
+│   │   ├── formatting.js
+│   │   ├── contractHelpers.js
+│   │   └── notifications.js
+│   └── abis/
+│       ├── MarketDAO.js
+│       ├── Proposal.js
+│       └── ProposalFactory.js
+└── README.md
+```
+
+## Development Status
+
+### ✅ Complete
+- Basic app shell and routing
+- Wallet connection (MetaMask)
+- Configuration system
+- Utility functions
+- ABIs for unified proposal architecture
+
+### 🚧 In Progress
+- Dashboard (DAO info, balances, token purchase)
+- Proposal list and cards
+- Create proposal forms
+- Voting interface
+
+### 📋 TODO
+- Elections view
+- History view
+- Members list
+- Distribution proposals
+
+## Key Differences from React Version
+
+1. **No Build Tools**: Everything runs directly via CDN imports
+2. **VanJS State**: Uses `van.state()` instead of React hooks
+3. **Unified Proposals**: New backend uses single Proposal contract with arbitrary calldata
+4. **Ethers v6**: Updated from v5 (BrowserProvider, await getSigner(), etc.)
+
+## Testing with Local Blockchain
+
+1. Start Anvil:
+   ```bash
+   anvil
+   ```
+
+2. Deploy contracts:
+   ```bash
+   forge script script/Deploy.s.sol --broadcast --rpc-url http://localhost:8545
+   ```
+
+3. Update contract addresses in `js/config.js` if different
+
+4. Open frontend and connect wallet
+
+## Debugging
+
+Open browser console (F12) to see:
+- Wallet connection logs
+- Contract initialization
+- Network validation
+- Error messages
+
+## Contributing
+
+This is an incremental build. Components will be added one at a time:
+1. Dashboard
+2. Proposal list
+3. Create proposal
+4. Elections/voting
+5. History
+6. Members
+
+See `CLAUDE.md` in project root for full architecture details.
