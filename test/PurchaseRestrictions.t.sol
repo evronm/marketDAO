@@ -29,9 +29,6 @@ contract PurchaseRestrictionsTest is TestHelper {
         initialAmounts[0] = 100;
         initialAmounts[1] = 50;
 
-        string[] memory treasuryConfig = new string[](1);
-        treasuryConfig[0] = "ETH";
-
         // Create DAO without restrictions (flags = 1, only minting enabled)
         daoOpen = new MarketDAO(
             "Open DAO",
@@ -42,7 +39,6 @@ contract PurchaseRestrictionsTest is TestHelper {
             FLAG_ALLOW_MINTING,  // flags: allow minting, no restrictions
             TOKEN_PRICE,
             0,     // No vesting for simpler tests
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );
@@ -57,7 +53,6 @@ contract PurchaseRestrictionsTest is TestHelper {
             FLAG_ALLOW_MINTING | FLAG_RESTRICT_PURCHASES,  // flags: both enabled
             TOKEN_PRICE,
             0,     // No vesting
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );

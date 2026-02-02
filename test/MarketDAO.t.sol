@@ -19,11 +19,7 @@ contract MarketDAOTest is TestHelper {
         uint256[] memory initialAmounts = new uint256[](2);
         initialAmounts[0] = 100;
         initialAmounts[1] = 50;
-        
-        string[] memory treasuryConfig = new string[](2);
-        treasuryConfig[0] = "ETH";
-        treasuryConfig[1] = "ERC20";
-        
+
         dao = new MarketDAO(
             "Test DAO",
             2000, // 20% support threshold (basis points)
@@ -33,7 +29,6 @@ contract MarketDAOTest is TestHelper {
             1, // flags (allowMinting=True)
             0, //token sales off
             0, // No vesting
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );
@@ -46,11 +41,6 @@ contract MarketDAOTest is TestHelper {
         assertEq(dao.maxProposalAge(), 100);
         assertEq(dao.electionDuration(), 50);
         assertTrue(dao.allowMinting());
-        assertTrue(dao.hasTreasury());
-        assertTrue(dao.acceptsETH());
-        assertTrue(dao.acceptsERC20());
-        assertFalse(dao.acceptsERC721());
-        assertFalse(dao.acceptsERC1155());
     }
     
     function testInitialTokenDistribution() public {
@@ -86,27 +76,6 @@ contract MarketDAOTest is TestHelper {
         assertEq(address(dao).balance, 1 ether);
     }
     
-    function testFailReceiveETHWhenNotConfigured() public {
-        address[] memory initialHolders = new address[](0);
-        uint256[] memory initialAmounts = new uint256[](0);
-        string[] memory treasuryConfig = new string[](0);
-
-        MarketDAO noTreasuryDao = new MarketDAO(
-            "No Treasury",
-            2000,  // 20% (basis points)
-            5100,  // 51% (basis points)
-            100,
-            50,
-            1, // flags (allowMinting=True)
-            0, //token sales off
-            0, // No vesting
-            treasuryConfig,
-            initialHolders,
-            initialAmounts
-        );
-
-        payable(address(noTreasuryDao)).transfer(1 ether);
-    }
 
     function testDeployerCanSetFactory() public {
         // The test contract is the deployer since it deployed in setUp

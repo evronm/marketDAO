@@ -12,9 +12,6 @@ contract HolderScalingTest is TestHelper, IERC1155Receiver {
     ProposalFactory factory;
 
     function setUp() public {
-        string[] memory treasuryConfig = new string[](1);
-        treasuryConfig[0] = "ETH";
-
         address[] memory initialHolders = new address[](0);
         uint256[] memory initialAmounts = new uint256[](0);
 
@@ -27,7 +24,6 @@ contract HolderScalingTest is TestHelper, IERC1155Receiver {
             1, // flags (allowMinting=True)
             0,
             0, // No vesting
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );
@@ -77,9 +73,6 @@ contract HolderScalingTest is TestHelper, IERC1155Receiver {
         bootstrapAmounts[0] = numHolders * 100;
 
         // Recreate DAO with initial tokens
-        string[] memory treasuryConfig = new string[](1);
-        treasuryConfig[0] = "ETH";
-
         dao = new MarketDAO(
             "Test DAO",
             2000, // 20% support threshold
@@ -89,7 +82,6 @@ contract HolderScalingTest is TestHelper, IERC1155Receiver {
             1, // flags (allowMinting=True)
             0,
             0, // No vesting
-            treasuryConfig,
             bootstrapHolders,
             bootstrapAmounts
         );

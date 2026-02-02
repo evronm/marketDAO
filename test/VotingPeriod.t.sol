@@ -17,12 +17,11 @@ contract TestMarketDAO is MarketDAO {
         uint256 _flags,
         uint256 _tokenPrice,
         uint256 _vestingPeriod,
-        string[] memory _treasuryConfig,
         address[] memory _initialHolders,
         uint256[] memory _initialAmounts
     ) MarketDAO(
         _name, _supportThreshold, _quorumPercentage, _maxProposalAge,
-        _electionDuration, _flags, _tokenPrice, _vestingPeriod, _treasuryConfig,
+        _electionDuration, _flags, _tokenPrice, _vestingPeriod,
         _initialHolders, _initialAmounts
     ) {}
         

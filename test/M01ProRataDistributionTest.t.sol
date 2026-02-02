@@ -62,10 +62,6 @@ contract M01ProRataDistributionTest is Test {
         initialAmounts[2] = 30;
         initialAmounts[3] = 20;
 
-        string[] memory treasuryConfig = new string[](2);
-        treasuryConfig[0] = "ETH";
-        treasuryConfig[1] = "ERC20";
-
         dao = new MarketDAO(
             "Test DAO",
             2000, // 20% support threshold
@@ -75,7 +71,6 @@ contract M01ProRataDistributionTest is Test {
             0,    // flags
             0,    // token price
             0,    // No vesting (instant vest for simplicity)
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );

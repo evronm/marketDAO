@@ -97,9 +97,6 @@ contract ETHTransferTest is TestHelper {
         initialAmounts[0] = 100;
         initialAmounts[1] = 50;
 
-        string[] memory treasuryConfig = new string[](1);
-        treasuryConfig[0] = "ETH";
-
         dao = new MarketDAO(
             "Test DAO",
             2000, // 20% support
@@ -109,7 +106,6 @@ contract ETHTransferTest is TestHelper {
             0, // flags (allowMinting=False)
             0,
             0, // No vesting
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );

@@ -21,8 +21,6 @@ contract VestedSupplyTrackingTest is TestHelper {
         uint256[] memory initialAmounts = new uint256[](1);
         initialAmounts[0] = 100; // Initial holder has 100 vested tokens
 
-        string[] memory treasuryConfig = new string[](0);
-
         dao = new MarketDAO(
             "Test DAO",
             2000, // 20% support
@@ -32,7 +30,6 @@ contract VestedSupplyTrackingTest is TestHelper {
             0, // flags (allowMinting=False)
             1 ether, // Token price
             100, // 100 block vesting period
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );
@@ -250,7 +247,6 @@ contract VestedSupplyTrackingTest is TestHelper {
         // Create DAO with no initial holders
         address[] memory noHolders = new address[](0);
         uint256[] memory noAmounts = new uint256[](0);
-        string[] memory treasuryConfig = new string[](0);
 
         MarketDAO emptyDao = new MarketDAO(
             "Empty DAO",
@@ -261,7 +257,6 @@ contract VestedSupplyTrackingTest is TestHelper {
             0, // flags (allowMinting=False)
             1 ether,
             100,
-            treasuryConfig,
             noHolders,
             noAmounts
         );

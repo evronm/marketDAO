@@ -77,12 +77,6 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     address public factory;
     address private immutable deployer;
 
-    // Treasury configuration
-    bool public hasTreasury;
-    bool public acceptsETH;
-    bool public acceptsERC20;
-    bool public acceptsERC721;
-    bool public acceptsERC1155;
 
     // Governance token holder tracking
     address[] private governanceTokenHolders;
@@ -117,7 +111,6 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         uint256 _flags,
         uint256 _tokenPrice,
         uint256 _vestingPeriod,
-        string[] memory _treasuryConfig,
         address[] memory _initialHolders,
         uint256[] memory _initialAmounts
     ) ERC1155("") {  // URI will be set later if needed
@@ -134,16 +127,6 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         flags = _flags;
         tokenPrice = _tokenPrice;
         vestingPeriod = _vestingPeriod;
-        
-        // Set up treasury configuration
-        hasTreasury = _treasuryConfig.length > 0;
-        for(uint i = 0; i < _treasuryConfig.length; i++) {
-            bytes32 config = keccak256(abi.encodePacked(_treasuryConfig[i]));
-            if(config == keccak256(abi.encodePacked("ETH"))) acceptsETH = true;
-            if(config == keccak256(abi.encodePacked("ERC20"))) acceptsERC20 = true;
-            if(config == keccak256(abi.encodePacked("ERC721"))) acceptsERC721 = true;
-            if(config == keccak256(abi.encodePacked("ERC1155"))) acceptsERC1155 = true;
-        }
         
         // Mint initial governance tokens
         for(uint i = 0; i < _initialHolders.length; i++) {
@@ -292,7 +275,6 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     
     // Treasury functions
     receive() external payable {
-        require(acceptsETH, "DAO does not accept ETH");
         _tryReleaseLockedProposals();
     }
 
@@ -304,14 +286,11 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
 
         // Verify sufficient available funds
         if (token == address(0)) {
-            require(acceptsETH, "ETH not accepted");
             require(getAvailableETH() >= amount, "Insufficient available ETH");
         } else if (tokenId == 0) {
-            require(acceptsERC20, "ERC20 not accepted");
             require(getAvailableERC20(token) >= amount, "Insufficient available ERC20");
         } else {
             // ERC721 or ERC1155
-            require(acceptsERC1155, "ERC1155 not accepted");
             require(getAvailableERC1155(token, tokenId) >= amount, "Insufficient available ERC1155");
         }
 
@@ -847,8 +826,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         if (id == GOVERNANCE_TOKEN_ID) {
             return this.onERC1155Received.selector;
         }
-        // For other tokens, check treasury config
-        require(acceptsERC1155, "DAO does not accept ERC1155");
+        // Accept all ERC1155 tokens
         return this.onERC1155Received.selector;
     }
 
@@ -859,13 +837,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         uint256[] memory,
         bytes memory
     ) public virtual returns (bytes4) {
-        // Check if any non-governance tokens are being received
-        for (uint256 i = 0; i < ids.length; i++) {
-            if (ids[i] != GOVERNANCE_TOKEN_ID) {
-                require(acceptsERC1155, "DAO does not accept ERC1155");
-                break;
-            }
-        }
+        // Accept all ERC1155 tokens
         return this.onERC1155BatchReceived.selector;
     }
 
@@ -876,7 +848,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         uint256,
         bytes memory
     ) public virtual returns (bytes4) {
-        require(acceptsERC721, "DAO does not accept ERC721");
+        // Accept all ERC721 tokens
         return this.onERC721Received.selector;
     }
 }

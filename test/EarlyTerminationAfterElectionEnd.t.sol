@@ -27,9 +27,6 @@ contract EarlyTerminationAfterElectionEndTest is TestHelper {
         initialAmounts[0] = 100;
         initialAmounts[1] = 100;
 
-        string[] memory treasuryConfig = new string[](1);
-        treasuryConfig[0] = "ETH";
-
         dao = new MarketDAO(
             "Test DAO",
             2000, // 20% support
@@ -39,7 +36,6 @@ contract EarlyTerminationAfterElectionEndTest is TestHelper {
             1,    // flags (allowMinting=True)
             0,    // token price
             0,    // no vesting
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );
@@ -80,19 +76,20 @@ contract EarlyTerminationAfterElectionEndTest is TestHelper {
         proposal.claimVotingTokens();
 
         // Vote YES with majority (just over 50% - should trigger early termination)
+        // Also need to meet 51% quorum (102 votes out of 200)
         uint256 votingTokenId = proposal.votingTokenId();
         address yesVoteAddr = proposal.yesVoteAddress();
 
         // Move forward in time but still during election
         vm.roll(block.number + 10);
 
-        // Vote with majority (Alice has 100 votes, which is exactly 50%, so vote all to reach majority)
+        // Vote with majority + quorum (Alice votes 100, Bob votes 2 = 102 total)
         vm.prank(alice);
         dao.safeTransferFrom(alice, yesVoteAddr, votingTokenId, 100, "");
 
-        // Bob also votes yes to reach >50%
+        // Bob votes 2 to reach >50% AND meet 51% quorum
         vm.prank(bob);
-        dao.safeTransferFrom(bob, yesVoteAddr, votingTokenId, 1, "");
+        dao.safeTransferFrom(bob, yesVoteAddr, votingTokenId, 2, "");
 
         // At this point, early termination should have been attempted but may have failed
         // Let's advance past the election end
@@ -141,11 +138,12 @@ contract EarlyTerminationAfterElectionEndTest is TestHelper {
         uint256 votingTokenId = proposal.votingTokenId();
         address yesVoteAddr = proposal.yesVoteAddress();
 
+        // Also need to meet 51% quorum (102 votes out of 200)
         vm.prank(alice);
         dao.safeTransferFrom(alice, yesVoteAddr, votingTokenId, 100, "");
 
         vm.prank(bob);
-        dao.safeTransferFrom(bob, yesVoteAddr, votingTokenId, 1, "");
+        dao.safeTransferFrom(bob, yesVoteAddr, votingTokenId, 2, "");
 
         // At this point early termination may or may not have been called
         // Move past the election end
@@ -184,6 +182,7 @@ contract EarlyTerminationAfterElectionEndTest is TestHelper {
         proposal.claimVotingTokens();
 
         // Vote NO with majority DURING the election
+        // Also need to meet 51% quorum (102 votes out of 200)
         uint256 votingTokenId = proposal.votingTokenId();
         address noVoteAddr = proposal.noVoteAddress();
 
@@ -191,7 +190,7 @@ contract EarlyTerminationAfterElectionEndTest is TestHelper {
         dao.safeTransferFrom(alice, noVoteAddr, votingTokenId, 100, "");
 
         vm.prank(bob);
-        dao.safeTransferFrom(bob, noVoteAddr, votingTokenId, 1, "");
+        dao.safeTransferFrom(bob, noVoteAddr, votingTokenId, 2, "");
 
         // Move past election end
         vm.roll(block.number + 60);

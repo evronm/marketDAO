@@ -15,10 +15,7 @@ contract ProposalFactoryTest is TestHelper {
         initialHolders[0] = proposer;
         uint256[] memory initialAmounts = new uint256[](1);
         initialAmounts[0] = 100;
-        string[] memory treasuryConfig = new string[](2);
-        treasuryConfig[0] = "ETH";
-        treasuryConfig[1] = "ERC20";
-        
+
         dao = new MarketDAO(
             "Test DAO",
             2000,  // 20% (basis points)
@@ -28,7 +25,6 @@ contract ProposalFactoryTest is TestHelper {
             1, // flags (allowMinting=True)
             0, //token sales off
             0, // No vesting
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );

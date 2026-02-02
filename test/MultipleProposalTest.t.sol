@@ -23,10 +23,7 @@ contract MultipleProposalTest is TestHelper {
         initialAmounts[0] = 100;
         initialAmounts[1] = 50;
         initialAmounts[2] = 50;
-        
-        string[] memory treasuryConfig = new string[](1);
-        treasuryConfig[0] = "ETH";
-        
+
         dao = new MarketDAO(
             "Test DAO",
             2000,  // 20% support threshold (basis points)
@@ -36,7 +33,6 @@ contract MultipleProposalTest is TestHelper {
             1, // flags (allowMinting=True)
             0.1 ether, // token price
             0, // No vesting
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );

@@ -25,9 +25,6 @@ contract JoinRequestTest is TestHelper {
         initialAmounts[0] = 100;
         initialAmounts[1] = 50;
 
-        string[] memory treasuryConfig = new string[](1);
-        treasuryConfig[0] = "ETH";
-
         dao = new MarketDAO(
             "Test DAO",
             2000,  // 20% support threshold
@@ -37,7 +34,6 @@ contract JoinRequestTest is TestHelper {
             FLAG_ALLOW_MINTING,
             0,     // No token sales
             0,     // No vesting
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );

@@ -22,8 +22,6 @@ contract CanTriggerElectionExpirationTest is TestHelper {
         initialAmounts[0] = 100;
         initialAmounts[1] = 100;
 
-        string[] memory treasuryConfig = new string[](0);
-
         dao = new MarketDAO(
             "Test DAO",
             2000, // 20% support (need 40 tokens)
@@ -33,7 +31,6 @@ contract CanTriggerElectionExpirationTest is TestHelper {
             0, // flags (allowMinting=False)
             0,
             0, // No vesting
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );

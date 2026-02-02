@@ -33,11 +33,7 @@ contract EarlyTerminationTest is TestHelper {
         initialAmounts[0] = 100;
         initialAmounts[1] = 50;
         initialAmounts[2] = 50;
-        
-        // Setup treasury config
-        string[] memory treasuryConfig = new string[](1);
-        treasuryConfig[0] = "ETH";
-        
+
         // Create DAO with a 30% support threshold and 60% quorum
         dao = new MarketDAO(
             "Test DAO",
@@ -48,7 +44,6 @@ contract EarlyTerminationTest is TestHelper {
             1, // flags (allowMinting=True)
             0, // Token price
             0, // No vesting
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );
@@ -109,10 +104,11 @@ contract EarlyTerminationTest is TestHelper {
         vm.stopPrank();
         vm.startPrank(alice);
         
-        // Then, Alice transfers 51 tokens to Yes to exceed half
-        uint256 voteAmount = 51;
+        // Then, Alice transfers 70 tokens to Yes to exceed half AND meet quorum
+        // 50 + 70 = 120 votes = 60% quorum AND >50% majority
+        uint256 voteAmount = 70;
         console.log("Alice voting with:", voteAmount);
-        
+
         dao.safeTransferFrom(alice, yesVoteAddress, votingTokenId, voteAmount, "");
         
         // Check post-vote balances
@@ -169,8 +165,9 @@ contract EarlyTerminationTest is TestHelper {
         vm.stopPrank();
         vm.startPrank(alice);
         
-        // Then, Alice transfers 51 tokens to No to exceed half
-        dao.safeTransferFrom(alice, noVoteAddress, votingTokenId, 51, "");
+        // Then, Alice transfers 70 tokens to No to exceed half AND meet quorum
+        // 50 + 70 = 120 votes = 60% quorum AND >50% majority
+        dao.safeTransferFrom(alice, noVoteAddress, votingTokenId, 70, "");
         
         // Manually check for early termination
         proposal.checkEarlyTermination();
@@ -228,9 +225,9 @@ contract EarlyTerminationTest is TestHelper {
         ids[0] = votingTokenId;
         
         uint256[] memory amounts = new uint256[](1);
-        amounts[0] = 51;
-        
-        // Alice batch transfers enough tokens to Yes to exceed half
+        amounts[0] = 70;  // 50 + 70 = 120 votes = 60% quorum AND >50% majority
+
+        // Alice batch transfers enough tokens to Yes to exceed half AND meet quorum
         dao.safeBatchTransferFrom(alice, yesVoteAddress, ids, amounts, "");
         
         // Manually check for early termination

@@ -24,13 +24,7 @@ contract ProposalTest is TestHelper {
         initialAmounts[0] = 100;
         initialAmounts[1] = 50;
         initialAmounts[2] = 50;
-        
-        string[] memory treasuryConfig = new string[](4);
-        treasuryConfig[0] = "ETH";
-        treasuryConfig[1] = "ERC20";
-        treasuryConfig[2] = "ERC721";
-        treasuryConfig[3] = "ERC1155";
-        
+
         dao = new MarketDAO(
             "Test DAO",
             2000,  // 20% support threshold (basis points)
@@ -40,7 +34,6 @@ contract ProposalTest is TestHelper {
             1, // flags (allowMinting=True)
             0, //token sales off
             0, // No vesting
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );

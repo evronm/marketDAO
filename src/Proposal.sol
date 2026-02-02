@@ -259,14 +259,16 @@ abstract contract Proposal {
         // Use snapshot taken at election start (gas optimization)
         uint256 totalPossibleVotes = snapshotTotalVotes;
 
-        uint256 halfVotes = totalPossibleVotes / 2;
-
         uint256 yesVotes = dao.balanceOf(yesVoteAddress, votingTokenId);
         uint256 noVotes = dao.balanceOf(noVoteAddress, votingTokenId);
+        uint256 totalVotes = yesVotes + noVotes;
+
+        // Check quorum requirement (same as regular execute)
+        uint256 quorumRequired = (totalPossibleVotes * dao.quorumPercentage()) / 10000;
+        require(totalVotes >= quorumRequired, "Quorum not met");
 
         // For early termination, we need a strict majority (> 50%)
-        // For odd total votes, halfVotes + 1 is a majority
-        // For even total votes, halfVotes + 1 is a majority
+        uint256 halfVotes = totalPossibleVotes / 2;
         uint256 majorityThreshold = halfVotes + 1;
 
         if(yesVotes >= majorityThreshold) {

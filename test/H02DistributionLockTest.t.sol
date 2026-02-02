@@ -33,9 +33,6 @@ contract H02DistributionLockTest is Test {
         initialAmounts[1] = 50;   // Attacker has 50 tokens
         initialAmounts[2] = 50;
 
-        string[] memory treasuryConfig = new string[](1);
-        treasuryConfig[0] = "ETH";
-
         dao = new MarketDAO(
             "Test DAO",
             2000, // 20% support threshold
@@ -45,7 +42,6 @@ contract H02DistributionLockTest is Test {
             0,    // flags
             0,    // token price
             0,    // no vesting (simplify test)
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );

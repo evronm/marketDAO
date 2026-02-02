@@ -16,8 +16,6 @@ contract VestingAutoCleanupTest is TestHelper {
         uint256[] memory initialAmounts = new uint256[](1);
         initialAmounts[0] = 1000;
 
-        string[] memory treasuryConfig = new string[](0);
-
         dao = new MarketDAO(
             "Test DAO",
             2000,  // 20% support threshold
@@ -27,7 +25,6 @@ contract VestingAutoCleanupTest is TestHelper {
             0, // flags (allowMinting=False)
             1e14,  // token price
             100,   // vesting period of 100 blocks
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );

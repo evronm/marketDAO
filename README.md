@@ -17,18 +17,18 @@ Unlike traditional DAOs where voting power is static, MarketDAO introduces trada
 - **Token vesting mechanism** to prevent governance attacks from new token purchases
 - **Purchase restrictions** to limit token purchases to existing holders (optional)
 - **Join request system** allowing non-holders to request membership via proposals
-- **Snapshot-based voting power** for unlimited scalability (no holder count limits)
+- **Lock-based voting power** for unlimited scalability (no holder count limits)
 - **Automatic vesting schedule management** with cleanup and consolidation
 - **Proposal lifecycle** with support thresholds and voting periods
-- **Unified proposal execution model**:
-  - **GenericProposal**: Flexible execution of arbitrary calls to any contract
+- **Two proposal types** for maximum flexibility:
+  - **GenericProposal**: Execute arbitrary calls to any contract
     - Resolution proposals (empty calldata = symbolic vote)
     - Treasury transfers (ETH, ERC20, ERC721, ERC1155)
     - Governance token minting (including join requests)
     - Parameter changes (modify any DAO configuration)
     - External protocol interactions (DeFi, other DAOs, smart contracts)
-  - **DistributionProposal**: Specialized proportional distribution system
-- **Early election termination** when clear majority is reached (works even after election ends)
+  - **DistributionProposal**: Proportional asset distribution to token holders
+- **Majority-based execution** when strict majority (>50%) is reached and quorum is met
 - **Configurable parameters** for tailoring governance to specific needs
 - **Security-hardened** with factory-based proposal registration and bounded gas costs
 
@@ -38,36 +38,17 @@ Unlike traditional DAOs where voting power is static, MarketDAO introduces trada
 - Token ID 0 is reserved for governance tokens
 - Each election creates unique voting tokens that can be claimed by governance token holders
 - Voting is done by transferring voting tokens to YES/NO addresses
-- Treasury functions support multiple asset types (ETH, ERC20, ERC721, ERC1155)
+- Treasury accepts all asset types (ETH, ERC20, ERC721, ERC1155)
 
-### Architecture (Simplified January 2026)
+### Architecture
 
-MarketDAO uses a **unified proposal execution model** for maximum flexibility:
+MarketDAO uses a flexible proposal execution model:
 
-- **2 proposal types** (down from 5): GenericProposal + DistributionProposal
-- **GenericProposal** handles all standard operations via arbitrary call execution
+- **GenericProposal** handles standard operations via arbitrary call execution
 - **No target restrictions** - proposals can interact with any blockchain contract
 - **Automatic fund detection** - treasury operations automatically trigger fund locking
 - **Frontend builds calldata** - UI constructs the appropriate encoded function calls
 - **Security through voting** - community approval is the safeguard for all operations
-
-**Migration from old proposal types:**
-```solidity
-// OLD: factory.createResolutionProposal("Description")
-// NEW: factory.createProposal("Description", address(dao), 0, "")
-
-// OLD: factory.createTreasuryProposal("Send ETH", recipient, 1 ether, address(0), 0)
-// NEW: factory.createProposal("Send ETH", address(dao), 0,
-//        abi.encodeWithSelector(dao.transferETH.selector, payable(recipient), 1 ether))
-
-// OLD: factory.createMintProposal("Mint tokens", recipient, 100)
-// NEW: factory.createProposal("Mint tokens", address(dao), 0,
-//        abi.encodeWithSelector(dao.mintGovernanceTokens.selector, recipient, 100))
-
-// OLD: factory.createParameterProposal("Change price", ParameterType.TokenPrice, 2 ether)
-// NEW: factory.createProposal("Change price", address(dao), 0,
-//        abi.encodeWithSelector(dao.setTokenPrice.selector, 2 ether))
-```
 
 ### Lazy Token Distribution
 
@@ -79,16 +60,17 @@ To minimize gas costs when elections are triggered, voting tokens use a "lazy mi
 - **One-time claim**: Each address can claim once per election, receiving voting tokens equal to their vested governance token balance
 - **Flexible participation**: Holders can claim and vote at any point during the election period
 
-### Early Election Termination
+### Majority-Based Execution
 
-To allow proposals with overwhelming support to execute quickly without waiting for the full election period:
+To allow proposals with overwhelming support to execute immediately:
 
-- **Automatic termination**: When YES or NO votes reach a strict majority (>50% of total possible votes), the proposal can terminate early
-- **Post-election calling**: `checkEarlyTermination()` can be called even after the election period formally ends
-- **Multiple attempts**: MarketDAO automatically attempts early termination on each vote transfer
-- **Manual fallback**: Anyone can manually call `checkEarlyTermination()` at any time during or after the election
-- **Graceful failure**: If automatic early termination fails (e.g., called after election ends), it's silently caught and execution can be triggered later
-- **Gas efficiency**: Allows winning proposals to execute immediately without waiting for the full voting period
+- **Dual requirements**: Requires BOTH strict majority (>50% of total possible votes) AND quorum to be met
+- **Strict majority threshold**: When YES or NO votes reach >50% of total possible votes, proposal can execute if quorum is also met
+- **Works during or after election**: Can be called anytime after the election starts, even after the voting period ends
+- **Automatic attempts**: MarketDAO automatically attempts majority-based execution after each vote transfer
+- **Manual fallback**: Anyone can manually call `checkEarlyTermination()` at any time
+- **Graceful failure**: Automatic attempts are wrapped in try/catch, so they never block vote transfers
+- **Gas efficiency**: Winning proposals can execute immediately when both majority and quorum are reached, without waiting for the full voting period
 
 ### Join Request System
 
@@ -104,19 +86,22 @@ Non-token holders can request to join the DAO through a special mint proposal:
 
 **Example**: `factory.createProposal("Join request", address(dao), 0, abi.encodeWithSelector(dao.mintGovernanceTokens.selector, requester, 1))`
 
-### Snapshot-Based Voting Power
+### Lock-Based Voting Power
 
-To enable unlimited scalability without gas limit concerns:
+To enable unlimited scalability without gas limit concerns, MarketDAO uses a lock-based system instead of traditional snapshots:
 
-- **O(1) snapshot creation**: Uses total vested supply instead of looping through all holders
-- **Truly unlimited holders**: Tested with 10,000+ holders with constant gas costs
+- **O(1) election triggering**: Records only total vested supply (not individual balances), enabling constant-time election starts
+- **Truly unlimited holders**: Tested with 10,000+ holders with constant gas costs (~280K regardless of holder count)
+- **Governance token locking**: Tokens are locked when used for support or voting, preventing double-counting
+- **On-demand voting power calculation**: Each user's voting power is calculated when they claim voting tokens (not stored for all holders)
 - **Accurate quorum**: Quorum calculated from vested supply only (unvested tokens cannot vote)
-- **Fair voting**: Voting power frozen at election start, preventing mid-election manipulation
-- **No gas limit concerns**: Election triggering cannot fail due to too many holders
+- **Fair voting**: Voting power determined at election start, preventing mid-election manipulation through new purchases
 
-### GenericProposal (Unified Execution Model)
+This lock-based approach is more scalable than traditional snapshot mechanisms because it doesn't require iterating through or storing individual holder balances.
 
-GenericProposal is the core execution primitive that enables flexible, arbitrary contract interactions:
+### GenericProposal
+
+GenericProposal is the core execution primitive that enables flexible contract interactions:
 
 - **Single call execution**: Each proposal executes one call with `target`, `value`, and `data`
 - **No target restrictions**: Can call any contract on the blockchain (DAO functions, DeFi protocols, other DAOs)
@@ -172,10 +157,11 @@ MarketDAO has been audited by **Hashlock Pty Ltd** (January 2026). **The audit h
 
 ### Scalability Guarantees
 
-- ✅ **Unlimited governance token holders**: O(1) snapshot using total supply enables 10,000+ participants
+- ✅ **Unlimited governance token holders**: Lock-based system tested with 10,000+ participants
 - ✅ **O(1) election triggering**: Constant 280K gas cost regardless of holder count
 - ✅ **Automatic vesting cleanup**: Prevents unbounded array growth in vesting schedules
 - ✅ **O(1) proposal execution**: Constant-time execution regardless of holder count
+- ✅ **No snapshot storage**: Doesn't need to store individual holder balances
 
 ### Known Limitations (By Design)
 
@@ -198,36 +184,107 @@ Common configurations:
 
 ## Usage Flow
 
+All operations can be performed through the **web interface** (see Frontend section above) or via direct contract interaction.
+
 ### For New Members (Join Request):
-1. Connect wallet to the DAO interface
-2. Submit join request with a description
+1. **Connect wallet** to the DAO interface (web UI or MetaMask)
+2. **Submit join request** with a description (web UI handles calldata generation)
 3. Wait for existing members to add support
 4. If threshold met, members vote on admission
 5. If approved, receive 1 governance token
 
 ### For Token Holders (Standard Proposals):
-1. Create a proposal using `factory.createProposal(description, target, value, data)`
-   - **Resolution**: `target = address(dao), value = 0, data = ""`
-   - **Treasury/Mint/Parameters**: `target = address(dao), value = 0, data = abi.encodeWithSelector(...)`
-   - **External calls**: `target = externalContract, value = ethAmount, data = encodedCall`
-2. Proposals need to reach support threshold to trigger an election
-3. When threshold is reached, an election period begins
-4. Claim voting tokens (1:1 with vested governance tokens)
-5. Cast votes by sending voting tokens to YES/NO addresses
-6. Successful proposals execute their call automatically
+1. **Create a proposal** via web UI or `factory.createProposal(description, target, value, data)`:
+   - **Resolution**: Empty calldata for symbolic votes
+   - **Treasury transfers**: Send ETH, ERC20, ERC721, or ERC1155 assets
+   - **Mint tokens**: Add new members or increase holdings
+   - **Change parameters**: Modify quorum, thresholds, durations, etc.
+   - **External calls**: Interact with DeFi protocols, other DAOs, etc.
+2. Proposals need to reach **support threshold** to trigger an election
+3. When threshold is reached, an **election period** begins
+4. **Claim voting tokens** (1:1 with vested governance tokens)
+5. **Cast votes** by transferring voting tokens to YES/NO addresses
+6. Successful proposals **execute automatically** when majority reached
 
 ### For Distribution Proposals:
-1. Create distribution proposal specifying asset type and amount per token
-2. Register during support/election phases to be included
-3. If approved, funds transfer to a DistributionRedemption contract
-4. Claim your proportional share at any time after execution
+1. Create distribution proposal specifying asset type and target amount per token
+2. Members **register** during support/election phases to be included
+3. If approved, funds transfer to a **DistributionRedemption** contract
+4. Registered members **claim their proportional share** at any time after execution
+
+### Web Interface Workflow:
+- **Dashboard**: View stats, buy/claim tokens
+- **Proposals**: Create proposals using intuitive forms (no calldata knowledge required)
+- **Support**: Click "Add Support" on proposals you want to see go to election
+- **Elections**: Claim voting tokens and vote with one click
+- **History**: Review all past proposal outcomes
+- **Members**: See all token holders and their balances
+
+## Frontend
+
+A complete web interface for MarketDAO is included, built with **VanJS** - a lightweight 1KB reactive UI framework requiring no build tools.
+
+### Frontend Features
+
+- **Wallet Integration**: Connect via MetaMask with automatic network detection
+- **Dashboard**: View DAO info, token balances, purchase/claim tokens
+- **Proposals**: Create, view, and support proposals (all types)
+- **Elections**: View active elections, claim voting tokens, cast votes
+- **History**: Browse all completed proposals and their outcomes
+- **Members**: View all DAO members and their token holdings
+- **Real-time Updates**: Reactive UI updates when blockchain state changes
+- **Error Handling**: User-friendly error messages with transaction failure details
+
+### Frontend Tech Stack
+
+- **VanJS** (1KB reactive UI library, no build step)
+- **Ethers.js v6** (Web3 interactions)
+- **Bootstrap 5** (Styling)
+- **No bundler required** - runs directly via CDN imports
+
+### Quick Start (Frontend)
+
+1. **Start a local web server** in the `frontend/` directory:
+   ```bash
+   cd frontend
+   python -m http.server 8080
+   # OR: npx serve . -p 8080
+   ```
+
+2. **Deploy contracts** to a local blockchain:
+   ```bash
+   # In project root
+   anvil  # Start local blockchain in one terminal
+
+   # In another terminal
+   forge script script/Deploy.s.sol --broadcast --rpc-url http://localhost:8545
+   ```
+
+3. **Configure frontend** - Edit `frontend/js/config.js`:
+   ```javascript
+   const CONFIG = {
+     network: {
+       chainId: 31337,  // Anvil default
+       name: 'Localhost',
+       rpcUrl: 'http://localhost:8545'
+     },
+     contracts: {
+       dao: '0x5fbdb2315678afecb367f032d93f642f64180aa3',  // Update from deploy
+       factory: '0x0165878a594ca255338adfa4d48449f69242eb8f'  // Update from deploy
+     }
+   }
+   ```
+
+4. **Open browser** to http://localhost:8080 and connect MetaMask
+
+See `frontend/README.md` for detailed frontend documentation.
 
 ## Development
 
 ### Build & Test Commands
 
 ```bash
-# Build the project
+# Build the contracts
 forge build
 
 # Run all tests
@@ -242,29 +299,14 @@ forge test --match-path test/FileName.t.sol
 # Format code
 forge fmt
 
-# Deploy locally
+# Deploy to local blockchain
 forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast
-```
 
-### Project Structure
+# Deploy with controlled supply (flag bit 2)
+forge script script/Deploy.controlled.s.sol --rpc-url http://localhost:8545 --broadcast
 
-```
-marketDAO/
-├── src/
-│   ├── MarketDAO.sol              # Core DAO contract (ERC1155-based)
-│   ├── Proposal.sol               # Abstract proposal base class
-│   ├── GenericProposal.sol        # Unified proposal execution (most use cases)
-│   ├── ProposalTypes.sol          # DistributionProposal + deprecated types
-│   ├── ProposalFactory.sol        # Factory for creating proposals
-│   └── DistributionRedemption.sol # Handles distribution claims
-├── script/
-│   ├── Deploy.s.sol               # Default deployment
-│   ├── Deploy.controlled.s.sol    # Controlled supply deployment
-│   └── Deploy.private.s.sol       # Restricted purchases deployment
-├── test/                          # Comprehensive test suite (193 tests)
-├── frontend/                      # React frontend application
-├── foundry.toml                   # Foundry configuration
-└── CLAUDE.md                      # Development guide
+# Deploy with restricted purchases (flag bit 1)
+forge script script/Deploy.private.s.sol --rpc-url http://localhost:8545 --broadcast
 ```
 
 ## Future Possibilities

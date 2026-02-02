@@ -18,11 +18,7 @@ contract MarketDAOTokenSaleTest is TestHelper {
         uint256[] memory initialAmounts = new uint256[](2);
         initialAmounts[0] = 100;
         initialAmounts[1] = 50;
-        
-        string[] memory treasuryConfig = new string[](2);
-        treasuryConfig[0] = "ETH";
-        treasuryConfig[1] = "ERC20";
-        
+
         dao = new MarketDAO(
             "Test DAO",
             2000,  // 20% (basis points)
@@ -32,7 +28,6 @@ contract MarketDAOTokenSaleTest is TestHelper {
             1, // flags (allowMinting=True)
             TOKEN_PRICE,
             0, // No vesting for these tests
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );
@@ -100,8 +95,7 @@ contract MarketDAOTokenSaleTest is TestHelper {
         // Create new DAO with token price = 0
         address[] memory initialHolders = new address[](0);
         uint256[] memory initialAmounts = new uint256[](0);
-        string[] memory treasuryConfig = new string[](0);
-        
+
         MarketDAO disabledSalesDao = new MarketDAO(
             "No Sales DAO",
             2000,  // 20% (basis points)
@@ -111,7 +105,6 @@ contract MarketDAOTokenSaleTest is TestHelper {
             1, // flags (allowMinting=True)
             0, // disable direct sales
             0, // No vesting
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );

@@ -16,13 +16,9 @@ contract TreasuryValidationTest is TestHelper {
         uint256[] memory initialAmounts = new uint256[](1);
         initialAmounts[0] = 100;
 
-        string[] memory treasuryConfig = new string[](1);
-        treasuryConfig[0] = "ETH";
-
         dao = new MarketDAO(
             "Test DAO",
             2000, 5100, 100, 50, 0, 0, 0,  // flags=0 (no minting)
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );

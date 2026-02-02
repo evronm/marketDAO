@@ -34,14 +34,6 @@ contract DeployConfig {
 }
 
 contract DeployScript is Script, DeployConfig {
-    function getTreasuryConfig() internal pure returns (string[] memory) {
-        string[] memory config = new string[](3);
-        config[0] = "ETH";
-        config[1] = "ERC20";
-        config[2] = "ERC1155";
-        return config;
-    }
-
     function run() external {
         // Use foundry's account system instead of env variable
         vm.startBroadcast();
@@ -63,7 +55,6 @@ contract DeployScript is Script, DeployConfig {
             buildFlags(),
             TOKEN_PRICE,
             VESTING_PERIOD,
-            getTreasuryConfig(),
             initialHolders,
             initialAmounts
         );

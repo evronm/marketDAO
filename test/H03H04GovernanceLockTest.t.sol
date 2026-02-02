@@ -30,9 +30,6 @@ contract H03H04GovernanceLockTest is Test {
         initialAmounts[1] = 50;
         initialAmounts[2] = 50;
 
-        string[] memory treasuryConfig = new string[](1);
-        treasuryConfig[0] = "ETH";
-
         dao = new MarketDAO(
             "Test DAO",
             2000, // 20% support threshold
@@ -42,7 +39,6 @@ contract H03H04GovernanceLockTest is Test {
             0,
             0,
             0, // No vesting
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );

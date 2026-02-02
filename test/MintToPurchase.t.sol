@@ -30,9 +30,6 @@ contract MintToPurchaseTest is TestHelper {
         initialAmounts[0] = 100;
         initialAmounts[1] = 50;
 
-        string[] memory treasuryConfig = new string[](1);
-        treasuryConfig[0] = "ETH";
-
         // Create DAO without FLAG_MINT_TO_PURCHASE (traditional behavior - mints to purchase)
         daoMintToPurchase = new MarketDAO(
             "Mint To Purchase DAO",
@@ -43,7 +40,6 @@ contract MintToPurchaseTest is TestHelper {
             FLAG_ALLOW_MINTING, // No FLAG_MINT_TO_PURCHASE, so it mints
             TOKEN_PRICE,
             0,     // No vesting for simpler tests
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );
@@ -58,7 +54,6 @@ contract MintToPurchaseTest is TestHelper {
             FLAG_ALLOW_MINTING | FLAG_MINT_TO_PURCHASE, // FLAG_MINT_TO_PURCHASE set
             TOKEN_PRICE,
             0,
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );

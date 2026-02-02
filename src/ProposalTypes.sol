@@ -152,7 +152,6 @@ contract DistributionProposal is Proposal {
     ) external {
         __Proposal_init(_dao, _description, _proposer);
         require(_amountPerToken > 0, "Amount per token must be positive");
-        require(dao.hasTreasury(), "DAO has no treasury");
 
         // Calculate total amount needed: amountPerToken * total vested supply
         uint256 vestedSupply = dao.getTotalVestedSupply();
@@ -161,11 +160,9 @@ contract DistributionProposal is Proposal {
 
         // Validate treasury has sufficient AVAILABLE balance (total - locked)
         if (_token == address(0)) {
-            require(dao.acceptsETH(), "ETH not accepted");
             require(dao.getAvailableETH() >= requiredAmount, "Insufficient available ETH balance");
         } else {
             if (_tokenId == 0) {
-                require(dao.acceptsERC20(), "ERC20 not accepted");
                 require(
                     dao.getAvailableERC20(_token) >= requiredAmount,
                     "Insufficient available ERC20 balance"
@@ -178,7 +175,6 @@ contract DistributionProposal is Proposal {
                 if (ERC165Checker.supportsInterface(_token, ERC721_INTERFACE_ID)) {
                     revert("Cannot distribute ERC721 tokens");
                 } else if (ERC165Checker.supportsInterface(_token, ERC1155_INTERFACE_ID)) {
-                    require(dao.acceptsERC1155(), "ERC1155 not accepted");
                     require(
                         dao.getAvailableERC1155(_token, _tokenId) >= requiredAmount,
                         "Insufficient available ERC1155 balance"
@@ -217,11 +213,9 @@ contract DistributionProposal is Proposal {
 
         // Transfer funds to redemption contract
         if (token == address(0)) {
-            require(dao.acceptsETH(), "ETH not accepted");
             dao.transferETH(payable(address(redemptionContract)), totalAmount);
         } else {
             if (tokenId == 0) {
-                require(dao.acceptsERC20(), "ERC20 not accepted");
                 dao.transferERC20(token, address(redemptionContract), totalAmount);
             } else {
                 // ERC1155 (ERC721 already rejected in initialize)
@@ -230,7 +224,6 @@ contract DistributionProposal is Proposal {
                     ERC165Checker.supportsInterface(token, ERC1155_INTERFACE_ID),
                     "Token must support ERC1155 interface"
                 );
-                require(dao.acceptsERC1155(), "ERC1155 not accepted");
                 dao.transferERC1155(token, address(redemptionContract), tokenId, totalAmount);
             }
         }

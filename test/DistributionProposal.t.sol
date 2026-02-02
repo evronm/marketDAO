@@ -37,10 +37,6 @@ contract DistributionProposalTest is TestHelper {
         initialAmounts[2] = 30;
         initialAmounts[3] = 20;
 
-        string[] memory treasuryConfig = new string[](2);
-        treasuryConfig[0] = "ETH";
-        treasuryConfig[1] = "ERC20";
-
         dao = new MarketDAO(
             "Test DAO",
             2000, // 20% support
@@ -50,7 +46,6 @@ contract DistributionProposalTest is TestHelper {
             0, // flags
             0,
             0, // No vesting
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );

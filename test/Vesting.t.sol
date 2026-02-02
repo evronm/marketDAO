@@ -23,9 +23,6 @@ contract VestingTest is TestHelper {
         initialAmounts[0] = 100;
         initialAmounts[1] = 50;
 
-        string[] memory treasuryConfig = new string[](1);
-        treasuryConfig[0] = "ETH";
-
         dao = new MarketDAO(
             "Test DAO",
             2000,  // 20% (basis points)
@@ -35,7 +32,6 @@ contract VestingTest is TestHelper {
             1, // flags (allowMinting=True)
             TOKEN_PRICE,
             VESTING_PERIOD,
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );
@@ -232,8 +228,6 @@ contract VestingTest is TestHelper {
         // Create DAO without vesting
         address[] memory initialHolders = new address[](0);
         uint256[] memory initialAmounts = new uint256[](0);
-        string[] memory treasuryConfig = new string[](1);
-        treasuryConfig[0] = "ETH";
 
         MarketDAO noVestingDao = new MarketDAO(
             "No Vesting DAO",
@@ -244,7 +238,6 @@ contract VestingTest is TestHelper {
             1, // flags (allowMinting=True)
             TOKEN_PRICE,
             0, // No vesting
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );

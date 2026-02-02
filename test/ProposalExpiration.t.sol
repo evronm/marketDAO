@@ -23,9 +23,6 @@ contract ProposalExpirationTest is TestHelper {
         initialAmounts[0] = 100;
         initialAmounts[1] = 50;
 
-        string[] memory treasuryConfig = new string[](1);
-        treasuryConfig[0] = "ETH";
-
         dao = new MarketDAO(
             "Test DAO",
             2000,  // 20% support threshold
@@ -35,7 +32,6 @@ contract ProposalExpirationTest is TestHelper {
             1, // flags (allowMinting=True)
             0,    // no token sales
             0,    // no vesting
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );

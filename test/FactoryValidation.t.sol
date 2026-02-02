@@ -17,8 +17,6 @@ contract FactoryValidationTest is TestHelper {
         uint256[] memory initialAmounts = new uint256[](1);
         initialAmounts[0] = 100;
 
-        string[] memory treasuryConfig = new string[](0);
-
         dao = new MarketDAO(
             "Test DAO",
             2000,
@@ -28,7 +26,6 @@ contract FactoryValidationTest is TestHelper {
             0, // flags (allowMinting=False)
             0,
             0,
-            treasuryConfig,
             initialHolders,
             initialAmounts
         );
