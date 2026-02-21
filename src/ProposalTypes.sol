@@ -200,7 +200,7 @@ contract DistributionProposal is Proposal {
         if (!electionTriggered) revert ElectionNotTriggered();
         if (address(redemptionContract) == address(0)) revert RedemptionNotDeployed();
 
-        uint256 vestedBal = dao.vestedBalance(msg.sender);
+        uint256 vestedBal = dao.vestedBalanceAt(msg.sender, electionStart);
         redemptionContract.registerClaimant(msg.sender, vestedBal);
 
         emit UserRegisteredForDistribution(msg.sender, vestedBal);
