@@ -135,11 +135,9 @@ contract DistributionProposal is Proposal {
     // Override to unlock funds when proposal fails
     function _unlockFunds() internal override {
         dao.unlockFunds();
-        
-        // ============ H-02 FIX: Clear redemption contract on failure ============
-        // Allow users to release their locks via the redemption contract
-        // The redemption contract's releaseLock() will check if proposal is no longer active
-        // ============ END H-02 FIX ============
+
+        // Clear the active redemption contract so another distribution proposal can proceed
+        dao.clearActiveRedemptionContract();
     }
 
     function initialize(
@@ -238,6 +236,9 @@ contract DistributionProposal is Proposal {
 
         // Unlock funds (they've been transferred to redemption contract)
         dao.unlockFunds();
+
+        // Clear the active redemption contract so another distribution proposal can proceed
+        dao.clearActiveRedemptionContract();
 
         // Clear the active proposal status at the very end of execution
         dao.clearActiveProposal();

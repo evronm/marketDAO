@@ -94,6 +94,8 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     
     // The currently active redemption contract authorized to manage locks
     address public activeRedemptionContract;
+    // All authorized redemption contracts (active + completed, can still unlock)
+    mapping(address => bool) public authorizedRedemptionContracts;
     // ============ END H-02 FIX ============
     
     // ============ H-03/H-04 FIX: Governance Lock Mechanism ============
@@ -352,7 +354,9 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
      */
     function setActiveRedemptionContract(address _redemptionContract) external {
         require(activeProposals[msg.sender], "Only active proposal can set redemption contract");
+        require(activeRedemptionContract == address(0), "Another redemption contract is already active");
         activeRedemptionContract = _redemptionContract;
+        authorizedRedemptionContracts[_redemptionContract] = true;
     }
     
     /**
@@ -385,7 +389,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
      * @param user Address to unlock tokens for
      */
     function unlockForDistribution(address user) external {
-        require(msg.sender == activeRedemptionContract, "Only active redemption contract");
+        require(authorizedRedemptionContracts[msg.sender], "Only authorized redemption contract");
         distributionLock[user] = 0;
     }
     
