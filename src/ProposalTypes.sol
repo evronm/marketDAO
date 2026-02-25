@@ -121,7 +121,8 @@ contract DistributionProposal is Proposal {
             address(dao),  // NEW: Pass DAO for locking mechanism
             token,
             tokenId,
-            amountPerGovernanceToken
+            amountPerGovernanceToken,
+            dao.electionDuration()  // Claim window: users have electionDuration blocks after funding
         );
 
         // Set this redemption contract as the active one in the DAO

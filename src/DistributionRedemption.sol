@@ -55,11 +55,16 @@ contract DistributionRedemption is ERC1155Holder, ReentrancyGuard {
     bool public poolFunded;                // True once funds have been received
     // ============ END M-01 FIX ============
 
+    // Claim deadline: unclaimed funds can be swept back to DAO after this block
+    uint256 public immutable claimDurationBlocks;
+    uint256 public claimDeadline;          // Set when pool is funded
+
     // Events
     event ClaimantRegistered(address indexed user, uint256 governanceTokenBalance);
     event FundsClaimed(address indexed user, uint256 amount);
     event LockReleased(address indexed user);
     event PoolFunded(uint256 amount);  // M-01 FIX: New event
+    event UnclaimedFundsSwept(uint256 amount);
 
     // Errors
     error OnlyProposal();
@@ -71,6 +76,7 @@ contract DistributionRedemption is ERC1155Holder, ReentrancyGuard {
     error TransferFailed();
     error DistributionStillActive();
     error PoolNotFunded();  // M-01 FIX: New error
+    error ClaimDeadlineNotReached();
 
     /**
      * @notice Initialize redemption contract
@@ -86,13 +92,15 @@ contract DistributionRedemption is ERC1155Holder, ReentrancyGuard {
         address _dao,
         address _token,
         uint256 _tokenId,
-        uint256 _amountPerToken
+        uint256 _amountPerToken,
+        uint256 _claimDurationBlocks
     ) {
         proposal = _proposal;
         dao = IMarketDAO(_dao);
         token = _token;
         tokenId = _tokenId;
         amountPerGovernanceToken = _amountPerToken;
+        claimDurationBlocks = _claimDurationBlocks;
     }
 
     /**
@@ -271,11 +279,44 @@ contract DistributionRedemption is ERC1155Holder, ReentrancyGuard {
         if (balance > 0) {
             totalPoolBalance = balance;
             poolFunded = true;
+            claimDeadline = block.number + claimDurationBlocks;
             emit PoolFunded(balance);
         }
     }
     
     // ============ END M-01 FIX ============
+
+    /**
+     * @notice Sweep unclaimed funds back to the DAO after the claim deadline
+     * @dev Callable by anyone after claimDeadline. Sends remaining balance to the DAO.
+     */
+    function sweepUnclaimedFunds() external nonReentrant {
+        if (!poolFunded) revert PoolNotFunded();
+        if (block.number < claimDeadline) revert ClaimDeadlineNotReached();
+
+        uint256 balance;
+        if (token == address(0)) {
+            balance = address(this).balance;
+        } else if (tokenId == 0) {
+            balance = IERC20(token).balanceOf(address(this));
+        } else {
+            balance = IERC1155(token).balanceOf(address(this), tokenId);
+        }
+
+        if (balance == 0) revert NothingToClaim();
+
+        address daoAddress = address(dao);
+        if (token == address(0)) {
+            (bool success, ) = payable(daoAddress).call{value: balance}("");
+            if (!success) revert TransferFailed();
+        } else if (tokenId == 0) {
+            IERC20(token).safeTransfer(daoAddress, balance);
+        } else {
+            IERC1155(token).safeTransferFrom(address(this), daoAddress, tokenId, balance, "");
+        }
+
+        emit UnclaimedFundsSwept(balance);
+    }
 
     /**
      * @notice Receive ETH
