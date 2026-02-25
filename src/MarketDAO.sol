@@ -298,6 +298,9 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         require(lockedFunds[msg.sender].amount == 0, "Already locked funds");
         require(amount > 0, "Amount must be positive");
 
+        // Clean up stale locks before checking available balances
+        _tryReleaseLockedProposals();
+
         // Verify sufficient available funds
         if (token == address(0)) {
             require(getAvailableETH() >= amount, "Insufficient available ETH");
