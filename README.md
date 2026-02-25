@@ -182,6 +182,10 @@ Common configurations:
 - `3`: Allow minting, restricted purchases (holder-only)
 - `5`: Allow minting, controlled supply (treasury transfers)
 
+### Block-Based Durations
+
+`maxProposalAge`, `electionDuration`, and `vestingPeriod` are all measured in **block numbers**, not wall-clock time. Block times vary significantly across EVM chains (Ethereum ~12s, some L2s sub-second or variable). Deployers must choose values appropriate for their target chain. For example, an `electionDuration` of 50 blocks is ~10 minutes on Ethereum mainnet but could be under a second on a fast L2.
+
 ## Usage Flow
 
 All operations can be performed through the **web interface** (see Frontend section above) or via direct contract interaction.
