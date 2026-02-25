@@ -102,6 +102,9 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     // Tracks governance tokens locked for proposal support and voting
     // Cumulative across all active proposals
     mapping(address => uint256) public governanceLock;
+
+    event GovernanceLockAdded(address indexed user, address indexed proposal, uint256 amount);
+    event GovernanceLockRemoved(address indexed user, address indexed proposal, uint256 amount);
     // ============ END H-03/H-04 FIX ============
     
     constructor(
@@ -418,6 +421,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     function addGovernanceLock(address user, uint256 amount) external {
         require(activeProposals[msg.sender], "Only active proposal");
         governanceLock[user] += amount;
+        emit GovernanceLockAdded(user, msg.sender, amount);
     }
     
     /**
@@ -433,6 +437,7 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
         } else {
             governanceLock[user] = 0;
         }
+        emit GovernanceLockRemoved(user, msg.sender, amount);
     }
     
     // ============ END H-03/H-04 FIX ============
