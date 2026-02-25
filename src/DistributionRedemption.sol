@@ -195,6 +195,8 @@ contract DistributionRedemption is ERC1155Holder, ReentrancyGuard {
             return;
         }
 
+        hasClaimed[msg.sender] = true;
+
         // ============ H-02 FIX: Unlock governance tokens ============
         dao.unlockForDistribution(msg.sender);
         // ============ END H-02 FIX ============
