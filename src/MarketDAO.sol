@@ -106,6 +106,15 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     event GovernanceLockAdded(address indexed user, address indexed proposal, uint256 amount);
     event GovernanceLockRemoved(address indexed user, address indexed proposal, uint256 amount);
     // ============ END H-03/H-04 FIX ============
+
+    // Governance parameter change events
+    event TokenPriceChanged(uint256 oldPrice, uint256 newPrice);
+    event SupportThresholdChanged(uint256 oldThreshold, uint256 newThreshold);
+    event QuorumPercentageChanged(uint256 oldQuorum, uint256 newQuorum);
+    event MaxProposalAgeChanged(uint256 oldAge, uint256 newAge);
+    event ElectionDurationChanged(uint256 oldDuration, uint256 newDuration);
+    event VestingPeriodChanged(uint256 oldPeriod, uint256 newPeriod);
+    event FlagsChanged(uint256 oldFlags, uint256 newFlags);
     
     constructor(
         string memory _name,
@@ -696,42 +705,56 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
     function setTokenPrice(uint256 newPrice) external {
         require(activeProposals[msg.sender], "Only active proposal can set price");
         require(newPrice > 0, "Price must be greater than 0");
+        uint256 oldPrice = tokenPrice;
         tokenPrice = newPrice;
+        emit TokenPriceChanged(oldPrice, newPrice);
     }
 
     function setSupportThreshold(uint256 newThreshold) external {
         require(activeProposals[msg.sender], "Only active proposal can set threshold");
         require(newThreshold > 0 && newThreshold <= 10000, "Threshold must be > 0 and <= 10000");
+        uint256 oldThreshold = supportThreshold;
         supportThreshold = newThreshold;
+        emit SupportThresholdChanged(oldThreshold, newThreshold);
     }
 
     function setQuorumPercentage(uint256 newQuorum) external {
         require(activeProposals[msg.sender], "Only active proposal can set quorum");
         require(newQuorum >= 100 && newQuorum <= 10000, "Quorum must be >= 1% and <= 100%");
+        uint256 oldQuorum = quorumPercentage;
         quorumPercentage = newQuorum;
+        emit QuorumPercentageChanged(oldQuorum, newQuorum);
     }
 
     function setMaxProposalAge(uint256 newAge) external {
         require(activeProposals[msg.sender], "Only active proposal can set proposal age");
         require(newAge > 0, "Proposal age must be greater than 0");
+        uint256 oldAge = maxProposalAge;
         maxProposalAge = newAge;
+        emit MaxProposalAgeChanged(oldAge, newAge);
     }
 
     function setElectionDuration(uint256 newDuration) external {
         require(activeProposals[msg.sender], "Only active proposal can set election duration");
         require(newDuration > 0, "Election duration must be greater than 0");
+        uint256 oldDuration = electionDuration;
         electionDuration = newDuration;
+        emit ElectionDurationChanged(oldDuration, newDuration);
     }
 
     function setVestingPeriod(uint256 newPeriod) external {
         require(activeProposals[msg.sender], "Only active proposal can set vesting period");
+        uint256 oldPeriod = vestingPeriod;
         vestingPeriod = newPeriod;
+        emit VestingPeriodChanged(oldPeriod, newPeriod);
     }
 
     function setFlags(uint256 newFlags) external {
         require(activeProposals[msg.sender], "Only active proposal can set flags");
         require(newFlags <= 7, "Invalid flags - only bits 0-2 are valid");
+        uint256 oldFlags = flags;
         flags = newFlags;
+        emit FlagsChanged(oldFlags, newFlags);
     }
 
     // View functions
