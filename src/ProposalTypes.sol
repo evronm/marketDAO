@@ -199,6 +199,7 @@ contract DistributionProposal is Proposal {
      */
     function registerForDistribution() external {
         if (!electionTriggered) revert ElectionNotTriggered();
+        require(!executed, "Distribution already executed");
         if (address(redemptionContract) == address(0)) revert RedemptionNotDeployed();
 
         uint256 vestedBal = dao.vestedBalanceAt(msg.sender, electionStart);
@@ -233,7 +234,7 @@ contract DistributionProposal is Proposal {
         redemptionContract.markPoolFunded();
         // ============ END M-01 FIX ============
 
-        executed = true;
+        // Note: executed is already set to true by super._execute()
 
         // Unlock funds (they've been transferred to redemption contract)
         dao.unlockFunds();
