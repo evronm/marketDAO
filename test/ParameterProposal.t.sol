@@ -54,8 +54,10 @@ contract ParameterProposalTest is TestHelper {
         revert("Invalid parameter type");
     }
 
-    // Helper to create proposal and expect execution failure
-    function _expectExecutionRevert(bytes4 selector, uint256 value, string memory expectedError) internal {
+    // Helper to create proposal with invalid params, pass it, and verify graceful failure.
+    // With the execution-failure fix, the call doesn't revert — it emits ExecutionFailed,
+    // marks the proposal as executed, and unlocks any funds, preventing permanent lock.
+    function _expectExecutionFailure(bytes4 selector, uint256 value) internal {
         vm.startPrank(proposer);
         GenericProposal proposal = factory.createProposal(
             "Invalid parameter",
@@ -85,12 +87,16 @@ contract ParameterProposalTest is TestHelper {
         dao.safeTransferFrom(voter2, proposal.yesVoteAddress(), votingTokenId, 50, "");
         vm.stopPrank();
 
-        // Roll forward to end of election
-        vm.roll(block.number + 50);
+        // The proposal may have already been executed via early termination
+        // during voting (proposer has >50% majority). If not, roll forward and execute.
+        if (!proposal.executed()) {
+            vm.roll(block.number + 50);
+            proposal.execute();
+        }
 
-        // Execution should fail with validation error (now we have quorum, so validation error will be hit)
-        vm.expectRevert(bytes(expectedError));
-        proposal.execute();
+        // Proposal is resolved — execution call failed gracefully,
+        // emitting ExecutionFailed and unlocking any funds
+        assertTrue(proposal.executed());
     }
 
     function _createAndExecuteProposal(
@@ -205,36 +211,50 @@ contract ParameterProposalTest is TestHelper {
     }
 
     function testInvalidSupportThreshold() public {
+        uint256 before = dao.supportThreshold();
         // Test threshold = 0
-        _expectExecutionRevert(dao.setSupportThreshold.selector, 0, "Threshold must be > 0 and <= 10000");
+        _expectExecutionFailure(dao.setSupportThreshold.selector, 0);
+        assertEq(dao.supportThreshold(), before);
 
         // Test threshold > 10000
-        _expectExecutionRevert(dao.setSupportThreshold.selector, 10001, "Threshold must be > 0 and <= 10000");
+        _expectExecutionFailure(dao.setSupportThreshold.selector, 10001);
+        assertEq(dao.supportThreshold(), before);
     }
 
     function testInvalidQuorum() public {
+        uint256 before = dao.quorumPercentage();
         // Test quorum < 100 (less than 1%)
-        _expectExecutionRevert(dao.setQuorumPercentage.selector, 99, "Quorum must be >= 1% and <= 100%");
+        _expectExecutionFailure(dao.setQuorumPercentage.selector, 99);
+        assertEq(dao.quorumPercentage(), before);
 
         // Test quorum > 10000
-        _expectExecutionRevert(dao.setQuorumPercentage.selector, 10001, "Quorum must be >= 1% and <= 100%");
+        _expectExecutionFailure(dao.setQuorumPercentage.selector, 10001);
+        assertEq(dao.quorumPercentage(), before);
     }
 
     function testInvalidMaxProposalAge() public {
-        _expectExecutionRevert(dao.setMaxProposalAge.selector, 0, "Proposal age must be greater than 0");
+        uint256 before = dao.maxProposalAge();
+        _expectExecutionFailure(dao.setMaxProposalAge.selector, 0);
+        assertEq(dao.maxProposalAge(), before);
     }
 
     function testInvalidElectionDuration() public {
-        _expectExecutionRevert(dao.setElectionDuration.selector, 0, "Election duration must be greater than 0");
+        uint256 before = dao.electionDuration();
+        _expectExecutionFailure(dao.setElectionDuration.selector, 0);
+        assertEq(dao.electionDuration(), before);
     }
 
     function testInvalidTokenPrice() public {
-        _expectExecutionRevert(dao.setTokenPrice.selector, 0, "Price must be greater than 0");
+        uint256 before = dao.tokenPrice();
+        _expectExecutionFailure(dao.setTokenPrice.selector, 0);
+        assertEq(dao.tokenPrice(), before);
     }
 
     function testInvalidFlags() public {
+        uint256 before = dao.flags();
         // Test flags > 7 (only bits 0-2 are valid)
-        _expectExecutionRevert(dao.setFlags.selector, 8, "Invalid flags - only bits 0-2 are valid");
+        _expectExecutionFailure(dao.setFlags.selector, 8);
+        assertEq(dao.flags(), before);
     }
 
     function testDirectSettersFail() public {

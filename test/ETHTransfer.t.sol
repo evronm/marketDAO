@@ -219,9 +219,11 @@ contract ETHTransferTest is TestHelper {
         assertTrue(proposal.executed());
     }
 
-    function testFailETHTransferToRejectingContract() public {
+    function testETHTransferToRejectingContractResolvesGracefully() public {
         // Deploy contract that rejects ETH
         ETHRejecter rejecter = new ETHRejecter();
+
+        uint256 daoBalanceBefore = address(dao).balance;
 
         vm.startPrank(proposer);
         GenericProposal proposal = factory.createProposal(
@@ -247,8 +249,16 @@ contract ETHTransferTest is TestHelper {
 
         vm.roll(block.number + 50);
 
-        // This should fail with "ETH transfer failed"
-        proposal.execute();
+        // Execution resolves gracefully — proposal is marked executed, funds are unlocked,
+        // even though the inner ETH transfer to the rejecting contract failed.
+        // (Early termination already executed this during voter1's vote)
+        assertTrue(proposal.executed());
+
+        // DAO balance unchanged since the transfer failed
+        assertEq(address(dao).balance, daoBalanceBefore);
+
+        // Funds are unlocked (available balance restored)
+        assertEq(dao.getAvailableETH(), daoBalanceBefore);
     }
 
     function testETHTransferToEOA() public {

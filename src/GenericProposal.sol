@@ -14,8 +14,12 @@ import "./Proposal.sol";
  * - External calls supported (enables DeFi participation, external governance)
  * - Automatic fund locking for DAO treasury operations
  * - Security: Community voting is the safeguard (no target restrictions)
+ * - Graceful execution failure: if the call reverts, funds are unlocked and the
+ *   proposal is marked resolved to prevent permanently locked treasury funds
  */
 contract GenericProposal is Proposal {
+    // Emitted when the proposal's external call fails during execution
+    event ExecutionFailed(bytes reason);
     // Single call storage
     address public target;
     uint256 public value;
@@ -167,6 +171,11 @@ contract GenericProposal is Proposal {
      * @notice Execute the proposal call (overrides base Proposal)
      * @dev Called after successful vote. Executes the call and unlocks funds.
      *      Empty data on DAO target = Resolution (symbolic vote, no execution)
+     *
+     *      If the external call reverts, the proposal is still marked as executed
+     *      and funds are unlocked. This prevents permanently locked treasury funds
+     *      when a passed proposal's call cannot succeed (e.g., transfer to a contract
+     *      without receive(), ERC20 blacklisted address, self-destructed target).
      */
     function _execute() internal override {
         super._execute();
@@ -179,21 +188,14 @@ contract GenericProposal is Proposal {
         if (data.length > 0 || target != address(dao)) {
             (bool success, bytes memory result) = target.call{value: value}(data);
             if (!success) {
-                // Include revert reason in error message for debugging
-                if (result.length > 0) {
-                    // Bubble up the revert reason
-                    assembly {
-                        let result_size := mload(result)
-                        revert(add(32, result), result_size)
-                    }
-                } else {
-                    revert("Execution failed: no revert reason");
-                }
+                // Call failed, but we still resolve the proposal to prevent
+                // permanently locked treasury funds. Emit the failure reason
+                // so the DAO can diagnose and create a new proposal if needed.
+                emit ExecutionFailed(result);
             }
         }
         // else: Resolution proposal with empty data on DAO - just mark executed
 
-        executed = true;
         _unlockFunds();
         dao.clearActiveProposal();
     }
