@@ -101,6 +101,8 @@ abstract contract Proposal {
     }
     
     function addSupport(uint256 amount) external onlyBeforeElection {
+        require(amount > 0, "Support amount must be greater than 0");
+
         // Check if proposal has expired
         require(
             block.number < createdAt + dao.maxProposalAge(),
@@ -162,9 +164,15 @@ abstract contract Proposal {
         if (block.number >= createdAt + dao.maxProposalAge()) {
             return false;
         }
+        // Cannot trigger election when no tokens are vested — prevents zero-threshold
+        // griefing where addSupport(0) triggers an election that is immediately failProposal()-able
+        uint256 totalVested = dao.getTotalVestedSupply();
+        if (totalVested == 0) {
+            return false;
+        }
         // Use vested supply for consistency with quorum calculation
         // This ensures threshold is based on tokens that can actually vote
-        uint256 threshold = (dao.getTotalVestedSupply() * dao.supportThreshold()) / 10000;
+        uint256 threshold = (totalVested * dao.supportThreshold()) / 10000;
         return supportTotal >= threshold;
     }
     
