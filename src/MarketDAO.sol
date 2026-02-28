@@ -252,12 +252,16 @@ contract MarketDAO is ERC1155, ReentrancyGuard {
 
         _addGovernanceTokenHolder(msg.sender);
 
-        // Add vesting schedule if vesting period is set
-        if (vestingPeriod > 0) {
+        // Always add a vesting schedule on purchase.
+        // When vestingPeriod == 0, a minimum 1-block lock is used to ensure tokens
+        // purchased after an election starts cannot inflate voting power via
+        // vestedBalanceAt(), which reads current balance but only subtracts locks
+        // active at the snapshot block.
+        {
             // Clean up expired schedules first
             _cleanupExpiredSchedules(msg.sender);
 
-            uint256 unlockBlock = block.number + vestingPeriod;
+            uint256 unlockBlock = block.number + (vestingPeriod > 0 ? vestingPeriod : 1);
             VestingSchedule[] storage schedules = vestingSchedules[msg.sender];
 
             // Try to consolidate with existing schedule at same unlock time

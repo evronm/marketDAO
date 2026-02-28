@@ -224,7 +224,7 @@ contract VestingTest is TestHelper {
         assertEq(dao.vestedBalance(bob), 50);
     }
 
-    function testNoVestingWhenPeriodIsZero() public {
+    function testMinimalVestingWhenPeriodIsZero() public {
         // Create DAO without vesting
         address[] memory initialHolders = new address[](0);
         uint256[] memory initialAmounts = new uint256[](0);
@@ -246,8 +246,12 @@ contract VestingTest is TestHelper {
         vm.prank(attacker);
         noVestingDao.purchaseTokens{value: 0.5 ether}();
 
-        // Tokens should be immediately available
+        // Tokens are minted but locked for 1 block to prevent election snapshot inflation
         assertEq(noVestingDao.balanceOf(attacker, 0), 5);
+        assertEq(noVestingDao.vestedBalance(attacker), 0);
+
+        // After 1 block, tokens vest
+        vm.roll(block.number + 1);
         assertEq(noVestingDao.vestedBalance(attacker), 5);
     }
 }

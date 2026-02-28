@@ -154,6 +154,11 @@ contract PurchaseRestrictionsTest is TestHelper {
         daoRestricted.purchaseTokens{value: 1 ether}();
         assertEq(daoRestricted.balanceOf(bob, 0), 60);
 
+        // Advance past the 1-block minimum vesting lock and claim
+        vm.roll(block.number + 1);
+        vm.prank(bob);
+        daoRestricted.claimVestedTokens();
+
         // Bob transfers all tokens to Alice
         vm.prank(bob);
         daoRestricted.safeTransferFrom(bob, alice, 0, 60, "");
