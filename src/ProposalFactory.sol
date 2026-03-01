@@ -14,6 +14,10 @@ contract ProposalFactory {
     address public genericImpl;
     address public distributionImpl;
 
+    // Events
+    event ProposalCreated(uint256 indexed id, address indexed proposal, address indexed proposer, string description);
+    event DistributionProposalCreated(uint256 indexed id, address indexed proposal, address indexed proposer, string description);
+
     constructor(
         MarketDAO _dao,
         address _genericImpl,
@@ -81,7 +85,9 @@ contract ProposalFactory {
         address clone = Clones.clone(genericImpl);
         GenericProposal(clone).initialize(dao, description, msg.sender, target, value, data);
         dao.setActiveProposal(clone);
-        proposals[proposalCount++] = clone;
+        uint256 id = proposalCount++;
+        proposals[id] = clone;
+        emit ProposalCreated(id, clone, msg.sender, description);
         return GenericProposal(clone);
     }
 
@@ -101,7 +107,9 @@ contract ProposalFactory {
             amountPerToken
         );
         dao.setActiveProposal(clone);
-        proposals[proposalCount++] = clone;
+        uint256 id = proposalCount++;
+        proposals[id] = clone;
+        emit DistributionProposalCreated(id, clone, msg.sender, description);
         return DistributionProposal(clone);
     }
 

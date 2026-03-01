@@ -105,6 +105,8 @@ contract DistributionProposal is Proposal {
     // Events
     event RedemptionContractDeployed(address indexed redemptionContract);
     event UserRegisteredForDistribution(address indexed user, uint256 governanceTokenBalance);
+    event DistributionExecuted(uint256 totalAmount, address indexed redemptionContract);
+    event DistributionFailed();
 
     // Errors
     error RedemptionNotDeployed();
@@ -135,6 +137,8 @@ contract DistributionProposal is Proposal {
 
     // Override to unlock funds when proposal fails
     function _unlockFunds() internal override {
+        emit DistributionFailed();
+
         dao.unlockFunds();
 
         // Clear the active redemption contract so another distribution proposal can proceed
@@ -235,6 +239,8 @@ contract DistributionProposal is Proposal {
         // ============ END M-01 FIX ============
 
         // Note: executed is already set to true by super._execute()
+
+        emit DistributionExecuted(totalAmount, address(redemptionContract));
 
         // Unlock funds (they've been transferred to redemption contract)
         dao.unlockFunds();
